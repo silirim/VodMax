@@ -1,5 +1,6 @@
 // Language (Italian for Italian browsers, else English; remembered), and
-// the download links of the newest release, read from GitHub.
+// the download links of the newest stable release, read from GitHub (betas
+// are offered only to who opts in, never from the site).
 "use strict";
 (() => {
   const root = document.documentElement;
@@ -12,11 +13,11 @@
     try { localStorage.setItem("lang", l); } catch { /* private mode */ }
     set(l);
   };
-  fetch("https://api.github.com/repos/silirim/VodMax/releases?per_page=10")
-    .then((r) => (r.ok ? r.json() : []))
-    .then((list) => {
-      const rel = list.find((r) => !r.draft);
-      if (!rel) return;
+  // releases/latest skips drafts and pre-releases.
+  fetch("https://api.github.com/repos/silirim/VodMax/releases/latest")
+    .then((r) => (r.ok ? r.json() : null))
+    .then((rel) => {
+      if (!rel || !Array.isArray(rel.assets)) return;
       for (const v of document.querySelectorAll(".ver")) v.textContent = rel.tag_name;
       for (const a of document.querySelectorAll("[data-asset]")) {
         const asset = rel.assets.find((x) => x.name.endsWith(a.dataset.asset));
