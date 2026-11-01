@@ -59,8 +59,12 @@ func (s *Store) Profile(ctx context.Context, id int64) (Profile, error) {
 var ErrNameTaken = errors.New("esiste già un profilo con questo nome")
 
 func (s *Store) AddProfile(ctx context.Context, p Profile) (int64, error) {
-	res, err := s.w.ExecContext(ctx, `INSERT INTO profile (name, kind, pin_hash, color, avatar, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		p.Name, p.Kind, p.PINHash, p.Color, p.Avatar, time.Now().Unix())
+	// SQLite reuses the id of a deleted profile: a new profile starts from
+	// an epoch no earlier selection can carry, so an old profile token never
+	// opens it.
+	now := time.Now()
+	res, err := s.w.ExecContext(ctx, `INSERT INTO profile (name, kind, pin_hash, pin_epoch, color, avatar, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		p.Name, p.Kind, p.PINHash, now.UnixNano(), p.Color, p.Avatar, now.Unix())
 	if isUnique(err) {
 		return 0, ErrNameTaken
 	}

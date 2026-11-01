@@ -417,6 +417,27 @@ func (s *Service) DeleteProfile(ctx context.Context, id int64) error {
 			return err
 		}
 	}
+	// A device locked to this profile would be left unlocked (it would see
+	// every profile), and an account of the home login would move to the
+	// next profile that gets the same id: both are fixed by the admin first.
+	devices, err := s.st.Devices(ctx)
+	if err != nil {
+		return err
+	}
+	for _, d := range devices {
+		if d.ProfileLock != nil && *d.ProfileLock == id {
+			return invalid("il dispositivo «%s» è bloccato su questo profilo: sbloccalo o rimuovilo prima", d.Name)
+		}
+	}
+	sso, _, err := s.SSOSettings(ctx)
+	if err != nil {
+		return err
+	}
+	for _, a := range sso.Accounts {
+		if a.ProfileID == id {
+			return invalid("l'account «%s» dell'accesso di casa è collegato a questo profilo: collegalo a un altro profilo prima", a.Account)
+		}
+	}
 	return s.st.DeleteProfile(ctx, id)
 }
 

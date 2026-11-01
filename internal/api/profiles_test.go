@@ -316,3 +316,47 @@ func TestOwnAvatar(t *testing.T) {
 		t.Fatalf("avatars: %s", b)
 	}
 }
+
+// A deleted profile's id comes back with the next profile (SQLite reuses
+// it): a token chosen for the old one must not open the new one, and a
+// profile still used by a locked device or a home-login account is not
+// deleted silently.
+func TestDeletedProfileTokenAndLinks(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.do(t, "PATCH", "/api/v1/profiles/1", map[string]any{"pin": "9753"}, true)
+	add := func(body map[string]any) int64 {
+		code, out := e.do(t, "POST", "/api/v1/profiles", body, true)
+		var r struct{ ID int64 }
+		if code != 201 || json.Unmarshal(out, &r) != nil {
+			t.Fatalf("add profile: %d %s", code, out)
+		}
+		return r.ID
+	}
+	guest := add(map[string]any{"name": "Ospite", "kind": "standard"})
+	tv := pair(t, e, "TV", nil)
+	code, tok := selectProfile(t, e, tv, guest, "")
+	if code != 200 || tok == "" {
+		t.Fatalf("select: %d", code)
+	}
+	if code, _ := e.do(t, "DELETE", "/api/v1/profiles/"+strconv.FormatInt(guest, 10), nil, true); code != 204 {
+		t.Fatalf("delete: %d", code)
+	}
+	boss := add(map[string]any{"name": "Capo", "kind": "admin", "pin": "8642"})
+	if boss != guest {
+		t.Skipf("id not reused (%d, %d): nothing to check", guest, boss)
+	}
+	if code, body := e.call(t, "GET", "/api/v1/me", nil, tv, tok); code == 200 && strings.Contains(string(body), `"admin":true`) {
+		t.Fatalf("old token opens the new admin profile: %s", body)
+	}
+	if code, _ := e.call(t, "GET", "/api/v1/vpn", nil, tv, tok); code == 200 {
+		t.Fatal("old token reaches admin routes")
+	}
+
+	// Locked device.
+	kids := add(map[string]any{"name": "Bimbi", "kind": "kids"})
+	pair(t, e, "Tablet", &kids)
+	code, body := e.do(t, "DELETE", "/api/v1/profiles/"+strconv.FormatInt(kids, 10), nil, true)
+	if code != 400 || !strings.Contains(string(body), "Tablet") {
+		t.Fatalf("profile of a locked device deleted: %d %s", code, body)
+	}
+}
