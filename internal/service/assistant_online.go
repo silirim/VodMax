@@ -113,11 +113,15 @@ func claudeError(err error) error {
 }
 
 // AssistantModels lists the models a service offers, with the stored key
-// when key is empty.
+// when key is empty and it was given for this same service or address.
 func (s *Service) AssistantModels(ctx context.Context, mode, provider, base, key string) ([]string, error) {
 	if key == "" {
+		to := AssistantSettings{Mode: mode, Provider: provider, URL: strings.TrimSuffix(strings.TrimRight(strings.TrimSpace(base), "/"), "/chat/completions")}
+		if mode != "online" {
+			to.Mode = "server"
+		}
 		var err error
-		if key, err = s.secretSetting(ctx, assistantSecretKey); err != nil {
+		if key, err = s.assistantSecret(ctx, to); err != nil {
 			return nil, err
 		}
 	}

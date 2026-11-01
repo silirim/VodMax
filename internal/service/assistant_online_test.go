@@ -90,3 +90,63 @@ func TestAssistantSettingsFromBeta2(t *testing.T) {
 		t.Fatalf("answer %q, %v", answer, err)
 	}
 }
+
+// A key goes only where it was given: an online key never reaches an
+// address typed as "your server", nor another online service, and a key
+// saved before the scope existed keeps working where it was saved.
+func TestAssistantKeyStaysWithItsService(t *testing.T) {
+	var auth []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth = append(auth, r.Header.Get("Authorization"))
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/v1/models" {
+			fmt.Fprint(w, `{"data":[{"id":"m1"}]}`)
+			return
+		}
+		fmt.Fprint(w, `{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`)
+	}))
+	defer srv.Close()
+	s, _ := localTestService(t)
+	ctx := context.Background()
+	k := "sk-online"
+	if err := s.SetAssistant(ctx, AssistantInput{Enabled: true, Mode: "online", Provider: "openai", Model: "gpt-x", Key: &k}); err != nil {
+		t.Fatal(err)
+	}
+	// The same address as a home server: no key.
+	if err := s.SetAssistant(ctx, AssistantInput{Enabled: true, Mode: "server", URL: srv.URL + "/v1", Model: "m1"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, has, _ := s.AssistantSettings(ctx); has {
+		t.Fatal("online key shown as the server's")
+	}
+	s.TestAssistant(ctx)
+	s.AssistantModels(ctx, "server", "", srv.URL+"/v1", "")
+	for _, h := range auth {
+		if h != "" {
+			t.Fatalf("online key sent to the home server: %q", h)
+		}
+	}
+	// Another online service does not get it either.
+	if err := s.SetAssistant(ctx, AssistantInput{Enabled: true, Mode: "online", Provider: "mistral", Model: "mistral-x"}); err == nil {
+		t.Fatal("mistral turned on with the OpenAI key")
+	}
+
+	// A key given for the server is used there.
+	auth = nil
+	sk := "sk-server"
+	if err := s.SetAssistant(ctx, AssistantInput{Enabled: true, Mode: "server", URL: srv.URL + "/v1", Model: "m1", Key: &sk}); err != nil {
+		t.Fatal(err)
+	}
+	s.TestAssistant(ctx)
+	if len(auth) == 0 || auth[len(auth)-1] != "Bearer sk-server" {
+		t.Fatalf("server key not sent: %q", auth)
+	}
+
+	// Saved before 0.6.0-beta.7: no scope, it belongs to the saved settings.
+	s.st.DeleteSetting(ctx, assistantKeyFor)
+	auth = nil
+	s.TestAssistant(ctx)
+	if len(auth) == 0 || auth[len(auth)-1] != "Bearer sk-server" {
+		t.Fatalf("older key lost: %q", auth)
+	}
+}

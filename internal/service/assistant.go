@@ -32,7 +32,8 @@ import (
 const (
 	assistantKey       = "assistant"
 	assistantSecretKey = "assistant_key"
-	assistantTimeout   = 5 * time.Minute // a small model on a processor reads ~50 tokens a second
+	assistantKeyFor    = "assistant_key_for" // where the key was given for
+	assistantTimeout   = 5 * time.Minute     // a small model on a processor reads ~50 tokens a second
 	tonightCache       = 20 * time.Minute
 )
 
@@ -72,8 +73,50 @@ func (s *Service) AssistantSettings(ctx context.Context) (AssistantSettings, boo
 	if err := s.st.Setting(ctx, assistantKey, &a); err != nil {
 		return a, false, err
 	}
-	key, err := s.secretSetting(ctx, assistantSecretKey)
+	key, err := s.assistantSecret(ctx, a)
 	return a, key != "", err
+}
+
+// keyScope names where a key is sent: a service, or a server address. A
+// key given for one never goes to another (an online key must not reach
+// any address typed as "your server", nor one service's key another).
+func keyScope(a AssistantSettings) string {
+	switch a.Mode {
+	case "online":
+		return "online:" + a.Provider
+	case "local":
+		return ""
+	}
+	return "server:" + a.URL
+}
+
+// assistantSecret returns the stored key if it was given for where a
+// sends its requests, "" otherwise.
+func (s *Service) assistantSecret(ctx context.Context, a AssistantSettings) (string, error) {
+	key, err := s.secretSetting(ctx, assistantSecretKey)
+	if err != nil || key == "" {
+		return "", err
+	}
+	scope, err := s.assistantKeyScope(ctx)
+	if err != nil || scope != keyScope(a) {
+		return "", err
+	}
+	return key, nil
+}
+
+// assistantKeyScope reads where the key was given for. Keys saved before
+// 0.6.0-beta.7 have no scope: they belong to the settings saved with them.
+func (s *Service) assistantKeyScope(ctx context.Context) (string, error) {
+	var scope string
+	if err := s.st.Setting(ctx, assistantKeyFor, &scope); err != nil || scope != "" {
+		return scope, err
+	}
+	var saved AssistantSettings
+	if err := s.st.Setting(ctx, assistantKey, &saved); err != nil {
+		return "", err
+	}
+	scope = keyScope(saved)
+	return scope, s.st.SetSetting(ctx, assistantKeyFor, scope)
 }
 
 // AssistantInput changes the settings; Key nil keeps the current one, ""
@@ -131,13 +174,21 @@ func (s *Service) SetAssistant(ctx context.Context, in AssistantInput) error {
 	if a.Enabled && a.Model == "" {
 		return invalid("per accendere l'assistente serve un modello")
 	}
+	// Pin an older key to the settings it was saved with before they change.
+	if _, err := s.assistantKeyScope(ctx); err != nil {
+		return err
+	}
 	if in.Key != nil {
-		if err := s.setSecretSetting(ctx, assistantSecretKey, strings.TrimSpace(*in.Key)); err != nil {
+		key := strings.TrimSpace(*in.Key)
+		if err := s.setSecretSetting(ctx, assistantSecretKey, key); err != nil {
+			return err
+		}
+		if err := s.st.SetSetting(ctx, assistantKeyFor, keyScope(a)); err != nil {
 			return err
 		}
 	}
 	if a.Enabled && a.Mode == "online" {
-		if key, err := s.secretSetting(ctx, assistantSecretKey); err != nil || key == "" {
+		if key, err := s.assistantSecret(ctx, a); err != nil || key == "" {
 			return invalid("per un servizio online serve la chiave API")
 		}
 	}
@@ -179,7 +230,7 @@ func (s *Service) chat(ctx context.Context, a AssistantSettings, messages []chat
 		base, model = b, m
 	default:
 		var err error
-		if key, err = s.secretSetting(ctx, assistantSecretKey); err != nil {
+		if key, err = s.assistantSecret(ctx, a); err != nil {
 			return "", err
 		}
 		if a.Mode == "online" {
