@@ -639,6 +639,12 @@
 
   // ---- Start ----
   async function start() {
+    // No radio channels: no Radio list (nothing behind it).
+    const radio = await load({ section: "radio" }).catch(() => []);
+    if (!radio.length) {
+      LISTS.splice(LISTS.findIndex((l) => l.id === "radio"), 1);
+      if (state.listIndex >= LISTS.length) { state.listIndex = 0; store.set("list", 0); }
+    }
     try { await refreshChannels(); } catch (e) { if (!e.handled) flash(e.message); return; }
     if (state.channels.length === 0) { flash(t("Nessun canale: sincronizza un abbonamento")); return; }
     // From the guide: /tv.html?channel=ID.

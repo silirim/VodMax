@@ -120,7 +120,9 @@ func (s *Service) checkVPNs(ctx context.Context, log *slog.Logger) {
 	}
 	used := map[int64]bool{}
 	for _, sub := range subs {
-		used[sub.VPNID] = true
+		if sub.VPNID != 0 { // collections (folders) need no VPN
+			used[sub.VPNID] = true
+		}
 	}
 	now := time.Now()
 	for id := range used {

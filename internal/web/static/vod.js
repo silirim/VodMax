@@ -416,7 +416,8 @@
     const [list, space, who] = await Promise.all([api("GET", "/api/v1/recordings"), api("GET", "/api/v1/recordings/space"),
       window.VodMax.me().catch(() => null)]);
     const kids = who && who.profile && who.profile.kind === "kids";
-    const gb = (b) => (b / 1e9).toLocaleString(locale, { maximumFractionDigits: 1 }) + " GB";
+    const gb = (b) => b >= 1e9 ? (b / 1e9).toLocaleString(locale, { maximumFractionDigits: 1 }) + " GB"
+      : Math.round(b / 1e6).toLocaleString(locale) + " MB"; // a short recording is not "0 GB"
     const day = (ts) => new Date(ts * 1000).toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
     const usage = [t("Usati {size}", { size: gb(space.used_bytes) }), space.free_bytes >= 0 ? t("liberi {size}", { size: gb(space.free_bytes) }) : "",
       space.max_gb ? t("limite {n} GB", { n: space.max_gb }) : "", space.keep_days ? t("si tengono {n} giorni", { n: space.keep_days }) : ""].filter(Boolean).join(" · ");
