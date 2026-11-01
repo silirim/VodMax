@@ -133,6 +133,7 @@
   "l'assistente integrato non è pronto: il modello si sta ancora caricando, riprova tra poco": "l'assistente integrato non è pronto: il modello si sta ancora caricando, riprova tra poco",
   "l'assistente non è configurato: Impostazioni → Assistente": "l'assistente non è configurato: Impostazioni → Assistente",
   "l'indirizzo del provider di accesso deve iniziare con https://": "l'indirizzo del provider di accesso deve iniziare con https://",
+  "l'indirizzo del server non deve contenere nome utente e password: usa i campi appositi": "l'indirizzo del server non deve contenere nome utente e password: usa i campi appositi",
   "la cartella %s non esiste": "la cartella %s non esiste",
   "la cartella %s non esiste o il server non la vede (permessi dell'utente del servizio, cartelle nascoste dal servizio)": "la cartella %s non esiste o il server non la vede (permessi dell'utente del servizio, cartelle nascoste dal servizio)",
   "la cartella %s non è leggibile dal server": "la cartella %s non è leggibile dal server",

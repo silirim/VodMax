@@ -310,6 +310,9 @@ func (s *Service) AddSubscription(ctx context.Context, in SubscriptionInput) (in
 	var sec subscriptionSecret
 	switch in.Kind {
 	case "xtream":
+		if err := noCredentialsIn(in.Server); err != nil {
+			return 0, err
+		}
 		if _, err := xtream.New(in.Server, in.Username, in.Password, nil); err != nil {
 			return 0, invalid("%v", err)
 		}
@@ -324,6 +327,9 @@ func (s *Service) AddSubscription(ctx context.Context, in SubscriptionInput) (in
 		sec.URL = u.String()
 	case "stalker":
 		mac, err := stalker.NormalizeMAC(in.MAC)
+		if err == nil {
+			err = noCredentialsIn(in.Server)
+		}
 		if err == nil {
 			_, err = stalker.New(in.Server, mac, nil)
 		}
@@ -409,6 +415,11 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 		if p.Password != nil && *p.Password != "" {
 			sec.Password = *p.Password
 		}
+		if p.Server != nil {
+			if err := noCredentialsIn(set.Server); err != nil {
+				return err
+			}
+		}
 		if _, err := xtream.New(set.Server, set.Username, sec.Password, nil); err != nil {
 			return invalid("%v", err)
 		}
@@ -434,6 +445,11 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 				return invalid("%v", err)
 			}
 			sec.MAC = mac
+		}
+		if p.Server != nil {
+			if err := noCredentialsIn(set.Server); err != nil {
+				return err
+			}
 		}
 		if _, err := stalker.New(set.Server, sec.MAC, nil); err != nil {
 			return invalid("%v", err)
@@ -498,6 +514,7 @@ func (s *Service) Subscriptions(ctx context.Context) ([]SubscriptionView, error)
 		s.mu.Lock()
 		syncing := s.syncing[sub.ID]
 		s.mu.Unlock()
+		sub.Settings = withoutCredentials(sub.Settings)
 		out = append(out, SubscriptionView{Subscription: sub, Counts: counts, Syncing: syncing})
 	}
 	return out, nil
@@ -735,4 +752,34 @@ func (s *Service) BrowseCategories(ctx context.Context, kind string) ([]store.Br
 		return nil, invalid("tipo non valido")
 	}
 	return s.st.BrowseCategories(ctx, kind, viewerOf(ctx).Kids)
+}
+
+// noCredentialsIn refuses a server address with a user name or password in
+// it: they have their own sealed fields, while the address is shown.
+func noCredentialsIn(server string) error {
+	if u, err := url.Parse(strings.TrimSpace(server)); err == nil && u.User != nil {
+		return invalid("l'indirizzo del server non deve contenere nome utente e password: usa i campi appositi")
+	}
+	return nil
+}
+
+// withoutCredentials hides a user name and password that an address saved
+// by an earlier version may carry.
+func withoutCredentials(settings json.RawMessage) json.RawMessage {
+	var m map[string]any
+	if json.Unmarshal(settings, &m) != nil {
+		return settings
+	}
+	server, _ := m["server"].(string)
+	u, err := url.Parse(server)
+	if server == "" || err != nil || u.User == nil {
+		return settings
+	}
+	u.User = nil
+	m["server"] = u.String()
+	out, err := json.Marshal(m)
+	if err != nil {
+		return settings
+	}
+	return out
 }

@@ -3,9 +3,12 @@ package api
 import (
 	"bytes"
 	"compress/gzip"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -84,5 +87,48 @@ func TestExternalGuideFillsGaps(t *testing.T) {
 	}
 	if _, body := e.do(t, "GET", "/api/v1/status", nil, true); !strings.Contains(string(body), "Rotta") {
 		t.Fatalf("status: %s", body)
+	}
+}
+
+// Passwords and keys in addresses are not shown: the guide address hides
+// them (and keeps them when the hidden form comes back), a server address
+// with user and password is refused.
+func TestAddressesHideSecrets(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.do(t, "POST", "/api/v1/guide/sources", map[string]string{"name": "Pay", "url": "https://u:segreto@epg.example/g.xml?apikey=K123&country=it"}, true)
+	_, body := e.do(t, "GET", "/api/v1/guide/sources", nil, true)
+	if strings.Contains(string(body), "segreto") || strings.Contains(string(body), "K123") || !strings.Contains(string(body), "country=it") {
+		t.Fatalf("guide address: %s", body)
+	}
+	var list []struct {
+		ID  int64  `json:"id"`
+		URL string `json:"url"`
+	}
+	json.Unmarshal(body, &list)
+	var shown string
+	for _, g := range list {
+		if strings.Contains(g.URL, "epg.example") {
+			shown = g.URL
+			e.do(t, "PATCH", "/api/v1/guide/sources/"+strconv.FormatInt(g.ID, 10), map[string]any{"name": "Pay 2", "url": g.URL}, true)
+		}
+	}
+	if shown == "" {
+		t.Fatalf("source missing: %s", body)
+	}
+	db, err := sql.Open("sqlite", e.dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var stored, name string
+	db.QueryRow(`SELECT url, name FROM guide_source WHERE url LIKE '%epg.example%'`).Scan(&stored, &name)
+	if !strings.Contains(stored, "segreto") || !strings.Contains(stored, "K123") || name != "Pay 2" {
+		t.Fatalf("stored address after the edit: %q %q", stored, name)
+	}
+
+	code, body := e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "C", "kind": "xtream", "vpn_id": 1,
+		"server": "http://bob:pw@127.0.0.1:1", "username": "u", "password": "p"}, true)
+	if code != 400 || strings.Contains(string(body), "pw@") {
+		t.Fatalf("server with credentials: %d %s", code, body)
 	}
 }

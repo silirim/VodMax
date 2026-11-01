@@ -133,6 +133,7 @@
   "l'assistente integrato non è pronto: il modello si sta ancora caricando, riprova tra poco": "the built-in assistant isn't ready: the model is still loading, try again shortly",
   "l'assistente non è configurato: Impostazioni → Assistente": "the assistant isn't set up: Settings → Assistant",
   "l'indirizzo del provider di accesso deve iniziare con https://": "the address of the sign-in provider must start with https://",
+  "l'indirizzo del server non deve contenere nome utente e password: usa i campi appositi": "the server address must not contain a user name and password: use their own fields",
   "la cartella %s non esiste": "the folder %s doesn't exist",
   "la cartella %s non esiste o il server non la vede (permessi dell'utente del servizio, cartelle nascoste dal servizio)": "the folder %s doesn't exist or the server can't see it (service user permissions, folders hidden from the service)",
   "la cartella %s non è leggibile dal server": "the server can't read the folder %s",

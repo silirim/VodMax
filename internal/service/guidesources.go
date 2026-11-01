@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -32,8 +33,38 @@ func checkGuideURL(raw string) (string, error) {
 	return u.String(), nil
 }
 
+// GuideSources lists the sources with any password or key in their
+// addresses hidden (hideURLSecrets); a patch that sends it back keeps the stored one.
 func (s *Service) GuideSources(ctx context.Context) ([]store.GuideSource, error) {
-	return s.st.GuideSources(ctx)
+	list, err := s.st.GuideSources(ctx)
+	for i := range list {
+		list[i].URL = hideURLSecrets(list[i].URL)
+	}
+	return list, err
+}
+
+// secretParam tells query parameters that usually carry a key or a password.
+var secretParam = regexp.MustCompile(`(?i)(key|token|pass|pwd|secret|auth|sig|user)`)
+
+// hideURLSecrets hides the password and the values of key-like parameters.
+func hideURLSecrets(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	if _, has := u.User.Password(); has {
+		u.User = url.UserPassword(u.User.Username(), "***")
+	}
+	if u.RawQuery != "" {
+		q := u.Query()
+		for k := range q {
+			if secretParam.MatchString(k) {
+				q[k] = []string{"***"}
+			}
+		}
+		u.RawQuery = q.Encode()
+	}
+	return u.String()
 }
 
 func (s *Service) AddGuideSource(ctx context.Context, name, rawURL string) (int64, error) {
@@ -66,7 +97,7 @@ func (s *Service) UpdateGuideSource(ctx context.Context, id int64, p GuideSource
 			return invalid("nome della guida obbligatorio (max 60 caratteri)")
 		}
 	}
-	if p.URL != nil {
+	if p.URL != nil && *p.URL != hideURLSecrets(g.URL) {
 		if g.URL, err = checkGuideURL(*p.URL); err != nil {
 			return err
 		}
