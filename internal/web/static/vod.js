@@ -28,10 +28,10 @@
   function poster(item, title) {
     if (item.logo) {
       const img = el("img", { className: "poster", src: item.logo, alt: "", loading: "lazy" });
-      img.onerror = () => img.replaceWith(el("div", { className: "poster" }, title));
+      img.onerror = () => img.replaceWith(el("div", { className: "poster" }, el("span", { className: "poster-title" }, title)));
       return img;
     }
-    return el("div", { className: "poster" }, title);
+    return el("div", { className: "poster" }, el("span", { className: "poster-title" }, title));
   }
 
   function itemCard(item) {

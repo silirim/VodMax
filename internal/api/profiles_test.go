@@ -374,3 +374,25 @@ func TestPairingLimitMessage(t *testing.T) {
 		t.Fatalf("sixth code: %d %s", code, body)
 	}
 }
+
+// Server problems are for administrators: a kids profile sees none.
+func TestStatusProblemsOnlyForAdmins(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.do(t, "PATCH", "/api/v1/profiles/1", map[string]any{"pin": "9753"}, true)
+	code, out := e.do(t, "POST", "/api/v1/profiles", map[string]any{"name": "Bimbi", "kind": "kids"}, true)
+	var kids struct{ ID int64 }
+	if code != 201 || json.Unmarshal(out, &kids) != nil {
+		t.Fatalf("kids: %d %s", code, out)
+	}
+	// A standard profile without PIN is a problem for the admin.
+	e.do(t, "POST", "/api/v1/profiles", map[string]any{"name": "Ospite", "kind": "standard"}, true)
+	_, body := e.do(t, "GET", "/api/v1/status", nil, true)
+	if !strings.Contains(string(body), `"area"`) {
+		t.Fatalf("admin sees no problems: %s", body)
+	}
+	tablet := pair(t, e, "Tablet", &kids.ID)
+	_, tok := selectProfile(t, e, tablet, kids.ID, "")
+	if code, body := e.call(t, "GET", "/api/v1/status", nil, tablet, tok); code != 200 || !strings.Contains(string(body), `"problems":[]`) {
+		t.Fatalf("kids status: %d %s", code, body)
+	}
+}

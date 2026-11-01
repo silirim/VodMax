@@ -816,7 +816,8 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
         state.assistantMode = null;
         await render();
         assistantPromo();
-        if (test && body.enabled) document.querySelector("#content .assistant-try")?.click();
+        const tryIt = test && body.enabled && document.querySelector("#content .assistant-try");
+        if (tryIt) tryIt.click(); // no "?.": old Android WebViews cannot read it
       } catch (e) { flash(e.message); }
     };
 

@@ -7,7 +7,7 @@
 /* Detail */
 .detail {
   position: fixed;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   z-index: 6; /* above the sticky header */
   overflow-y: auto;
   padding: 4vh 6vw;
@@ -17,6 +17,7 @@
 .detail-head { display: flex; gap: 2rem; align-items: flex-start; }
 .detail-head > div { flex: 1; min-width: 0; } /* the text never runs off the screen */
 .detail-head img { width: 14rem; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 12px; background: var(--raised); }
+@supports not (aspect-ratio: 2 / 3) { .detail-head img { height: 21rem; } }
 .detail h1 { margin: 0 0 0.5rem; font-size: 2rem; }
 .meta { color: var(--soft); }
 .actions { margin-top: 1.4rem; }
@@ -86,7 +87,7 @@
 .recs .state.recording { color: var(--rec); font-weight: 600; }
 
 /* Player */
-.player { position: fixed; inset: 0; z-index: 7; /* above the detail it starts from */ background: #000; }
+.player { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 7; /* above the detail it starts from */ background: #000; }
 .player video { width: 100%; height: 100%; object-fit: contain; }
 .player-bar {
   position: absolute;
@@ -186,6 +187,7 @@
   border-radius: 10px;
 }
 #server-problems.error { border-color: var(--rec); }
+#server-problems.compact { max-width: 2.6rem; max-height: 2.6rem; overflow: hidden; white-space: nowrap; padding-left: 0.75rem; padding-right: 0.75rem; }
 
 .pair-code { font-size: 3.2rem; font-weight: 700; letter-spacing: 0.2em; text-align: center; margin: 1.2rem 0; }
 .setup-panel .hint { color: var(--soft); font-size: 0.9rem; }
@@ -210,7 +212,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 
 /* Detail page: backdrop behind a dark gradient, plot and credits. */
 .detail.with-backdrop { background-size: cover; background-position: center top; }
-.detail.with-backdrop::before { content: ""; position: fixed; inset: 0; z-index: -1;
+.detail.with-backdrop::before { content: ""; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: -1;
   background: linear-gradient(90deg, rgba(8, 9, 11, 0.97) 35%, rgba(8, 9, 11, 0.7) 70%, rgba(8, 9, 11, 0.5)); }
 .detail { isolation: isolate; }
 .plot { max-width: 48rem; line-height: 1.5; margin: 1rem 0; }
@@ -232,7 +234,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .rule-form input, .rule-form select { padding: 0.5em 0.7em; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
 .rule-form button { justify-self: start; min-width: 9rem; }
 .matches { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; color: var(--text); }
-.matches li { display: grid; gap: 0.15rem; padding: 0.6rem 0.9rem; background: var(--raised); border-radius: 10px; border-left: 3px solid var(--line); overflow-wrap: anywhere; }
+.matches li { display: grid; gap: 0.15rem; padding: 0.6rem 0.9rem; background: var(--raised); border-radius: 10px; border-left: 3px solid var(--line); overflow-wrap: anywhere; word-break: break-word; }
 .matches li.empty { display: block; background: none; border: 0; padding: 0; }
 .matches .when { color: var(--soft); font-size: 0.9rem; }
 .matches strong { color: var(--text); font-weight: 600; }
@@ -286,7 +288,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .hero.skeleton { border-radius: 0; animation: none; background: var(--surface); }
 .hero-art {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background-size: cover;
   background-position: center 20%;
   filter: blur(28px) brightness(0.5);
@@ -297,7 +299,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .hero::after {
   content: "";
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background: linear-gradient(90deg, rgba(11, 12, 16, 0.96) 0%, rgba(11, 12, 16, 0.75) 38%, rgba(11, 12, 16, 0.1) 75%),
     linear-gradient(0deg, var(--bg) 0%, rgba(11, 12, 16, 0) 40%);
 }
@@ -338,7 +340,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
   .detail { padding: 1rem 1rem calc(2rem + env(safe-area-inset-bottom)); }
   .detail-head { flex-direction: column; gap: 1rem; }
   .detail-head img { width: 9rem; }
-  .detail h1 { font-size: 1.6rem; overflow-wrap: anywhere; }
+  .detail h1 { font-size: 1.6rem; overflow-wrap: anywhere; word-break: break-word; }
   .detail .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .detail .actions .button { margin: 0; }
   .seasons { margin: 1.4rem 0 0.6rem; }
@@ -350,7 +352,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 @media (max-width: 800px) {
   .recs li button { grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 0.8rem; padding: 0.75rem 0.9rem; }
   .recs li button > span:nth-child(1) { color: var(--soft); font-size: 0.9rem; }
-  .recs li button > span:nth-child(2) { grid-column: 1 / -1; order: 3; overflow-wrap: anywhere; }
+  .recs li button > span:nth-child(2) { grid-column: 1 / -1; order: 3; overflow-wrap: anywhere; word-break: break-word; }
   .recs li button > span:nth-child(3) { text-align: right; font-size: 0.9rem; }
   .recs li button > span:nth-child(4) { order: 4; grid-column: 1 / -1; font-size: 0.85rem; }
   .recs li button > span:empty { display: none; }
@@ -366,7 +368,9 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 @media (max-width: 700px) {
   .player-bar { left: 0.6rem; right: 0.6rem; bottom: calc(0.6rem + env(safe-area-inset-bottom)); padding: 1rem 1rem 0.9rem; }
   .player-title { font-size: 1.05rem; }
-  .player-buttons { gap: 0.4rem; justify-content: space-between; flex-wrap: nowrap; }
+  /* On two lines when they do not fit (episodes add Next, tracks add
+     Audio and Subtitles): Close must stay on screen. */
+  .player-buttons { gap: 0.4rem; justify-content: center; flex-wrap: wrap; }
   .player-buttons button { padding: 0.6em 0.8em; }
   .player-buttons button[data-action="close"] { margin-left: 0; }
   .player-buttons button .lbl { display: none; }
@@ -376,7 +380,8 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 /* Episodes: "Skip intro" and the next episode, above the picture at the
    bottom right (higher while the commands show). */
 .player-extra { position: absolute; right: 4vw; bottom: 5vh; display: flex; flex-direction: column; align-items: flex-end; gap: 0.8rem; transition: bottom 0.2s; }
-.player:has(.player-bar:not(.idle)) .player-extra { bottom: calc(5vh + 12.5rem); }
+/* The bar shows when the cursor does (no :has(): webOS 22 ignores it). */
+.player:not(.cursor-hidden) .player-extra { bottom: calc(5vh + 12.5rem); }
 .player-extra button {
   display: inline-flex; align-items: center; gap: 0.45em;
   padding: 0.7em 1.4em; font: inherit; font-weight: 600; color: var(--text);
@@ -392,7 +397,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .next-buttons button { padding: 0.55em 1.1em; font-weight: 400; background: var(--bg); }
 @media (max-width: 700px) {
   .player-extra { right: 0.6rem; left: 0.6rem; bottom: calc(0.6rem + env(safe-area-inset-bottom)); }
-  .player:has(.player-bar:not(.idle)) .player-extra { bottom: calc(9.5rem + env(safe-area-inset-bottom)); }
+  .player:not(.cursor-hidden) .player-extra { bottom: calc(9.5rem + env(safe-area-inset-bottom)); }
   .next-card { width: 100%; }
 }
 
@@ -406,7 +411,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .rule-ask { display: grid; gap: 0.5rem; padding-bottom: 0.9rem; border-bottom: 1px solid var(--line); }
 .rule-ask button { justify-self: start; }
 .pick-art { position: relative; align-items: center; justify-content: center; padding: 0; background: #14161c; }
-.pick-art::before { content: ""; position: absolute; inset: -12%; background: var(--art) center / cover; filter: blur(16px) brightness(0.45); }
+.pick-art::before { content: ""; position: absolute; top: -12%; right: -12%; bottom: -12%; left: -12%; background: var(--art) center / cover; filter: blur(16px) brightness(0.45); }
 .pick-art img { position: absolute; top: 0; left: 50%; transform: translateX(-50%); height: 100%; width: auto; max-width: none; max-height: none; }
 .pick-art span { position: relative; padding: 0.7rem; }
-.pick-art.backdrop::before { inset: 0; filter: none; }
+.pick-art.backdrop::before { top: 0; right: 0; bottom: 0; left: 0; filter: none; }

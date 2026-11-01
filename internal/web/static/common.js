@@ -56,6 +56,17 @@ window.VodMax = (() => {
   function profileToken() { return store.get("profile", ""); }
   const handled = (msg) => Object.assign(new Error(msg), { handled: true });
 
+  // What is open, as classes on body for the style sheets (":has()" is too
+  // new for webOS 22 and older WebViews).
+  const syncOpen = () => {
+    const shown = (id) => { const e = document.getElementById(id); return Boolean(e && !e.hidden); };
+    const b = document.body;
+    b.classList.toggle("with-player", shown("player"));
+    b.classList.toggle("with-detail", shown("detail"));
+    b.classList.toggle("with-panel", Boolean(document.querySelector(".setup-panel, #my-profile, #update-banner, #picker")));
+  };
+  new MutationObserver(syncOpen).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"] });
+
   // Android keyboards close without sending a form unless the field says
   // what Enter does: every text field gets one, set before the keyboard
   // opens.
@@ -759,13 +770,27 @@ window.VodMax = (() => {
       if (!problems.length) { if (box) box.remove(); return; }
       if (!box) {
         box = Object.assign(document.createElement("a"), { id: "server-problems" });
+        const open = () => { box.classList.remove("compact"); clearTimeout(box.timer); box.timer = setTimeout(() => box.classList.add("compact"), 6000); };
+        box.addEventListener("focus", open);
+        box.addEventListener("mouseenter", open);
         // A page can give it a place of its own instead of floating.
         (document.getElementById("problems-slot") || document.body).append(box);
       }
       const error = problems.some((p) => p.level === "error");
-      box.className = error ? "error" : "warning";
+      box.classList.toggle("error", error);
+      box.classList.toggle("warning", !error);
       box.href = "/settings.html?view=" + (problems[0].area === "profile" ? "profiles" : "system");
-      box.textContent = "⚠ " + (problems.length > 1 ? t("{text} (e altri {count})", { text: problems[0].text, count: problems.length - 1 }) : problems[0].text);
+      const text = "⚠ " + (problems.length > 1 ? t("{text} (e altri {count})", { text: problems[0].text, count: problems.length - 1 }) : problems[0].text);
+      // Read once, then a small ⚠ that does not cover the page; focus or
+      // the pointer show the text again. A new problem shows it again too.
+      if (box.textContent !== text && box.dataset.text !== text) {
+        box.dataset.text = text;
+        box.textContent = text;
+        box.title = text;
+        box.classList.remove("compact");
+        clearTimeout(box.timer);
+        box.timer = setTimeout(() => box.classList.add("compact"), 10000);
+      }
     };
     check();
     setInterval(check, 30000);

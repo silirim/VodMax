@@ -13,7 +13,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: #000; color:
 .mv-label .name { font-weight: 600; white-space: nowrap; }
 .mv-label .now { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mv-label svg { width: 1.1em; height: 1.1em; margin-left: auto; flex: none; color: var(--accent); }
-.mv-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5em; color: var(--soft); text-align: center; padding: 1em; }
+.mv-empty { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5em; color: var(--soft); text-align: center; padding: 1em; }
 .mv-empty svg { width: 2.2em; height: 2.2em; }
 .mv-cell.active .mv-empty { color: var(--text); }
 .mv-bar { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.7rem;

@@ -1216,6 +1216,11 @@ func (a *api) status(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
+	// Problems are for who can fix them: a kids or standard profile is
+	// not shown "disk nearly full" or "the profile Marco has no PIN".
+	if !identity(r).Admin() {
+		st.Problems = []service.Problem{}
+	}
 	writeJSON(w, http.StatusOK, st)
 }
 
