@@ -144,3 +144,44 @@ func TestDownloads(t *testing.T) {
 		t.Fatal("empty window accepted")
 	}
 }
+
+// The downloads collection saved with another data folder (restored from a
+// backup, folder moved): it is pointed at this server's folder instead of
+// failing on its name, and the downloaded film shows up.
+func TestDownloadsCollectionFromAnotherFolder(t *testing.T) {
+	e, _ := tvSetup(t)
+	dir := t.TempDir()
+	old := filepath.Join(t.TempDir(), filepath.Base(dir), "Movies")
+	os.MkdirAll(old, 0o755)
+	if code, body := e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "Scaricati · Film", "kind": "local", "path": old, "content": "movie"}, true); code != 201 {
+		t.Fatalf("old collection: %d %s", code, body)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	if err := e.svc.StartDownloads(ctx, dir, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
+		t.Fatal(err)
+	}
+	e.do(t, "POST", "/api/v1/downloads", map[string]any{"media": "movie", "id": findItem(t, e, "movie", "1408")}, true)
+	waitDownloads(t, e, 1)
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+		_, body := e.do(t, "GET", "/api/v1/subscriptions", nil, true)
+		var subs []struct {
+			Name     string
+			Settings struct{ Path string }
+		}
+		json.Unmarshal(body, &subs)
+		n, here := 0, false
+		for _, s := range subs {
+			if strings.HasPrefix(s.Name, "Scaricati · Film") {
+				n++
+				here = here || s.Settings.Path == filepath.Join(dir, "Movies")
+			}
+		}
+		if n == 1 && here {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("downloads collection: %s", body)
+		}
+	}
+}

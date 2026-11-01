@@ -712,14 +712,37 @@ func (s *Service) syncDownloads(ctx context.Context, media string, allowDrop boo
 	if err != nil {
 		return
 	}
-	var id int64
+	var id, moved int64
+	taken := false
 	for _, x := range subs {
 		var set localSettings
-		if x.Kind == "local" && json.Unmarshal(x.Settings, &set) == nil && set.Path == folder {
+		if x.Kind != "local" || json.Unmarshal(x.Settings, &set) != nil {
+			continue
+		}
+		if set.Path == folder {
 			id = x.ID
+		}
+		if x.Name == name {
+			taken = true
+			// The same collection with the folder of another data directory
+			// (moved, or restored from a backup of another server).
+			downloadsLike := filepath.Base(set.Path) == sub && filepath.Base(filepath.Dir(set.Path)) == filepath.Base(dir)
+			if fi, err := os.Stat(set.Path); err != nil || !fi.IsDir() || downloadsLike {
+				moved = x.ID
+			}
+		}
+	}
+	if id == 0 && moved != 0 {
+		if err := s.UpdateSubscription(ctx, moved, SubscriptionPatch{Path: &folder}); err == nil {
+			id = moved
+		} else {
+			s.dl.log.Warn("raccolta dei download non aggiornata", "err", err)
 		}
 	}
 	if id == 0 {
+		if taken {
+			name += " (VodMax)" // the name of a collection made by hand
+		}
 		if id, err = s.AddSubscription(ctx, SubscriptionInput{Name: name, Kind: "local", Path: folder, Content: content}); err != nil {
 			s.dl.log.Warn("raccolta dei download non creata", "err", err)
 			return
