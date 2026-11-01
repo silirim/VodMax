@@ -80,7 +80,7 @@ func FromXtream(ctx context.Context, c *xtream.Client) (*Snapshot, error) {
 		return nil, err
 	}
 	for _, s := range live {
-		if IsSeparator(s.Name.String()) {
+		if IsSeparator(s.Name.String()) || !validEntry(s.Name, s.StreamID) {
 			snap.Skipped++
 			continue
 		}
@@ -100,6 +100,10 @@ func FromXtream(ctx context.Context, c *xtream.Client) (*Snapshot, error) {
 		return nil, err
 	}
 	for _, s := range vod {
+		if !validEntry(s.Name, s.StreamID) {
+			snap.Skipped++
+			continue
+		}
 		title, year := CleanTitle(s.Name.String())
 		if y := int(s.Year.Int()); y >= 1900 && y <= 2100 {
 			year = y
@@ -248,4 +252,11 @@ func tmdbID(s string) string {
 		return ""
 	}
 	return s
+}
+
+// validEntry leaves out entries with no real name or id (a broken line in
+// the provider's list would become a channel that plays nothing).
+func validEntry(name, id xtream.Flex) bool {
+	n := strings.TrimSpace(name.String())
+	return n != "" && n[0] != '[' && n[0] != '{' && id.Int() > 0
 }

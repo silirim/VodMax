@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -272,6 +273,7 @@ func (s *Service) SyncProviderGuide(ctx context.Context, subID int64) (GuideResu
 	s.guideDone(ctx, subID, err)
 	if err == nil {
 		s.syncExternalGuides(ctx)
+		s.applyRules(ctx, slog.Default()) // the guide may have moved programmes
 	}
 	return res, err
 }

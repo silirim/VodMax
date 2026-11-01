@@ -163,7 +163,7 @@ func first(v []string) string {
 
 // ParseTime reads XMLTV times: "20261028113910 +0100", with or without
 // seconds and offset (no offset means UTC); also written "…+0100",
-// "… +01:00" or "…Z".
+// "… +01:00", "… +01" or "…Z".
 func ParseTime(s string) (time.Time, error) {
 	s = strings.TrimSpace(s)
 	digits, offset, _ := strings.Cut(s, " ")
@@ -173,6 +173,9 @@ func ParseTime(s string) (time.Time, error) {
 	offset = strings.TrimSpace(offset)
 	if offset == "Z" {
 		offset = ""
+	}
+	if len(offset) == 3 { // "+01"
+		offset += "00"
 	}
 	if len(offset) == 6 && offset[3] == ':' {
 		offset = offset[:3] + offset[4:]

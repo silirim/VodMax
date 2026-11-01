@@ -148,6 +148,9 @@ func TestSyncProviderDownIs502(t *testing.T) {
 func TestSubscriptionNameTaken(t *testing.T) {
 	e := setup(t, true)
 	e.do(t, "POST", "/api/v1/vpn", map[string]string{"name": "VPN", "config": wgConf(t)}, true)
+	if code, body := e.do(t, "POST", "/api/v1/vpn", map[string]string{"name": "VPN", "config": wgConf(t)}, true); code != 400 || strings.Contains(string(body), "UNIQUE") {
+		t.Fatalf("same VPN name: %d %s", code, body)
+	}
 	sub := map[string]any{"name": "Casa", "kind": "xtream", "vpn_id": 1, "server": "http://127.0.0.1:1", "username": "u", "password": "p"}
 	e.do(t, "POST", "/api/v1/subscriptions", sub, true)
 	code, body := e.do(t, "POST", "/api/v1/subscriptions", sub, true)

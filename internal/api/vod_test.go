@@ -451,3 +451,25 @@ func TestFailedRecordingLeavesNoFile(t *testing.T) {
 		t.Fatalf("files left: %v", files)
 	}
 }
+
+// A stream that stops once and comes back: the recording ends normally at
+// its stop time but still says it has a hole.
+func TestRecordingKeepsTheNoteOfAGap(t *testing.T) {
+	e, p := tvSetup(t)
+	e.svc.SetRecordStall(300 * time.Millisecond)
+	p.mu.Lock()
+	p.stalls = map[string]bool{"101.ts": true}
+	p.mu.Unlock()
+	rai := channels(t, e, "?section=tv")[0]
+	now := time.Now().Unix()
+	e.do(t, "POST", "/api/v1/recordings", map[string]any{"channel_id": rai.ID, "start": now, "stop": now + 6, "title": "Buco"}, true)
+	time.Sleep(time.Second)
+	p.mu.Lock()
+	p.stalls = nil // healthy from the reconnection on
+	p.mu.Unlock()
+	time.Sleep(6 * time.Second)
+	_, body := e.do(t, "GET", "/api/v1/recordings", nil, true)
+	if !strings.Contains(string(body), `"status":"completed"`) || !strings.Contains(string(body), "smesso di mandare dati") {
+		t.Fatalf("recording with a gap: %s", body)
+	}
+}

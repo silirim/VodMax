@@ -274,7 +274,7 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusBadRequest
 	case errors.Is(err, store.ErrNotFound):
 		status = http.StatusNotFound
-	case errors.Is(err, store.ErrSubscriptionName):
+	case errors.Is(err, store.ErrSubscriptionName), errors.Is(err, store.ErrVPNName):
 		status = http.StatusBadRequest
 	case errors.As(err, &busy) && busy.Recording:
 		// Held by recordings: nobody can take it over (409 offers to).
@@ -678,7 +678,7 @@ func (a *api) syncGuide(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	res, err := a.svc.SyncProviderGuide(ctx, id)
 	if err != nil {
-		a.fail(w, r, err)
+		a.fail(w, r, &service.ProviderError{Err: err})
 		return
 	}
 	writeJSON(w, http.StatusOK, res)

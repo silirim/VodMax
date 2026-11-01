@@ -963,7 +963,9 @@
     if (r.error) flash(t("Riproduzione non riuscita: {error}", { error: r.error }));
     const position = (c.offset || 0) + r.position;
     const total = (c.sess && c.sess.duration) || r.duration;
-    if ((c.media === "movie" || c.media === "episode") && total > 0 && position > 5) {
+    // r.position 0: no answer from the player (closed by Android): the
+    // position it saved while playing stands.
+    if ((c.media === "movie" || c.media === "episode") && total > 0 && position > 5 && r.position > 0) {
       api("PUT", "/api/v1/progress/" + c.media + "/" + c.id, { position: Math.floor(position), duration: Math.floor(total) })
         .then(() => {
           if (state.detail && !$("detail").hidden) openDetail(state.detail); // the new position on the page

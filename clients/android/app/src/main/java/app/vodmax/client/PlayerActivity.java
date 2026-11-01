@@ -88,7 +88,7 @@ public class PlayerActivity extends Activity {
         @Override
         public void run() {
             updateEpisodeExtras();
-            if (System.currentTimeMillis() - lastSaved > 15_000) saveProgress();
+            if (System.currentTimeMillis() - lastSaved > 15_000 && player != null && player.isPlaying()) saveProgress();
             ticker.postDelayed(this, 500);
         }
     };
@@ -182,8 +182,34 @@ public class PlayerActivity extends Activity {
             }
 
             @Override
+            public long getContentPosition() {
+                return getCurrentPosition();
+            }
+
+            @Override
+            public long getBufferedPosition() {
+                return restarts ? offsetMs + super.getBufferedPosition() : super.getBufferedPosition();
+            }
+
+            @Override
+            public long getContentBufferedPosition() {
+                return getBufferedPosition();
+            }
+
+            @Override
             public long getDuration() {
                 return restarts && knownDurationMs > 0 ? knownDurationMs : super.getDuration();
+            }
+
+            @Override
+            public long getContentDuration() {
+                return getDuration();
+            }
+
+            @Override
+            public void seekTo(int mediaItemIndex, long positionMs) {
+                if (restarts) reopenAt(positionMs);
+                else super.seekTo(mediaItemIndex, positionMs);
             }
 
             @Override

@@ -37,7 +37,7 @@
   background: var(--bg); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
 .form .check { color: var(--text); }
 .check:hover { border-color: var(--soft); }
-.check:has(input:checked) { border-color: var(--text); }
+@supports selector(:has(a)) { .check:has(input:checked) { border-color: var(--text); } }
 .check:focus-within { border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus); }
 .form .check input, .check input { flex: none; width: 1.4rem; height: 1.4rem; margin: 0; padding: 0; accent-color: var(--accent); cursor: pointer; }
 .form .check input:focus { outline: none; }

@@ -257,26 +257,28 @@ func (s *Service) record(ctx context.Context, a *activeRec) error {
 		return err
 	}
 	defer f.Close()
-	var lastErr error
+	var gap error // the last interruption: it stays, the file has a hole
 	for ctx.Err() == nil {
 		it, err := s.st.ChannelForGroup(ctx, a.rec.GroupKey)
 		if err != nil {
 			return fmt.Errorf("canale non più disponibile: %w", err)
 		}
-		lastErr = s.recordOnce(ctx, a, it, f)
+		err = s.recordOnce(ctx, a, it, f)
 		if ctx.Err() != nil {
-			// Reaching the stop time closes the stream: not an error.
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				lastErr = nil
+			// Reaching the stop time closes the stream: not an error
+			// (earlier interruptions still count).
+			if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				gap = err
 			}
 			break
 		}
+		gap = err
 		select {
 		case <-ctx.Done():
 		case <-time.After(3 * time.Second): // reconnect
 		}
 	}
-	return lastErr
+	return gap
 }
 
 func (s *Service) recordOnce(ctx context.Context, a *activeRec, it store.PlaybackItem, f *os.File) error {

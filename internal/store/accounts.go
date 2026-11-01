@@ -35,6 +35,9 @@ type Subscription struct {
 	Secret     []byte          `json:"-"`
 }
 
+// ErrVPNName: two VPN connections with one name.
+var ErrVPNName = errors.New("esiste già una connessione VPN con questo nome")
+
 // AddVPN stores a connection; seal receives the new row id so the sealed
 // value is bound to it.
 func (s *Store) AddVPN(ctx context.Context, name, kind string, seal func(id int64) []byte) (int64, error) {
@@ -44,6 +47,9 @@ func (s *Store) AddVPN(ctx context.Context, name, kind string, seal func(id int6
 	}
 	defer tx.Rollback()
 	res, err := tx.ExecContext(ctx, `INSERT INTO vpn (name, kind, config, created_at) VALUES (?, ?, x'', ?)`, name, kind, time.Now().Unix())
+	if isUnique(err) {
+		return 0, ErrVPNName
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -239,6 +245,9 @@ func (s *Store) UpdateSubscription(ctx context.Context, id int64, name *string, 
 func (s *Store) UpdateVPN(ctx context.Context, id int64, name *string, config []byte) error {
 	res, err := s.w.ExecContext(ctx, `UPDATE vpn SET name = coalesce(?, name), config = coalesce(?, config) WHERE id = ?`,
 		name, config, id)
+	if isUnique(err) {
+		return ErrVPNName
+	}
 	if err != nil {
 		return err
 	}

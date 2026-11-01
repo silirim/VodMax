@@ -171,7 +171,7 @@ public class MainActivity extends Activity {
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
-                    prefs().edit().putBoolean(KEY_LOCAL, false).apply();
+                    // The choice stays: a busy port passes, next time it may work.
                     showSetup(getString(R.string.local_failed) + ": " + e.getMessage());
                 });
             }
@@ -202,7 +202,7 @@ public class MainActivity extends Activity {
                 } catch (Exception e) {
                     picking = null;
                     callback.onReceiveValue(null);
-                    return false;
+                    return true;
                 }
                 return true;
             }
@@ -213,9 +213,12 @@ public class MainActivity extends Activity {
                 Uri u = request.getUrl();
                 // The home login goes to the account's site and comes back
                 // with a code: the whole round trip stays in the app.
-                if (u.toString().startsWith(server + "/auth/sso/")) signingIn = true;
+                if (u.toString().startsWith(server + "/auth/sso/")) {
+                    signingIn = true;
+                    web.removeJavascriptInterface("VodMaxNative"); // not for the account's site
+                }
                 if (u.toString().startsWith(server + "/") || u.toString().equals(server)) {
-                    if (!u.getPath().startsWith("/auth/sso/")) signingIn = false;
+                    if (!u.getPath().startsWith("/auth/sso/")) endSignIn();
                     return false;
                 }
                 if (signingIn) return false;
@@ -360,7 +363,7 @@ public class MainActivity extends Activity {
                     Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
                         .setType(mime).putExtra(Intent.EXTRA_TITLE, name);
                     startActivityForResult(i, SAVE);
-                } catch (Exception e) {
+                } catch (Exception | OutOfMemoryError e) {
                     saving = null;
                     saveDone(getString(R.string.save_unavailable));
                 }
@@ -371,6 +374,12 @@ public class MainActivity extends Activity {
         public void changeServer() {
             runOnUiThread(() -> showSetup(null));
         }
+    }
+
+    private void endSignIn() {
+        if (!signingIn) return;
+        signingIn = false;
+        web.addJavascriptInterface(new Bridge(), "VodMaxNative");
     }
 
     private void saveDone(String error) {
@@ -395,10 +404,11 @@ public class MainActivity extends Activity {
             }
             try (java.io.OutputStream out = getContentResolver().openOutputStream(data.getData())) {
                 out.write(bytes);
-                saveDone(null);
             } catch (Exception e) {
                 saveDone(getString(R.string.save_failed));
+                return;
             }
+            saveDone(null); // written and closed
             return;
         }
         if (request != PLAY || web == null) return;
@@ -418,6 +428,12 @@ public class MainActivity extends Activity {
     // to close, the app goes to the background.
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && web != null && signingIn) {
+            // Back on the account's site: the sign-in is given up.
+            endSignIn();
+            web.loadUrl(server + "/");
+            return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && web != null) {
             web.evaluateJavascript("(window.VodMaxNativeBack ? window.VodMaxNativeBack() : false)", handled -> {
                 if (!"true".equals(handled)) moveTaskToBack(true);
@@ -434,7 +450,7 @@ public class MainActivity extends Activity {
         updater.resume();
         if (!prefs().getBoolean(KEY_LOCAL, false) || web == null) return;
         new Thread(() -> {
-            if (!LocalServer.running()) runOnUiThread(this::openLocal);
+            if (!LocalServer.ours()) runOnUiThread(this::openLocal);
         }).start();
     }
 

@@ -50,6 +50,8 @@ final class LocalServer {
                 if (System.currentTimeMillis() > until) throw new Exception(context.getString(R.string.local_no_answer));
                 Thread.sleep(300);
             }
+            // Something answers, but our process has gone: someone else's port.
+            if (exited(p)) throw new Exception(context.getString(R.string.local_port_busy));
         }
         try (InputStream in = new FileInputStream(new File(data, "admin.token"))) {
             return new String(readAll(in), StandardCharsets.UTF_8).trim();
@@ -75,6 +77,11 @@ final class LocalServer {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /** True while the process started here is alive and answering. */
+    static synchronized boolean ours() {
+        return process != null && !exited(process) && running();
     }
 
     static boolean running() {

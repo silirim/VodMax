@@ -72,6 +72,7 @@
   "errore: %s": "error: %s",
   "esiste già un abbonamento o una raccolta con questo nome": "a subscription or collection with this name already exists",
   "esiste già un profilo con questo nome": "a profile with this name already exists",
+  "esiste già una connessione VPN con questo nome": "a VPN connection with this name already exists",
   "fascia oraria non valida (ore 0-23, inizio diverso dalla fine)": "invalid time window (hours 0-23, start different from end)",
   "file MP4 vuoto": "empty MP4 file",
   "file del backup troppo grande o interrotto": "backup file too large or interrupted",

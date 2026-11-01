@@ -37,7 +37,7 @@
   function normalize(s) {
     s = (s || "").replace(/^\s+|\s+$/g, "");
     if (!s) return null;
-    if (!/^https?:\/\//.test(s)) s = "http://" + s;
+    if (!/^https?:\/\//i.test(s)) s = "http://" + s;
     return s.replace(/\/+$/, "");
   }
 
@@ -80,7 +80,12 @@
     try { localStorage.setItem(KEY, base); } catch (err) { /* private storage off */ }
     open(base);
   });
-  $("retry").addEventListener("click", function () { open(normalize($("server").value)); });
+  $("retry").addEventListener("click", function () {
+    var base = normalize($("server").value);
+    if (!base) { showForm("", null); return; }
+    try { localStorage.setItem(KEY, base); } catch (err) { /* private storage off */ }
+    open(base);
+  });
 
   // Remote: Up/Down between the field and the buttons, Left/Right between
   // the buttons.
