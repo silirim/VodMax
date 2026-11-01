@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/silirim/vodmax/internal/store"
 )
@@ -120,7 +121,7 @@ type SSOInput struct {
 func (s *Service) SetSSO(ctx context.Context, in SSOInput) error {
 	o := SSOSettings{Enabled: in.Enabled, Issuer: strings.TrimRight(strings.TrimSpace(in.Issuer), "/"),
 		ClientID: strings.TrimSpace(in.ClientID), Label: strings.TrimSpace(in.Label)}
-	if len(o.Label) > 30 {
+	if utf8.RuneCountInString(o.Label) > 30 {
 		return invalid("nome del pulsante troppo lungo (max 30 caratteri)")
 	}
 	if o.Issuer != "" {
@@ -388,7 +389,7 @@ func (s *Service) SSOFinish(ctx context.Context, state, code string) (string, er
 	}
 	token := randomToken()
 	name := "Accesso " + who
-	if len(name) > 60 {
+	if utf8.RuneCountInString(name) > 60 {
 		name = name[:60]
 	}
 	id, err := s.st.AddDevice(ctx, name, hashToken(token))

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/silirim/vodmax/internal/store"
 )
@@ -289,7 +290,7 @@ func (s *Service) applyProfile(p *store.Profile, in ProfileInput) (pinChanged bo
 	if in.Name != nil {
 		p.Name = strings.TrimSpace(*in.Name)
 	}
-	if p.Name == "" || len(p.Name) > 40 {
+	if p.Name == "" || utf8.RuneCountInString(p.Name) > 40 {
 		return false, invalid("nome del profilo obbligatorio (max 40 caratteri)")
 	}
 	if in.Kind != nil {
@@ -481,7 +482,7 @@ func (s *Service) Devices(ctx context.Context) ([]store.Device, error) {
 
 func (s *Service) UpdateDevice(ctx context.Context, id int64, name string, lock *int64) error {
 	name = strings.TrimSpace(name)
-	if name == "" || len(name) > 60 {
+	if name == "" || utf8.RuneCountInString(name) > 60 {
 		return invalid("nome del dispositivo obbligatorio (max 60 caratteri)")
 	}
 	if lock != nil {
@@ -556,7 +557,7 @@ func (s *Service) ApprovePairing(ctx context.Context, code, name string, lock *i
 		code = code[:3] + "-" + code[3:]
 	}
 	name = strings.TrimSpace(name)
-	if name == "" || len(name) > 60 {
+	if name == "" || utf8.RuneCountInString(name) > 60 {
 		return store.Device{}, invalid("nome del dispositivo obbligatorio (max 60 caratteri)")
 	}
 	if lock != nil {

@@ -126,7 +126,13 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
   // changed is marked; saving redraws the page with new fields.
   document.addEventListener("input", (e) => { if (e.target.closest("main")) e.target.dataset.changed = "1"; }, true);
   document.addEventListener("submit", (e) => {
-    for (const i of e.target.querySelectorAll("[data-changed]")) delete i.dataset.changed;
+    // A second press while the first is being saved is ignored (it
+    // created the profile twice, then said the name was taken).
+    const f = e.target;
+    if (f.dataset.busy) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    f.dataset.busy = "1";
+    setTimeout(() => { delete f.dataset.busy; }, 1500);
+    for (const i of f.querySelectorAll("[data-changed]")) delete i.dataset.changed;
   }, true);
   const unsaved = () => document.querySelector("main [data-changed]") !== null;
 

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/silirim/vodmax/internal/catalog"
 	"github.com/silirim/vodmax/internal/playlist/m3u"
@@ -125,7 +126,7 @@ func (s *Service) AddVPN(ctx context.Context, name, conf string) (int64, error) 
 // cannot check that it really goes through a VPN).
 func (s *Service) AddVPNKind(ctx context.Context, name, kind, conf string) (int64, error) {
 	name = strings.TrimSpace(name)
-	if name == "" || len(name) > 80 {
+	if name == "" || utf8.RuneCountInString(name) > 80 {
 		return 0, invalid("nome della VPN obbligatorio (max 80 caratteri)")
 	}
 	switch kind {
@@ -291,7 +292,7 @@ func subOwner(id int64) string { return fmt.Sprintf("subscription:%d", id) }
 
 func (s *Service) AddSubscription(ctx context.Context, in SubscriptionInput) (int64, error) {
 	in.Name = strings.TrimSpace(in.Name)
-	if in.Name == "" || len(in.Name) > 80 {
+	if in.Name == "" || utf8.RuneCountInString(in.Name) > 80 {
 		return 0, invalid("nome dell'abbonamento obbligatorio (max 80 caratteri)")
 	}
 	if in.Kind == "local" {
@@ -368,7 +369,7 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 	}
 	if p.Name != nil {
 		n := strings.TrimSpace(*p.Name)
-		if n == "" || len(n) > 80 {
+		if n == "" || utf8.RuneCountInString(n) > 80 {
 			return invalid("nome dell'abbonamento obbligatorio (max 80 caratteri)")
 		}
 		p.Name = &n
@@ -467,7 +468,7 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 func (s *Service) UpdateVPN(ctx context.Context, id int64, name, conf *string) error {
 	if name != nil {
 		n := strings.TrimSpace(*name)
-		if n == "" || len(n) > 80 {
+		if n == "" || utf8.RuneCountInString(n) > 80 {
 			return invalid("nome della VPN obbligatorio (max 80 caratteri)")
 		}
 		name = &n
@@ -684,6 +685,9 @@ func (s *Service) fetch(ctx context.Context, id int64) (*catalog.Snapshot, error
 		p, err := m3u.Parse(io.LimitReader(resp.Body, 1<<30), m3u.DefaultLimits)
 		if err != nil {
 			return nil, err
+		}
+		if len(p.Entries) == 0 {
+			return nil, errors.New("la playlist non contiene canali né titoli")
 		}
 		return catalog.FromM3U(p, s.box.Seal, id), nil
 	case "stalker":

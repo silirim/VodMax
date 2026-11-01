@@ -432,3 +432,22 @@ func TestRecordingCarriesOnAfterRestart(t *testing.T) {
 		t.Fatalf("files after restart: %v", files)
 	}
 }
+
+// A recording that never got data leaves no empty file behind.
+func TestFailedRecordingLeavesNoFile(t *testing.T) {
+	e, p := tvSetup(t)
+	p.mu.Lock()
+	p.broken = map[string]bool{"101.ts": true}
+	p.mu.Unlock()
+	rai := channels(t, e, "?section=tv")[0]
+	now := time.Now().Unix()
+	e.do(t, "POST", "/api/v1/recordings", map[string]any{"channel_id": rai.ID, "start": now, "stop": now + 2, "title": "Vuota"}, true)
+	time.Sleep(3 * time.Second)
+	_, body := e.do(t, "GET", "/api/v1/recordings", nil, true)
+	if !strings.Contains(string(body), `"status":"failed"`) {
+		t.Fatalf("recording: %s", body)
+	}
+	if files, _ := os.ReadDir(e.recordings); len(files) != 0 {
+		t.Fatalf("files left: %v", files)
+	}
+}

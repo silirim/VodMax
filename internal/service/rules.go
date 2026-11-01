@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
 
@@ -129,7 +130,7 @@ func (s *Service) checkRule(r *store.RecordingRule) error {
 		r.Spec.All = []string{r.Name}
 	}
 	switch {
-	case r.Name == "" || len(r.Name) > 60:
+	case r.Name == "" || utf8.RuneCountInString(r.Name) > 60:
 		return invalid("nome della regola obbligatorio (max 60 caratteri)")
 	case len(r.Spec.All) == 0:
 		return invalid("serve almeno una parola che il programma deve contenere")

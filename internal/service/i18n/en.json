@@ -150,6 +150,8 @@
   "la guida la indica come diretta": "the guide marks it as live",
   "la guida la indica come già trasmessa": "the guide marks it as previously shown",
   "la password del backup deve avere almeno %d caratteri": "the backup password must have at least %d characters",
+  "la playlist non contiene canali né titoli": "the playlist has no channels or titles",
+  "la risposta non è una playlist M3U (sembra una pagina web o un altro documento)": "the answer is not an M3U playlist (it looks like a web page or another document)",
   "llama-server non trovato nel pacchetto": "llama-server not found in the package",
   "modalità non valida": "invalid mode",
   "modalità non valida: timeshift o direct": "invalid mode: timeshift or direct",

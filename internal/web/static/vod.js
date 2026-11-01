@@ -899,6 +899,7 @@
 
   async function play(media, id, title, startAt, mode, keep) {
     diagCount = 0;
+    if (!state.play) state.playFrom = document.activeElement;
     let sess;
     flash(mode === "remux" ? t("Preparazione della conversione…") : t("Avvio…"));
     const native = window.VodMax.native;
@@ -964,7 +965,10 @@
     const total = (c.sess && c.sess.duration) || r.duration;
     if ((c.media === "movie" || c.media === "episode") && total > 0 && position > 5) {
       api("PUT", "/api/v1/progress/" + c.media + "/" + c.id, { position: Math.floor(position), duration: Math.floor(total) })
-        .then(() => { if (state.view === "home" && $("detail").hidden) render(); }).catch(() => {});
+        .then(() => {
+          if (state.detail && !$("detail").hidden) openDetail(state.detail); // the new position on the page
+          else if (state.view === "home") render();
+        }).catch(() => {});
     }
     if (c.media === "catchup" && state.catchupBack) location.href = state.catchupBack;
     if (c.media === "episode" && c.sess.series_id) {
@@ -1371,13 +1375,13 @@
 
   function saveProgress() {
     const p = state.play;
-    if (!p || p.recording || p.media === "catchup" || !duration()) return;
-    api("PUT", "/api/v1/progress/" + p.media + "/" + p.id, { position: Math.floor(position()), duration: Math.floor(duration()) })
+    if (!p || p.recording || p.media === "catchup" || !duration()) return Promise.resolve();
+    return api("PUT", "/api/v1/progress/" + p.media + "/" + p.id, { position: Math.floor(position()), duration: Math.floor(duration()) })
       .catch(() => {});
   }
 
   function stopPlayback(save) {
-    if (save) saveProgress();
+    const saved = save ? saveProgress() : Promise.resolve();
     // An archive opened from the TV or the guide: closing goes back there.
     if (save && state.play && state.play.media === "catchup" && state.catchupBack) {
       location.href = state.catchupBack;
@@ -1393,6 +1397,18 @@
     video.load();
     state.play = null;
     $("player").hidden = true;
+    // Closed by the person: the detail page shows the new position
+    // ("Riprendi da…", the next episode), and the focus goes back where it
+    // was instead of being lost.
+    if (save) {
+      const from = state.playFrom;
+      saved.then(() => {
+        if (state.play) return;
+        if (state.detail && !$("detail").hidden) openDetail(state.detail);
+        else if (from && document.body.contains(from)) from.focus();
+        else focusFirst($("content"));
+      });
+    }
   }
 
   function showBar() {

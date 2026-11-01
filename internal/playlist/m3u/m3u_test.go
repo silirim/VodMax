@@ -57,3 +57,15 @@ func TestLimits(t *testing.T) {
 		t.Fatal("expected error for overlong line")
 	}
 }
+
+// A web page (a provider's error or login page) is not a playlist, and
+// lines that are not addresses are not entries.
+func TestNotAPlaylist(t *testing.T) {
+	if _, err := Parse(strings.NewReader("<html><body>not a playlist</body></html>"), Limits{}); !errors.Is(err, ErrNotPlaylist) {
+		t.Fatalf("web page: %v", err)
+	}
+	p, err := Parse(strings.NewReader("#EXTM3U\n#EXTINF:-1,Uno\nhttp://x/1.ts\nsolo testo\n#EXTINF:-1,Due\n/locale/2.ts\n"), Limits{})
+	if err != nil || len(p.Entries) != 2 {
+		t.Fatalf("entries: %+v %v", p, err)
+	}
+}

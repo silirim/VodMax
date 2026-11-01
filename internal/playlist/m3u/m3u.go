@@ -41,6 +41,9 @@ type Limits struct {
 // DefaultLimits fit the largest real provider lists seen (~250k entries).
 var DefaultLimits = Limits{MaxEntries: 2_000_000, MaxLineLength: 64 * 1024}
 
+// ErrNotPlaylist means the answer is a web page or another document.
+var ErrNotPlaylist = errors.New("la risposta non è una playlist M3U (sembra una pagina web o un altro documento)")
+
 // ErrTooManyEntries means the playlist exceeded Limits.MaxEntries.
 var ErrTooManyEntries = errors.New("playlist troppo grande")
 
@@ -62,6 +65,10 @@ func Parse(r io.Reader, limits Limits) (*Playlist, error) {
 		}
 		switch {
 		case line == "":
+		case strings.HasPrefix(line, "<") && len(p.Entries) == 0 && pending == nil:
+			// A web page or an XML document (a login page, an XMLTV guide
+			// given as the playlist), not a playlist.
+			return nil, ErrNotPlaylist
 		case strings.HasPrefix(line, "#EXTM3U"):
 			attrs, _ := parseAttrs(strings.TrimPrefix(line, "#EXTM3U"))
 			for _, key := range []string{"url-tvg", "x-tvg-url"} {
@@ -90,6 +97,8 @@ func Parse(r io.Reader, limits Limits) (*Playlist, error) {
 			}
 		case strings.HasPrefix(line, "#"):
 			// Other directives (#KODIPROP, #EXT-X-...) are not needed.
+		case !strings.Contains(line, "://") && !strings.HasPrefix(line, "/"):
+			pending = nil // not an address: not an entry
 		default:
 			e := Entry{Duration: -1}
 			if pending != nil {

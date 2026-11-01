@@ -208,6 +208,8 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 		case final.Status == "cancelled":
 		case final.Bytes == 0:
 			final.Status = "failed"
+			os.Remove(final.File) // nothing in it: no empty file left behind
+			final.File = ""
 			if err != nil {
 				final.Error = err.Error()
 			} else {

@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/silirim/vodmax/internal/epg"
 	"github.com/silirim/vodmax/internal/lineup"
@@ -70,7 +71,7 @@ func hideURLSecrets(raw string) string {
 
 func (s *Service) AddGuideSource(ctx context.Context, name, rawURL string) (int64, error) {
 	name = strings.TrimSpace(name)
-	if name == "" || len(name) > 60 {
+	if name == "" || utf8.RuneCountInString(name) > 60 {
 		return 0, invalid("nome della guida obbligatorio (max 60 caratteri)")
 	}
 	u, err := checkGuideURL(rawURL)
@@ -94,7 +95,7 @@ func (s *Service) UpdateGuideSource(ctx context.Context, id int64, p GuideSource
 	}
 	if p.Name != nil {
 		g.Name = strings.TrimSpace(*p.Name)
-		if g.Name == "" || len(g.Name) > 60 {
+		if g.Name == "" || utf8.RuneCountInString(g.Name) > 60 {
 			return invalid("nome della guida obbligatorio (max 60 caratteri)")
 		}
 	}

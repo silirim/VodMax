@@ -416,3 +416,15 @@ func TestCurrentPINLimited(t *testing.T) {
 		t.Fatalf("right PIN after five wrong ones: %d (want 429)", code)
 	}
 }
+
+// Name limits count letters, not bytes: "é" is one letter.
+func TestNameLimitsCountLetters(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.do(t, "PATCH", "/api/v1/profiles/1", map[string]any{"pin": "9753"}, true)
+	if code, body := e.do(t, "POST", "/api/v1/profiles", map[string]any{"name": strings.Repeat("é", 40), "kind": "kids"}, true); code != 201 {
+		t.Fatalf("40 letters refused: %d %s", code, body)
+	}
+	if code, _ := e.do(t, "POST", "/api/v1/profiles", map[string]any{"name": strings.Repeat("è", 41), "kind": "kids"}, true); code != 400 {
+		t.Fatalf("41 letters accepted: %d", code)
+	}
+}

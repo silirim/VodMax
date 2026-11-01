@@ -150,6 +150,8 @@
   "la guida la indica come diretta": "la guida la indica come diretta",
   "la guida la indica come già trasmessa": "la guida la indica come già trasmessa",
   "la password del backup deve avere almeno %d caratteri": "la password del backup deve avere almeno %d caratteri",
+  "la playlist non contiene canali né titoli": "la playlist non contiene canali né titoli",
+  "la risposta non è una playlist M3U (sembra una pagina web o un altro documento)": "la risposta non è una playlist M3U (sembra una pagina web o un altro documento)",
   "llama-server non trovato nel pacchetto": "llama-server non trovato nel pacchetto",
   "modalità non valida": "modalità non valida",
   "modalità non valida: timeshift o direct": "modalità non valida: timeshift o direct",
