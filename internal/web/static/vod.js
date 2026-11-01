@@ -781,24 +781,28 @@
     // Only the saved position: a playback session is created on "play",
     // because preparing it may already use the provider connection.
     const saved = await api("GET", "/api/v1/progress/movie/" + item.id).catch(() => null);
+    if (state.detail !== item) return;
     const resume = saved && !saved.completed && saved.position > 30 ? saved : null;
+    // Play comes first: the download button may have arrived meanwhile.
+    const main = [];
     if (resume) {
       const r = el("button", { className: "button primary focusable" });
       window.VodMax.label(r, "play", t("Riprendi da {time}", { time: clock(resume.position) }));
       r.onclick = () => play("movie", item.id, item.display_title, resume.position);
-      actions.append(r);
+      main.push(r);
     }
     const start = el("button", { className: "button focusable" + (resume ? "" : " primary") });
     window.VodMax.label(start, resume ? "undo-2" : "play", resume ? t("Dall'inizio") : t("Guarda"));
     start.onclick = () => play("movie", item.id, item.display_title, 0);
-    actions.append(start);
+    main.push(start);
     if (item.variant_count > 1) {
       const v = el("button", { className: "button focusable" });
       v.dataset.variants = "1";
       window.VodMax.label(v, "layers", t("Altre versioni"));
       v.onclick = () => showVariants(item);
-      actions.append(v);
+      main.push(v);
     }
+    actions.prepend(...main);
     addListButton(item);
     // The trailer (added when the details arrive) always comes last.
     const trailer = actions.querySelector(".trailer");
@@ -862,7 +866,7 @@
         next.progress && !next.progress.completed ? t("Riprendi {episode}", code) : t("Guarda {episode}", code));
       go.onclick = () => play("episode", next.id, item.display_title + " · S" + next.season + "E" + next.number + " " + next.title,
         next.progress && !next.progress.completed ? next.progress.position : 0);
-      $("detail-actions").append(go);
+      $("detail-actions").prepend(go);
       showSeason(next.season);
     }
     addDownloadButtons(item, next ? next.season : 0);
