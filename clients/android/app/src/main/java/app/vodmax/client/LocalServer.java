@@ -26,10 +26,13 @@ final class LocalServer {
     private LocalServer() {
     }
 
-    /** Starts the server if it is not answering; waits for it. Returns the admin token. */
+    /** Starts the server if it is not running; waits for it. Returns the admin token. */
     static synchronized String start(Context context) throws Exception {
         File data = new File(context.getFilesDir(), "server");
-        if (!running()) {
+        // Only the process started here is trusted: anything else answering
+        // on the port (another app) would be handed the admin token.
+        if (process == null || exited(process)) {
+            if (running()) throw new Exception(context.getString(R.string.local_port_busy));
             if (process != null) process.destroy();
             File bin = new File(context.getApplicationInfo().nativeLibraryDir, "libvodmax.so");
             ProcessBuilder pb = new ProcessBuilder(bin.getAbsolutePath(), "-device", "-data", data.getAbsolutePath(),
