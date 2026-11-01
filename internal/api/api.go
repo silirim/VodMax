@@ -264,12 +264,16 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 	var bad service.ErrInvalid
+	var busy service.ConnectionBusy
 	status := http.StatusInternalServerError
 	switch {
 	case errors.As(err, &bad):
 		status = http.StatusBadRequest
 	case errors.Is(err, store.ErrNotFound):
 		status = http.StatusNotFound
+	case errors.As(err, &busy) && busy.Recording:
+		// Held by recordings: nobody can take it over (409 offers to).
+		status = http.StatusLocked
 	case errors.Is(err, store.ErrInUse), errors.Is(err, service.ErrBusy), errors.Is(err, store.ErrSuspiciousDrop),
 		errors.Is(err, service.ErrBusyRecording),
 		errors.As(err, new(service.ConnectionBusy)):

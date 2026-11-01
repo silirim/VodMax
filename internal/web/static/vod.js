@@ -1175,9 +1175,14 @@
   video.addEventListener("error", async () => {
     const p = state.play;
     if (!p || p.recording) { if (p && p.recording) flash(t("Registrazione non riproducibile in questo browser")); return; }
-    // Find out why: a busy connection answers 409.
+    // Find out why: a busy connection answers 409, one held by a recording 423.
     const status = await fetch(p.sess.url + (p.sess.mode === "remux" ? "?t=0" : ""), { headers: { Range: "bytes=0-0" } })
       .then((r) => { r.body && r.body.cancel(); return r.status; }).catch(() => 0);
+    if (status === 423) {
+      flash(t("Tutte le connessioni dell'abbonamento sono occupate da una registrazione in corso"));
+      stopPlayback(true);
+      return;
+    }
     if (status === 409) {
       if (confirm(t("La connessione dell'abbonamento è in uso su un altro dispositivo. Prendere il controllo?"))) load(position(), true);
       else stopPlayback(true);

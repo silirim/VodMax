@@ -97,7 +97,8 @@
         if (cell.player !== player) return;
         stop(cell);
         const code = info && info.code;
-        render(cell, code === 409 ? t("Nessuna connessione libera: l'abbonamento ne ha già in uso il massimo")
+        render(cell, code === 423 ? t("Tutte le connessioni dell'abbonamento sono occupate da una registrazione in corso")
+          : code === 409 ? t("Nessuna connessione libera: l'abbonamento ne ha già in uso il massimo")
           : type === mpegts.ErrorTypes.MEDIA_ERROR ? t("Questo dispositivo non riesce a decodificare il canale ({detail})", { detail })
             : t("Canale non disponibile ({code})", { code: code || detail }));
       },

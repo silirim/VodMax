@@ -708,5 +708,6 @@
   "Va bene qualsiasi server con l'API compatibile OpenAI: Ollama, LM Studio, llama.cpp. Con un server in casa non esce nulla dalla tua rete.": "Va bene qualsiasi server con l'API compatibile OpenAI: Ollama, LM Studio, llama.cpp. Con un server in casa non esce nulla dalla tua rete.",
   "VodMax scarica e fa girare il modello qui. Niente esce di casa.": "VodMax scarica e fa girare il modello qui. Niente esce di casa.",
   "Cast e regia noti per {known} titoli su {total}: servono per richieste come «un film con…». VodMax completa l'elenco di notte, a poco a poco, finché l'assistente è acceso.": "Cast e regia noti per {known} titoli su {total}: servono per richieste come «un film con…». VodMax completa l'elenco di notte, a poco a poco, finché l'assistente è acceso.",
-  "file non leggibile": "file non leggibile"
+  "file non leggibile": "file non leggibile",
+  "Tutte le connessioni dell'abbonamento sono occupate da una registrazione in corso": "Tutte le connessioni dell'abbonamento sono occupate da una registrazione in corso"
 }

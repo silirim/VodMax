@@ -172,7 +172,7 @@ func TestRecordingWatchWhileRecordingAndDelete(t *testing.T) {
 	busy, _ := openStream(t, e, ticket(t, e, tv[1].ID, "salotto-tv-01")+"?force=1")
 	body, _ = io.ReadAll(busy.Body)
 	busy.Body.Close()
-	if busy.StatusCode != 409 || !strings.Contains(string(body), "registrazione") {
+	if busy.StatusCode != http.StatusLocked || !strings.Contains(string(body), "registrazione") {
 		t.Fatalf("recording must not be taken over: %d %s", busy.StatusCode, body)
 	}
 

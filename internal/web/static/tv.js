@@ -91,6 +91,7 @@
         if (state.player !== player) return;
         stopPlayer();
         const code = info && info.code;
+        if (code === 423) { flash(t("Tutte le connessioni dell'abbonamento sono occupate da una registrazione in corso")); return; }
         if (code === 409) {
           confirmDialog(t("Tutte le connessioni dell'abbonamento sono in uso su un altro dispositivo.\n\nPrendere il controllo?"),
             () => tune(channel, true));
@@ -139,6 +140,7 @@
     try {
       buf = await api("POST", "/api/v1/live/" + channel.id + "/timeshift", { viewer, force: Boolean(force) });
     } catch (e) {
+      if (e.status === 423) { flash(e.message); return true; }
       if (e.status === 409) {
         confirmDialog(t("Tutte le connessioni dell'abbonamento sono in uso su un altro dispositivo.\n\nPrendere il controllo?"),
           () => tune(channel, true));
