@@ -396,3 +396,23 @@ func TestStatusProblemsOnlyForAdmins(t *testing.T) {
 		t.Fatalf("kids status: %d %s", code, body)
 	}
 }
+
+// Changing the PIN asks for the current one, with the same limit as
+// choosing the profile: it cannot be used to guess the PIN.
+func TestCurrentPINLimited(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.do(t, "PATCH", "/api/v1/profiles/1", map[string]any{"pin": "9753"}, true)
+	code, out := e.do(t, "POST", "/api/v1/profiles", map[string]any{"name": "Marco", "kind": "standard", "pin": "2468"}, true)
+	var marco struct{ ID int64 }
+	if code != 201 || json.Unmarshal(out, &marco) != nil {
+		t.Fatalf("add: %d %s", code, out)
+	}
+	tv := pair(t, e, "TV", nil)
+	_, tok := selectProfile(t, e, tv, marco.ID, "2468")
+	for range 5 {
+		e.call(t, "PUT", "/api/v1/profile", map[string]any{"pin": "1111", "current_pin": "0000"}, tv, tok)
+	}
+	if code, _ := e.call(t, "PUT", "/api/v1/profile", map[string]any{"pin": "1111", "current_pin": "2468"}, tv, tok); code != 429 {
+		t.Fatalf("right PIN after five wrong ones: %d (want 429)", code)
+	}
+}

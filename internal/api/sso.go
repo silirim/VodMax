@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"net"
 	"net/http"
 	"net/url"
 
@@ -26,7 +27,8 @@ func (a *api) ssoBack(w http.ResponseWriter, r *http.Request, key, value string)
 }
 
 func (a *api) ssoStart(w http.ResponseWriter, r *http.Request) {
-	to, err := a.svc.SSOStart(r.Context(), ssoRedirect(r))
+	client, _, _ := net.SplitHostPort(r.RemoteAddr)
+	to, err := a.svc.SSOStart(r.Context(), ssoRedirect(r), client)
 	if err != nil {
 		a.log.Warn("accesso con account esterno", "err", err)
 		a.ssoBack(w, r, "sso_error", service.Localize(service.LangOf(r.Context()), err))

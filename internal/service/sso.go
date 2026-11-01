@@ -33,11 +33,18 @@ const (
 	ssoLoginTTL  = 10 * time.Minute
 	ssoClaimTTL  = 2 * time.Minute
 	ssoMaxLogins = 100
+	// Sign-ins started and not finished from one address: the page needs
+	// no login, so one host must not use up the whole ssoMaxLogins.
+	ssoLoginsPerClient = 10
+	// A provider of accounts that did not answer is asked again only after
+	// this: every start would otherwise be a request out of the house.
+	ssoRetryAfter = 30 * time.Second
 )
 
 var (
 	ErrSSOOff     = errors.New("l'accesso con account esterno non è configurato")
 	ErrSSOLogin   = errors.New("accesso non riuscito: riprova dall'inizio")
+	ErrSSOBusy    = errors.New("troppi accessi iniziati e non finiti: riprova tra qualche minuto")
 	ErrSSOAccount = errors.New("questo account non è collegato a nessun profilo di VodMax: chiedi a chi gestisce il server")
 )
 
@@ -62,12 +69,17 @@ type ssoState struct {
 	logins map[string]ssoLogin // by state
 	claims map[string]ssoClaim // by one-time code
 	disc   *ssoDiscovery
+	failed struct {
+		issuer string
+		at     time.Time
+		err    error
+	}
 	client *http.Client // tests
 }
 
 type ssoLogin struct {
-	verifier, nonce, redirect string
-	expires                   time.Time
+	verifier, nonce, redirect, client string
+	expires                           time.Time
 }
 
 type ssoClaim struct {
@@ -136,14 +148,14 @@ func (s *Service) SetSSO(ctx context.Context, in SSOInput) error {
 		seen[a.Account] = true
 		o.Accounts = append(o.Accounts, a)
 	}
-	if in.Secret != nil {
-		if err := s.setSecretSetting(ctx, ssoSecretKey, strings.TrimSpace(*in.Secret)); err != nil {
-			return err
-		}
-	}
+	// Everything is checked before anything is saved: a refused form
+	// leaves the stored settings (and secret) as they were.
 	secret, err := s.secretSetting(ctx, ssoSecretKey)
 	if err != nil {
 		return err
+	}
+	if in.Secret != nil {
+		secret = strings.TrimSpace(*in.Secret)
 	}
 	if o.Enabled && (o.Issuer == "" || o.ClientID == "" || secret == "") {
 		return invalid("per accendere l'accesso servono indirizzo del provider, client ID e client secret")
@@ -151,11 +163,17 @@ func (s *Service) SetSSO(ctx context.Context, in SSOInput) error {
 	if o.Enabled && len(o.Accounts) == 0 {
 		return invalid("collega almeno un account a un profilo")
 	}
+	if in.Secret != nil {
+		if err := s.setSecretSetting(ctx, ssoSecretKey, secret); err != nil {
+			return err
+		}
+	}
 	if err := s.st.SetSetting(ctx, ssoKey, o); err != nil {
 		return err
 	}
 	s.sso.mu.Lock()
 	s.sso.disc = nil
+	s.sso.failed.issuer = ""
 	s.sso.mu.Unlock()
 	return nil
 }
@@ -184,6 +202,24 @@ func (s *Service) ssoDiscover(ctx context.Context, issuer string) (*ssoDiscovery
 	if d != nil && d.configured == issuer && time.Since(d.fetched) < time.Hour {
 		return d, nil
 	}
+	s.sso.mu.Lock()
+	f := s.sso.failed
+	s.sso.mu.Unlock()
+	if f.issuer == issuer && time.Since(f.at) < ssoRetryAfter {
+		return nil, f.err
+	}
+	d, err := s.fetchDiscovery(ctx, issuer)
+	s.sso.mu.Lock()
+	if err != nil {
+		s.sso.failed.issuer, s.sso.failed.at, s.sso.failed.err = issuer, time.Now(), err
+	} else {
+		s.sso.disc = d
+	}
+	s.sso.mu.Unlock()
+	return d, err
+}
+
+func (s *Service) fetchDiscovery(ctx context.Context, issuer string) (*ssoDiscovery, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, issuer+"/.well-known/openid-configuration", nil)
 	if err != nil {
 		return nil, err
@@ -196,7 +232,7 @@ func (s *Service) ssoDiscover(ctx context.Context, issuer string) (*ssoDiscovery
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("provider di accesso: risposta %d all'indirizzo di configurazione", resp.StatusCode)
 	}
-	d = &ssoDiscovery{configured: issuer, fetched: time.Now()}
+	d := &ssoDiscovery{configured: issuer, fetched: time.Now()}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(d); err != nil {
 		return nil, fmt.Errorf("provider di accesso: configurazione illeggibile: %w", err)
 	}
@@ -208,15 +244,12 @@ func (s *Service) ssoDiscover(ctx context.Context, issuer string) (*ssoDiscovery
 	if strings.TrimRight(d.Issuer, "/") != issuer {
 		return nil, errors.New("provider di accesso: l'indirizzo dichiarato non corrisponde a quello configurato")
 	}
-	s.sso.mu.Lock()
-	s.sso.disc = d
-	s.sso.mu.Unlock()
 	return d, nil
 }
 
 // SSOStart returns the address of the provider's sign-in page; redirect is
 // VodMax's callback address, which the provider must know.
-func (s *Service) SSOStart(ctx context.Context, redirect string) (string, error) {
+func (s *Service) SSOStart(ctx context.Context, redirect, client string) (string, error) {
 	o, _, err := s.SSOSettings(ctx)
 	if err != nil {
 		return "", err
@@ -239,11 +272,17 @@ func (s *Service) SSOStart(ctx context.Context, redirect string) (string, error)
 			delete(s.sso.logins, k)
 		}
 	}
-	if len(s.sso.logins) >= ssoMaxLogins {
-		s.sso.mu.Unlock()
-		return "", ErrBusy
+	fromClient := 0
+	for _, l := range s.sso.logins {
+		if l.client == client {
+			fromClient++
+		}
 	}
-	s.sso.logins[state] = ssoLogin{verifier: verifier, nonce: nonce, redirect: redirect, expires: now.Add(ssoLoginTTL)}
+	if len(s.sso.logins) >= ssoMaxLogins || fromClient >= ssoLoginsPerClient {
+		s.sso.mu.Unlock()
+		return "", ErrSSOBusy
+	}
+	s.sso.logins[state] = ssoLogin{verifier: verifier, nonce: nonce, redirect: redirect, client: client, expires: now.Add(ssoLoginTTL)}
 	s.sso.mu.Unlock()
 	sum := sha256.Sum256([]byte(verifier))
 	q := url.Values{"response_type": {"code"}, "client_id": {o.ClientID}, "redirect_uri": {redirect},
@@ -374,17 +413,21 @@ func (s *Service) SSOFinish(ctx context.Context, state, code string) (string, er
 	return once, nil
 }
 
-// ssoMatch finds the linked profile: by verified e-mail, then by username.
+// ssoMatch finds the linked profile: by e-mail, only if the account
+// service says it is verified (a missing email_verified is not a yes: on a
+// service with self-registration anyone could type the admin's address);
+// then by username, only for linked accounts written as a username (one
+// with "@" is an e-mail, and preferred_username is not always unique).
 func ssoMatch(accounts []SSOAccount, c ssoClaims) (int64, string) {
 	email := strings.ToLower(c.Email)
 	user := strings.ToLower(c.Username)
 	for _, a := range accounts {
-		if email != "" && (c.EmailVerified == nil || *c.EmailVerified) && a.Account == email {
+		if email != "" && c.EmailVerified != nil && *c.EmailVerified && a.Account == email {
 			return a.ProfileID, email
 		}
 	}
 	for _, a := range accounts {
-		if user != "" && a.Account == user {
+		if user != "" && !strings.Contains(a.Account, "@") && a.Account == user {
 			return a.ProfileID, user
 		}
 	}

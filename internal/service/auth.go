@@ -204,35 +204,45 @@ func (s *Service) SelectProfile(ctx context.Context, id Identity, profileID int6
 		return "", store.ErrNotFound
 	}
 	if p.HasPIN {
-		key := fmt.Sprintf("%d:%d", id.DeviceID, p.ID)
-		s.auth.mu.Lock()
-		if s.auth.pinFail == nil {
-			s.auth.pinFail = map[string]*pinFails{}
+		if err := s.tryPIN(id.DeviceID, p, pin); err != nil {
+			return "", err
 		}
-		f := s.auth.pinFail[key]
-		if f != nil && time.Now().Before(f.until) {
-			s.auth.mu.Unlock()
-			return "", ErrPINLocked
-		}
-		s.auth.mu.Unlock()
-		if !checkPIN(p.PINHash, pin) {
-			s.auth.mu.Lock()
-			if f == nil {
-				f = &pinFails{}
-				s.auth.pinFail[key] = f
-			}
-			f.n++
-			if f.n >= pinMaxFails {
-				f.n, f.until = 0, time.Now().Add(pinLockFor)
-			}
-			s.auth.mu.Unlock()
-			return "", ErrPIN
-		}
-		s.auth.mu.Lock()
-		delete(s.auth.pinFail, key)
-		s.auth.mu.Unlock()
 	}
 	return strconv.FormatInt(p.ID, 10) + "." + s.profileSignature(id.DeviceID, p), nil
+}
+
+// tryPIN checks a profile's PIN typed on a device: after pinMaxFails wrong
+// ones the device waits pinLockFor, wherever the PIN is asked (choosing the
+// profile, or changing the PIN, which asks for the current one).
+func (s *Service) tryPIN(deviceID int64, p store.Profile, pin string) error {
+	key := fmt.Sprintf("%d:%d", deviceID, p.ID)
+	s.auth.mu.Lock()
+	if s.auth.pinFail == nil {
+		s.auth.pinFail = map[string]*pinFails{}
+	}
+	f := s.auth.pinFail[key]
+	if f != nil && time.Now().Before(f.until) {
+		s.auth.mu.Unlock()
+		return ErrPINLocked
+	}
+	s.auth.mu.Unlock()
+	if !checkPIN(p.PINHash, pin) {
+		s.auth.mu.Lock()
+		if f == nil {
+			f = &pinFails{}
+			s.auth.pinFail[key] = f
+		}
+		f.n++
+		if f.n >= pinMaxFails {
+			f.n, f.until = 0, time.Now().Add(pinLockFor)
+		}
+		s.auth.mu.Unlock()
+		return ErrPIN
+	}
+	s.auth.mu.Lock()
+	delete(s.auth.pinFail, key)
+	s.auth.mu.Unlock()
+	return nil
 }
 
 func hashPIN(pin string) (string, error) {
@@ -389,8 +399,12 @@ func (s *Service) UpdateOwnProfile(ctx context.Context, id Identity, in OwnProfi
 		if p.Kind == "kids" {
 			return ErrForbidden
 		}
-		if p.HasPIN && !checkPIN(p.PINHash, in.CurrentPIN) {
-			return ErrCurrentPIN
+		if p.HasPIN {
+			if err := s.tryPIN(id.DeviceID, p, in.CurrentPIN); errors.Is(err, ErrPIN) {
+				return ErrCurrentPIN
+			} else if err != nil {
+				return err
+			}
 		}
 		change.PIN = in.PIN
 	}

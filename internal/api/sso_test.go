@@ -165,3 +165,17 @@ func TestSSOSignIn(t *testing.T) {
 }
 
 func jsonInt(n int64) string { b, _ := json.Marshal(n); return string(b) }
+
+// A refused form does not keep half of it: the secret is not saved.
+func TestSSORefusedFormSavesNothing(t *testing.T) {
+	e := setup(t, true)
+	code, _ := e.do(t, "PUT", "/api/v1/settings/sso", map[string]any{"enabled": true, "issuer": "https://login.example",
+		"client_id": "vodmax", "client_secret": "segreto"}, true)
+	if code != 400 {
+		t.Fatalf("form without accounts: %d", code)
+	}
+	_, body := e.do(t, "GET", "/api/v1/settings/sso", nil, true)
+	if strings.Contains(string(body), `"has_secret":true`) {
+		t.Fatalf("secret saved by a refused form: %s", body)
+	}
+}
