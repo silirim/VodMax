@@ -352,6 +352,9 @@ func (s *Service) Downloads(ctx context.Context) ([]store.Download, error) {
 		}
 	}
 	s.dl.mu.Unlock()
+	for i := range list {
+		list[i].Error = TranslateText(LangOf(ctx), list[i].Error) // saved in Italian
+	}
 	return list, nil
 }
 

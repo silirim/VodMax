@@ -416,6 +416,7 @@ func (s *Service) RecordingRules(ctx context.Context) ([]store.RecordingRule, er
 				list[i].ChannelName = it.Title
 			}
 		}
+		list[i].LastNote = TranslateText(LangOf(ctx), list[i].LastNote) // saved in Italian
 	}
 	return list, nil
 }

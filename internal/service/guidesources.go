@@ -39,6 +39,7 @@ func (s *Service) GuideSources(ctx context.Context) ([]store.GuideSource, error)
 	list, err := s.st.GuideSources(ctx)
 	for i := range list {
 		list[i].URL = hideURLSecrets(list[i].URL)
+		list[i].Error = TranslateText(LangOf(ctx), list[i].Error)
 	}
 	return list, err
 }

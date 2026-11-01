@@ -568,12 +568,12 @@ window.VodMax = (() => {
     const data = res.status === 204 ? null : await res.json().catch(() => null);
     if (res.status === 401) {
       showPairing();
-      throw handled("dispositivo non abbinato");
+      throw handled(t("dispositivo non abbinato"));
     }
     if (res.status === 403 && data && data.code === "profile_required") {
       store.set("profile", "");
       showProfiles();
-      throw handled("scegli un profilo");
+      throw handled(t("scegli un profilo"));
     }
     if (!res.ok) throw Object.assign(new Error(data && data.error ? data.error : t("errore {status}", { status: res.status })), { status: res.status });
     return data;

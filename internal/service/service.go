@@ -515,6 +515,7 @@ func (s *Service) Subscriptions(ctx context.Context) ([]SubscriptionView, error)
 		syncing := s.syncing[sub.ID]
 		s.mu.Unlock()
 		sub.Settings = withoutCredentials(sub.Settings)
+		sub.SyncError = TranslateText(LangOf(ctx), sub.SyncError) // saved in Italian
 		out = append(out, SubscriptionView{Subscription: sub, Counts: counts, Syncing: syncing})
 	}
 	return out, nil

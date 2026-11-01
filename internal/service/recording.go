@@ -453,6 +453,7 @@ func (s *Service) Recordings(ctx context.Context) ([]store.Recording, error) {
 			list[i].Bytes = a.size()
 			list[i].Status = "recording"
 		}
+		list[i].Error = TranslateText(LangOf(ctx), list[i].Error) // saved in Italian
 	}
 	s.rec.mu.Unlock()
 	return list, err

@@ -714,5 +714,7 @@
   "La diretta si è interrotta": "The live stream stopped",
   "La diretta si è interrotta: la riapro…": "The live stream stopped: opening it again…",
   "Il canale non manda immagini: riprova o scegli un altro canale": "The channel sends no picture: try again or pick another channel",
-  "riguarda": "replay"
+  "riguarda": "replay",
+  "dispositivo non abbinato": "device not paired",
+  "scegli un profilo": "choose a profile"
 }
