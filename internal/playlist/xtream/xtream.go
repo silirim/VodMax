@@ -210,33 +210,27 @@ func (c *Client) LoginInfo(ctx context.Context) (Account, ServerInfo, error) {
 }
 
 func (c *Client) LiveCategories(ctx context.Context) ([]Category, error) {
-	var out []Category
-	return out, c.get(ctx, "get_live_categories", nil, &out)
+	return getList[Category](ctx, c, "get_live_categories")
 }
 
 func (c *Client) LiveStreams(ctx context.Context) ([]LiveStream, error) {
-	var out []LiveStream
-	return out, c.get(ctx, "get_live_streams", nil, &out)
+	return getList[LiveStream](ctx, c, "get_live_streams")
 }
 
 func (c *Client) VODCategories(ctx context.Context) ([]Category, error) {
-	var out []Category
-	return out, c.get(ctx, "get_vod_categories", nil, &out)
+	return getList[Category](ctx, c, "get_vod_categories")
 }
 
 func (c *Client) VODStreams(ctx context.Context) ([]VODStream, error) {
-	var out []VODStream
-	return out, c.get(ctx, "get_vod_streams", nil, &out)
+	return getList[VODStream](ctx, c, "get_vod_streams")
 }
 
 func (c *Client) SeriesCategories(ctx context.Context) ([]Category, error) {
-	var out []Category
-	return out, c.get(ctx, "get_series_categories", nil, &out)
+	return getList[Category](ctx, c, "get_series_categories")
 }
 
 func (c *Client) Series(ctx context.Context) ([]Series, error) {
-	var out []Series
-	return out, c.get(ctx, "get_series", nil, &out)
+	return getList[Series](ctx, c, "get_series")
 }
 
 // SeriesInfo returns a series with all its episodes, ordered by season.
@@ -301,6 +295,23 @@ func (c *Client) CatchupURL(streamID string, start time.Time, duration time.Dura
 	minutes := max(1, int(duration.Round(time.Minute)/time.Minute))
 	return c.base.JoinPath("timeshift", c.username, c.password, strconv.Itoa(minutes),
 		start.In(loc).Format("2006-01-02:15-04"), streamID+".ts").String()
+}
+
+// getList reads a list, leaving out the entries that do not decode: one
+// malformed title must not stop the whole catalog from updating.
+func getList[T any](ctx context.Context, c *Client, action string) ([]T, error) {
+	var raw []json.RawMessage
+	if err := c.get(ctx, action, nil, &raw); err != nil {
+		return nil, err
+	}
+	out := make([]T, 0, len(raw))
+	for _, r := range raw {
+		var v T
+		if json.Unmarshal(r, &v) == nil {
+			out = append(out, v)
+		}
+	}
+	return out, nil
 }
 
 func (c *Client) get(ctx context.Context, action string, extra url.Values, out any) error {

@@ -36,7 +36,9 @@ func fakeServer(t *testing.T) *httptest.Server {
 		case "":
 			w.Write([]byte(`{"user_info":{"auth":1,"status":"Active","exp_date":"1893456000","max_connections":"2","active_cons":0}}`))
 		case "get_live_streams":
+			// The middle entry is malformed (a string): left out, not fatal.
 			w.Write([]byte(`[{"num":1,"name":"Rai 1","stream_id":101,"epg_channel_id":"rai1.it","category_id":"5","tv_archive":1,"tv_archive_duration":"7"},
+				"rotto",
 				{"num":"2","name":"Canale 5","stream_id":"102","epg_channel_id":null,"category_id":5,"tv_archive":0}]`))
 		case "get_vod_streams":
 			w.Write([]byte(`[{"name":"1408","stream_id":555,"rating":"7.1","container_extension":"mkv","tmdb":3021,"year":"2007"}]`))

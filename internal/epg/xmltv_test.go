@@ -48,12 +48,35 @@ func TestParse(t *testing.T) {
 }
 
 func TestParseTime(t *testing.T) {
-	for _, s := range []string{"20261029200000 +0100", "202610292000 +0100", "20261029190000"} {
+	for _, s := range []string{"20261029200000 +0100", "202610292000 +0100", "20261029190000",
+		"20261029200000+0100", "20261029200000 +01:00", "20261029190000Z", "20261029190000 Z"} {
 		if tm, err := ParseTime(s); err != nil || tm.UTC().Hour() != 19 {
 			t.Errorf("%q → %v %v", s, tm, err)
 		}
 	}
 	if _, err := ParseTime("domani"); err == nil {
 		t.Error("invalid time accepted")
+	}
+}
+
+// stop is optional in XMLTV: a programme without it ends when the next one
+// of its channel starts; the last one, with nothing after it, is left out.
+func TestParseWithoutStop(t *testing.T) {
+	const guide = `<tv>
+  <programme start="20261029200000 +0100" channel="A"><title>Uno</title></programme>
+  <programme start="20261029200000 +0100" channel="B"><title>Altro canale</title></programme>
+  <programme start="20261029203000 +0100" channel="A"><title>Due</title></programme>
+  <programme start="20261029210000 +0100" stop="20261029220000 +0100" channel="A"><title>Tre</title></programme>
+</tv>`
+	g, err := Parse(strings.NewReader(guide), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, p := range g.Programmes {
+		got = append(got, p.Channel+" "+p.Title+" "+p.Stop.Sub(p.Start).String())
+	}
+	if strings.Join(got, ", ") != "a Uno 30m0s, a Due 30m0s, a Tre 1h0m0s" {
+		t.Fatalf("programmes: %v", got)
 	}
 }
