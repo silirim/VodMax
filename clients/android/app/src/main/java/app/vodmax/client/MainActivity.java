@@ -2,8 +2,11 @@ package app.vodmax.client;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -55,10 +58,17 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> picking;
     private byte[] saving;
     private boolean signingIn;
+    // Live TV plays in the page: the page says when (Bridge.pip) and the
+    // whole activity becomes the small window.
+    private boolean pipAvailable, pipPlaying;
+    private int pipWidth, pipHeight;
+    private BroadcastReceiver pipToggle;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        pipAvailable = Pip.available(this);
+        if (pipAvailable) pipToggle = Pip.listen(this, () -> page("window.VodMaxNativePipToggle && window.VodMaxNativePipToggle()"));
         server = prefs().getString(KEY_SERVER, null);
         if (prefs().getBoolean(KEY_LOCAL, false)) openLocal();
         else if (server == null) showSetup(null);
@@ -230,6 +240,12 @@ public class MainActivity extends Activity {
                 return true;
             }
 
+            // A page that has no video to keep on screen.
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                updatePip(false, 0, 0);
+            }
+
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) showOffline();
@@ -315,12 +331,19 @@ public class MainActivity extends Activity {
                         i.putExtra(PlayerActivity.INTRO_END, m.optInt("intro_end", 0));
                         i.putExtra(PlayerActivity.CREDITS, m.optInt("credits", 0));
                     }
+                    PlayerActivity.closeRunning();
                     startActivityForResult(i, PLAY);
                 } catch (Exception e) {
                     web.evaluateJavascript("window.VodMaxNativeError && window.VodMaxNativeError("
                         + JSONObject.quote(String.valueOf(e.getMessage())) + ")", null);
                 }
             });
+        }
+
+        /** The page's video started or stopped; its size in pixels. */
+        @JavascriptInterface
+        public void pip(boolean playing, int width, int height) {
+            runOnUiThread(() -> updatePip(playing, width, height));
         }
 
         /** {url, sha256, version} of a release APK: download, check, install. */
@@ -376,6 +399,29 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void page(String js) {
+        if (web != null) web.evaluateJavascript(js, null);
+    }
+
+    private void updatePip(boolean playing, int width, int height) {
+        pipPlaying = playing;
+        pipWidth = width;
+        pipHeight = height;
+        if (pipAvailable && Build.VERSION.SDK_INT >= 26) setPictureInPictureParams(Pip.params(this, playing, width, height));
+    }
+
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (pipAvailable && pipPlaying && Build.VERSION.SDK_INT >= 26 && Build.VERSION.SDK_INT < 31) Pip.enter(this, true, pipWidth, pipHeight);
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean on, Configuration config) {
+        super.onPictureInPictureModeChanged(on, config);
+        page("window.VodMaxNativePip && window.VodMaxNativePip(" + on + ")");
+    }
+
     private void endSignIn() {
         if (!signingIn) return;
         signingIn = false;
@@ -412,6 +458,7 @@ public class MainActivity extends Activity {
             return;
         }
         if (request != PLAY || web == null) return;
+        if (data != null && data.getBooleanExtra(PlayerActivity.SUPERSEDED, false)) return;
         long position = data == null ? 0 : data.getLongExtra(PlayerActivity.POSITION, 0);
         long duration = data == null ? 0 : data.getLongExtra(PlayerActivity.DURATION, 0);
         String error = data == null ? null : data.getStringExtra(PlayerActivity.ERROR);
@@ -456,6 +503,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (pipToggle != null) unregisterReceiver(pipToggle);
         if (web != null) web.destroy();
         super.onDestroy();
     }

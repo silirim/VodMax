@@ -686,6 +686,16 @@
 
   window.VodMax.withToken(start);
 
+  // The Android app's small window: it opens on leaving the app while the
+  // video plays, and shows the picture alone.
+  if (window.VodMax.native && window.VodMax.native.pip) {
+    const video = $("video");
+    const report = () => window.VodMax.native.pip(!video.paused && !video.ended, video.videoWidth, video.videoHeight);
+    for (const e of ["playing", "pause", "ended", "emptied", "resize"]) video.addEventListener(e, report);
+    window.VodMaxNativePip = (on) => document.body.classList.toggle("pip", on);
+    window.VodMaxNativePipToggle = () => actions.toggle();
+  }
+
   // Android "Back" goes through the page's own Back handling.
   window.VodMaxNativeBack = () => {
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));

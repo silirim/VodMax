@@ -1,13 +1,16 @@
 package app.vodmax.client;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -56,12 +59,20 @@ public class PlayerActivity extends Activity {
     static final String AUDIO_LANGUAGE = "audio_language";
     static final String PROGRESS_URL = "progress_url", PROGRESS_TOKEN = "progress_token", PROGRESS_PROFILE = "progress_profile";
     static final String RESTART_URL = "restart_url", RESTART_OFFSET = "restart_offset", KNOWN_DURATION = "known_duration";
+    static final String SUPERSEDED = "superseded";
 
     private static final int ACCENT = 0xFF00D6CA, PANEL = 0xEB13151B, LINE = 0x1FFFFFFF, TEXT = 0xFFF5F5F7, SOFT = 0xFFA9ABB5;
 
     private ExoPlayer player;
     private PlayerView view;
     private String error;
+
+    // Small window: the app can be used again under it, so another title
+    // may start while this one still plays there (see closeRunning).
+    private static PlayerActivity running;
+    private boolean pipAvailable, inPip, wasInPip, stopped;
+    private BroadcastReceiver pipToggle;
+    private LinearLayout extras;
 
     // The position is saved on the server every few seconds, not only on
     // the way out: the TV may be switched off with the player open.
@@ -77,7 +88,7 @@ public class PlayerActivity extends Activity {
     private String nextTitle;
     private int introStart, introEnd, credits;          // known, seconds
     private int learnedIntroStart, learnedIntroEnd, learnedCredits;
-    private boolean goNext, nextCancelled, skipping;
+    private boolean goNext, nextCancelled, skipping, superseded;
     private long nextAt;                                // ms, 0: not counting
     private long chainStart = -1, chainEnd;
     private Button skipIntro;
@@ -87,7 +98,7 @@ public class PlayerActivity extends Activity {
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
-            updateEpisodeExtras();
+            if (!inPip) updateEpisodeExtras();
             if (System.currentTimeMillis() - lastSaved > 15_000 && player != null && player.isPlaying()) saveProgress();
             ticker.postDelayed(this, 500);
         }
@@ -106,6 +117,8 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        running = this;
+        pipAvailable = Pip.available(this);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Intent in = getIntent();
         episode = in.getBooleanExtra(EPISODE, false);
@@ -262,9 +275,20 @@ public class PlayerActivity extends Activity {
         player.addListener(new Player.Listener() {
             @Override
             public void onPlaybackStateChanged(int state) {
-                if (state != Player.STATE_ENDED) return;
-                if (nextTitle != null && !nextCancelled) playNext(false);
-                else finishWithResult();
+                updatePip();
+                // In the small window the app cannot come forward to open
+                // the next episode: that waits until the window is reopened.
+                if (state == Player.STATE_ENDED && !inPip) ended();
+            }
+
+            @Override
+            public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
+                updatePip();
+            }
+
+            @Override
+            public void onVideoSizeChanged(androidx.media3.common.VideoSize size) {
+                updatePip();
             }
 
             @Override
@@ -283,6 +307,69 @@ public class PlayerActivity extends Activity {
         player.play();
         view.requestFocus();
         ticker.post(tick);
+        if (pipAvailable) {
+            pipToggle = Pip.listen(this, () -> {
+                if (player == null) return;
+                Player p = view.getPlayer();
+                p.setPlayWhenReady(!p.getPlayWhenReady());
+            });
+            updatePip();
+        }
+    }
+
+    private void ended() {
+        if (nextTitle != null && !nextCancelled) playNext(false);
+        else finishWithResult();
+    }
+
+    /** Nothing playing: closing the app does not open an empty window. */
+    private boolean pipPlaying() {
+        return player != null && player.getPlayWhenReady() && player.getPlaybackState() != Player.STATE_ENDED;
+    }
+
+    private void updatePip() {
+        if (!pipAvailable || player == null || Build.VERSION.SDK_INT < 26) return;
+        setPictureInPictureParams(Pip.params(this, pipPlaying(), player.getVideoSize().width, player.getVideoSize().height));
+    }
+
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (pipAvailable && pipPlaying() && Build.VERSION.SDK_INT >= 26 && Build.VERSION.SDK_INT < 31) {
+            Pip.enter(this, true, player.getVideoSize().width, player.getVideoSize().height);
+        }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean on, Configuration config) {
+        super.onPictureInPictureModeChanged(on, config);
+        inPip = on;
+        wasInPip |= on;
+        // Only the picture: the controls and subtitles do not fit.
+        view.setUseController(!on);
+        if (on) view.hideController();
+        if (view.getSubtitleView() != null) view.getSubtitleView().setVisibility(on ? View.GONE : View.VISIBLE);
+        if (extras != null) extras.setVisibility(on ? View.GONE : View.VISIBLE);
+        if (on) return;
+        // The window's X stops the activity, reopening it does not.
+        if (stopped) {
+            finishWithResult();
+            return;
+        }
+        hideSystemBars();
+        view.requestFocus();
+        if (player != null && player.getPlaybackState() == Player.STATE_ENDED) ended();
+    }
+
+    /**
+     * A new title replaces the one in the small window. Its position is
+     * saved here; the result must not be taken for the new title's.
+     */
+    static void closeRunning() {
+        PlayerActivity p = running;
+        if (p == null || p.player == null) return;
+        p.superseded = true;
+        p.finishWithResult();
     }
 
     /** A converted stream reopened at positionMs (from its own start). */
@@ -385,6 +472,7 @@ public class PlayerActivity extends Activity {
             FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
         lp.setMargins(dp(24), dp(24), dp(32), dp(32));
         root.addView(box, lp);
+        extras = box;
 
         skipIntro = pill(R.string.skip_intro, true);
         skipIntro.setVisibility(View.GONE);
@@ -531,7 +619,7 @@ public class PlayerActivity extends Activity {
         }
         // Play/pause and the other media keys always go to the player, also
         // while "Skip intro" or the next-episode card has the focus.
-        if (KeyEvent.isMediaSessionKey(event.getKeyCode())) {
+        if (mediaKey(event.getKeyCode())) {
             return view.dispatchKeyEvent(event) || super.dispatchKeyEvent(event);
         }
         View f = getCurrentFocus();
@@ -540,6 +628,25 @@ public class PlayerActivity extends Activity {
             return super.dispatchKeyEvent(event);
         }
         return view.dispatchKeyEvent(event) || super.dispatchKeyEvent(event);
+    }
+
+    // KeyEvent.isMediaSessionKey only exists from Android 12.
+    private static boolean mediaKey(int code) {
+        switch (code) {
+            case KeyEvent.KEYCODE_MEDIA_PLAY:
+            case KeyEvent.KEYCODE_MEDIA_PAUSE:
+            case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+            case KeyEvent.KEYCODE_HEADSETHOOK:
+            case KeyEvent.KEYCODE_MEDIA_STOP:
+            case KeyEvent.KEYCODE_MEDIA_NEXT:
+            case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+            case KeyEvent.KEYCODE_MEDIA_REWIND:
+            case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
+            case KeyEvent.KEYCODE_MUTE:
+                return true;
+            default:
+                return false;
+        }
     }
 
     private void finishWithResult() {
@@ -553,6 +660,7 @@ public class PlayerActivity extends Activity {
         out.putExtra(POSITION, Math.max(0, position));
         out.putExtra(DURATION, duration == C.TIME_UNSET ? 0 : duration);
         if (error != null) out.putExtra(ERROR, error);
+        out.putExtra(SUPERSEDED, superseded);
         out.putExtra(NEXT, goNext);
         if (learnedIntroEnd > 0) {
             out.putExtra(INTRO_START, learnedIntroStart);
@@ -562,13 +670,27 @@ public class PlayerActivity extends Activity {
         setResult(RESULT_OK, out);
         player.release();
         player = null;
+        // Once in the small window the player is in a task of its own:
+        // without this, closing it from full screen would land on the home
+        // screen and the interface would not get the result nor the next episode.
+        boolean backToApp = wasInPip && !inPip && !stopped && !superseded;
         finish();
+        if (backToApp) startActivity(new Intent(this, MainActivity.class));
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        stopped = false;
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        if (player != null && !isFinishing()) {
+        stopped = true;
+        // Also when finishing: Android may close the small window without
+        // telling us first.
+        if (player != null) {
             player.pause();
             saveProgress();
         }
@@ -576,6 +698,8 @@ public class PlayerActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (running == this) running = null;
+        if (pipToggle != null) unregisterReceiver(pipToggle);
         ticker.removeCallbacksAndMessages(null);
         if (player != null) {
             player.release();

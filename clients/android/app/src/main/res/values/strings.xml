@@ -24,6 +24,8 @@
     <string name="save_failed">file non salvato</string>
     <string name="update_refused">aggiornamento rifiutato: non viene dalle release di VodMax</string>
     <string name="update_bad_checksum">il file scaricato non corrisponde alla release (checksum diverso)</string>
+    <string name="pip_play">Riproduci</string>
+    <string name="pip_pause">Pausa</string>
     <string name="skip_intro">Salta intro</string>
     <string name="next_episode">Prossimo episodio</string>
     <string name="next_in">tra %1$d s</string>

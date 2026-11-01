@@ -23,6 +23,9 @@ video {
 
 [hidden] { display: none !important; }
 
+/* Android's small window: the picture alone. */
+.pip > :not(#screen), .pip #screen > :not(video) { display: none !important; }
+
 .hint { color: var(--soft); font-size: 0.85rem; }
 
 .panel {
