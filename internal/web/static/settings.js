@@ -116,6 +116,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
   }
 
   function open(view) {
+    if (!leaveAsked()) return;
     state.view = view;
     history.replaceState(null, "", "?view=" + view);
     render().then(() => { if (phone.matches) window.scrollTo(0, 0); });
@@ -135,12 +136,20 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     for (const i of f.querySelectorAll("[data-changed]")) delete i.dataset.changed;
   }, true);
   const unsaved = () => document.querySelector("main [data-changed]") !== null;
+  const leaveAsked = () => {
+    if (!unsaved() || !confirm(t("Ci sono modifiche non salvate. Uscire lo stesso?"))) return !unsaved();
+    for (const i of document.querySelectorAll("main [data-changed]")) delete i.dataset.changed;
+    return true;
+  };
+  document.addEventListener("click", (e) => { // the "Menu" link
+    if (e.target.closest(".side-back") && !leaveAsked()) e.preventDefault();
+  }, true);
 
   function back() {
     // An open folder picker closes first; changes not saved are asked about.
     const picker = document.querySelector(".picker-panel");
     if (picker && picker.close) { picker.close(); return; }
-    if (unsaved() && !confirm(t("Ci sono modifiche non salvate. Uscire lo stesso?"))) return;
+    if (!leaveAsked()) return;
     if (phone.matches && state.view) {
       const was = state.view;
       state.view = null;
@@ -1427,6 +1436,11 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     if (key === "OK" && active && active.tagName === "INPUT" && active.type === "checkbox") {
       e.preventDefault();
       active.click();
+      return;
+    }
+    if (key === "Back" && e.key !== "Backspace" && typing(active)) { // out of the field first
+      e.preventDefault();
+      moveFocus("ArrowDown");
       return;
     }
     if ((key === "Back" || e.key === "Backspace") && !typing(active)) {

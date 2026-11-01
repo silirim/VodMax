@@ -774,7 +774,15 @@ func (s *Service) BrowseCategories(ctx context.Context, kind string) ([]store.Br
 // noCredentialsIn refuses a server address with a user name or password in
 // it: they have their own sealed fields, while the address is shown.
 func noCredentialsIn(server string) error {
-	if u, err := url.Parse(strings.TrimSpace(server)); err == nil && u.User != nil {
+	u, err := url.Parse(strings.TrimSpace(server))
+	if err != nil {
+		return nil
+	}
+	hidden := u.User != nil
+	for k := range u.Query() {
+		hidden = hidden || secretParam.MatchString(k)
+	}
+	if hidden {
 		return invalid("l'indirizzo del server non deve contenere nome utente e password: usa i campi appositi")
 	}
 	return nil
@@ -789,11 +797,15 @@ func withoutCredentials(settings json.RawMessage) json.RawMessage {
 	}
 	server, _ := m["server"].(string)
 	u, err := url.Parse(server)
-	if server == "" || err != nil || u.User == nil {
+	if server == "" || err != nil {
 		return settings
 	}
 	u.User = nil
-	m["server"] = u.String()
+	shown := hideURLSecrets(u.String())
+	if shown == server {
+		return settings
+	}
+	m["server"] = shown
 	out, err := json.Marshal(m)
 	if err != nil {
 		return settings

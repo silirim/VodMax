@@ -125,12 +125,13 @@ type Progress struct {
 }
 
 // SaveProgress records a position. A title counts as watched from 95% (or
-// the last 3 minutes) on: it then leaves "continue watching".
+// the last 3 minutes, on a long one: not a third of a short) on: it then
+// leaves "continue watching".
 func (s *Store) SaveProgress(ctx context.Context, profileID int64, media string, mediaID int64, position, duration int) (Progress, error) {
 	if position < 0 || duration < 0 || (duration > 0 && position > duration+60) {
 		return Progress{}, errors.New("posizione non valida")
 	}
-	completed := duration > 0 && (position >= duration*95/100 || duration-position <= 180)
+	completed := duration > 0 && (position >= duration*95/100 || duration-position <= min(180, duration/10))
 	now := time.Now().Unix()
 	_, err := s.w.ExecContext(ctx, `INSERT INTO progress VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (profile_id, media, media_id) DO UPDATE SET position = excluded.position,

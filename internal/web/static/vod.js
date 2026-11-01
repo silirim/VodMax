@@ -463,8 +463,7 @@
       catch (e) { flash(e.message); }
     };
     const actions = $("detail-actions");
-    const trailer = actions.querySelector(".trailer");
-    actions.insertBefore(b, trailer || null);
+    actions.insertBefore(b, actions.querySelector(".download, .dl-state, .trailer")); // same order whatever arrives first
     try { on = (await api("GET", "/api/v1/mylist/" + item.id)).on; draw(); } catch { /* the button still works */ }
   }
 
@@ -908,7 +907,12 @@
         ? await api("POST", "/api/v1/catchup/" + id + "/session", { viewer, ...state.catchup })
         // The Android player reads MKV, AC-3, HEVC: the file as it is.
         : await api("POST", "/api/v1/vod/" + media + "/" + id + "/session", { viewer, mode: native ? "direct" : mode || "" });
-    } catch (e) { flash(e.message); return; }
+    } catch (e) {
+      flash(e.message);
+      // The next episode did not start: its card goes, the error stays read.
+      if (state.play) { state.play.nextCancelled = true; state.play.nextStarted = false; updateEpisodeExtras(); }
+      return;
+    }
     if (native) { playNative({ media, id, title: title || sess.title, sess, startAt: startAt || 0 }); return; }
     stopPlayback(false);
     const tracks = chooseTracks(sess, keep);
@@ -1503,7 +1507,9 @@
         if (key.startsWith("Arrow")) { moveFocus(key); showBar(); e.preventDefault(); return; }
         if (key === "OK") { document.activeElement.click(); showBar(); e.preventDefault(); return; }
         if (key === "Back" || key === "Backspace") {
-          if (!$("player-menu").hidden) { closeMenu(); $("player-toggle").focus(); } else document.activeElement.blur();
+          if (!$("player-menu").hidden) { closeMenu(); $("player-toggle").focus(); }
+          else if ($("player-extra").contains(document.activeElement)) stopPlayback(true); // a card has the focus by itself
+          else document.activeElement.blur();
           e.preventDefault();
           return;
         }

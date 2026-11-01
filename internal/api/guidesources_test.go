@@ -177,3 +177,33 @@ func TestHealthReadableFromTheTVApp(t *testing.T) {
 		t.Fatal("other routes readable from any origin")
 	}
 }
+
+// An address edited from its hidden form keeps the hidden secrets.
+func TestEditedGuideAddressKeepsSecrets(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.do(t, "POST", "/api/v1/guide/sources", map[string]string{"name": "Pay", "url": "https://u:segreto@epg.example/g.xml?apikey=K123&x=1"}, true)
+	_, body := e.do(t, "GET", "/api/v1/guide/sources", nil, true)
+	var list []struct {
+		ID  int64  `json:"id"`
+		URL string `json:"url"`
+	}
+	json.Unmarshal(body, &list)
+	id := list[len(list)-1].ID
+	shown := list[len(list)-1].URL
+	if !strings.Contains(shown, "apikey=***") || !strings.Contains(shown, ":***@") {
+		t.Fatalf("shown: %s", shown)
+	}
+	e.do(t, "PATCH", "/api/v1/guide/sources/"+strconv.FormatInt(id, 10), map[string]any{"url": strings.Replace(shown, "x=1", "x=2", 1)}, true)
+	db, _ := sql.Open("sqlite", e.dbPath)
+	defer db.Close()
+	var stored string
+	db.QueryRow(`SELECT url FROM guide_source WHERE id = ?`, id).Scan(&stored)
+	if !strings.Contains(stored, "segreto") || !strings.Contains(stored, "K123") || !strings.Contains(stored, "x=2") {
+		t.Fatalf("stored: %s", stored)
+	}
+	code, _ := e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "Q", "kind": "xtream", "vpn_id": 1,
+		"server": "http://127.0.0.1:1/?password=z", "username": "u", "password": "p"}, true)
+	if code != 400 {
+		t.Fatalf("password in the server address accepted: %d", code)
+	}
+}

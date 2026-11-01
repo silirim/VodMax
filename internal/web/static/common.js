@@ -128,8 +128,9 @@ window.VodMax = (() => {
       }
     } catch (e) {
       const admin = el("button", { type: "button", className: "link", onclick: () => askToken() }, t("Ho il token di amministrazione"));
-      overlay("pairing", el("h1", {}, "VodMax"), el("p", {}, t("Impossibile avviare l'abbinamento: {error}", { error: e.message })),
-        el("button", { type: "button", onclick: () => showPairing(true) }, t("Riprova")), admin);
+      const again = el("button", { type: "button", onclick: () => showPairing(true) }, t("Riprova"));
+      overlay("pairing", el("h1", {}, "VodMax"), el("p", {}, t("Impossibile avviare l'abbinamento: {error}", { error: e.message })), again, admin);
+      again.focus();
       return;
     }
     const code = el("p", { className: "pair-code" }, req.code);
@@ -771,6 +772,7 @@ window.VodMax = (() => {
       if (!problems.length) { if (box) box.remove(); return; }
       if (!box) {
         box = Object.assign(document.createElement("a"), { id: "server-problems" });
+        box.classList.add("focusable"); // the remote reaches it
         const open = () => { box.classList.remove("compact"); clearTimeout(box.timer); box.timer = setTimeout(() => box.classList.add("compact"), 6000); };
         box.addEventListener("focus", open);
         box.addEventListener("mouseenter", open);

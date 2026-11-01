@@ -65,8 +65,29 @@ func hideURLSecrets(raw string) string {
 				q[k] = []string{"***"}
 			}
 		}
-		u.RawQuery = q.Encode()
+		u.RawQuery = strings.ReplaceAll(q.Encode(), "%2A%2A%2A", "***")
 	}
+	return strings.Replace(u.String(), ":%2A%2A%2A@", ":***@", 1)
+}
+
+// keepURLSecrets puts back what hideURLSecrets hid, in an address edited
+// from its hidden form: the *** of the password and of each parameter.
+func keepURLSecrets(edited, stored string) string {
+	u, err := url.Parse(strings.TrimSpace(edited))
+	old, err2 := url.Parse(stored)
+	if err != nil || err2 != nil {
+		return edited
+	}
+	if pw, has := u.User.Password(); has && pw == "***" {
+		u.User = old.User
+	}
+	q, was := u.Query(), old.Query()
+	for k, v := range q {
+		if len(v) == 1 && v[0] == "***" && was.Has(k) {
+			q[k] = was[k]
+		}
+	}
+	u.RawQuery = q.Encode()
 	return u.String()
 }
 
@@ -101,7 +122,7 @@ func (s *Service) UpdateGuideSource(ctx context.Context, id int64, p GuideSource
 		}
 	}
 	if p.URL != nil && *p.URL != hideURLSecrets(g.URL) {
-		if g.URL, err = checkGuideURL(*p.URL); err != nil {
+		if g.URL, err = checkGuideURL(keepURLSecrets(*p.URL, g.URL)); err != nil {
 			return err
 		}
 	}

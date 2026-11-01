@@ -416,7 +416,7 @@ func (s *Service) Status(ctx context.Context) (SystemStatus, error) {
 	for _, sub := range subs {
 		if sub.SyncStatus == "error" {
 			out.Problems = append(out.Problems, Problem{Level: "error", Area: "subscription",
-				Text: T(ctx, "Ultima sincronizzazione di “%s” non riuscita: %s", sub.Name, sub.SyncError)})
+				Text: T(ctx, "Ultima sincronizzazione di “%s” non riuscita: %s", sub.Name, TranslateText(LangOf(ctx), sub.SyncError))})
 		}
 		var acc struct {
 			Active  *bool `json:"active"`
