@@ -27,6 +27,7 @@ type tvProvider struct {
 	ranges   []string
 	refused  int             // live requests refused for exceeding the connection limit
 	broken   map[string]bool // live streams ("101.ts") the provider does not serve
+	stalls   map[string]bool // live streams that stop sending after a few packets, connection open
 	extra    string          // more live streams, JSON objects
 }
 
@@ -98,7 +99,14 @@ func newTVProvider() *tvProvider {
 			w.Header().Set("Content-Type", "video/mp2t")
 			packet := make([]byte, 188)
 			packet[0] = 0x47
-			for {
+			p.mu.Lock()
+			stalls := p.stalls[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]]
+			p.mu.Unlock()
+			for sent := 0; ; sent++ {
+				if stalls && sent >= 20 {
+					<-r.Context().Done()
+					return
+				}
 				if _, err := w.Write(packet); err != nil {
 					return
 				}

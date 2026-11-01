@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/silirim/vodmax/internal/store"
@@ -44,7 +45,12 @@ type recorderState struct {
 	log     *slog.Logger
 	tickets map[string]recTicket
 	comskip string
+	stall   time.Duration // no data for this long: reconnect (0: recordStall)
 }
+
+// recordStall is how long a recording waits for data before it reconnects:
+// a provider can keep the connection open and send nothing.
+const recordStall = 20 * time.Second
 
 type recTicket struct {
 	id      int64
@@ -54,6 +60,9 @@ type recTicket struct {
 // StartRecorder runs the scheduler until ctx ends. Recordings left
 // "recording" by a previous run (crash, restart) are marked failed with
 // what they managed to save.
+// SetRecordStall changes how long a recording waits for data (tests).
+func (s *Service) SetRecordStall(d time.Duration) { s.rec.stall = d }
+
 func (s *Service) StartRecorder(ctx context.Context, dir string, log *slog.Logger) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -225,15 +234,41 @@ func (s *Service) recordOnce(ctx context.Context, a *activeRec, it store.Playbac
 	if err != nil {
 		return err
 	}
-	resp, err := s.upstream(streamCtx, it.SubscriptionID, link, "")
+	readCtx, cancel := context.WithCancel(streamCtx)
+	defer cancel()
+	resp, err := s.upstream(readCtx, it.SubscriptionID, link, "")
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+	stall := s.rec.stall
+	if stall <= 0 {
+		stall = recordStall
+	}
+	var last atomic.Int64
+	var stalled atomic.Bool
+	last.Store(time.Now().UnixNano())
+	go func() {
+		t := time.NewTicker(stall / 10)
+		defer t.Stop()
+		for {
+			select {
+			case <-readCtx.Done():
+				return
+			case <-t.C:
+				if time.Since(time.Unix(0, last.Load())) > stall {
+					stalled.Store(true)
+					cancel()
+					return
+				}
+			}
+		}
+	}()
 	buf := make([]byte, 188*512)
 	for {
 		n, err := resp.Body.Read(buf)
 		if n > 0 {
+			last.Store(time.Now().UnixNano())
 			if _, werr := f.Write(buf[:n]); werr != nil {
 				return werr
 			}
@@ -242,6 +277,9 @@ func (s *Service) recordOnce(ctx context.Context, a *activeRec, it store.Playbac
 			a.mu.Unlock()
 		}
 		if err != nil {
+			if stalled.Load() && ctx.Err() == nil {
+				return errors.New("il provider ha smesso di mandare dati")
+			}
 			if err == io.EOF {
 				return errors.New("flusso terminato dal provider")
 			}

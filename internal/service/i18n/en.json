@@ -95,6 +95,7 @@
   "il programma è già finito": "the programme has already ended",
   "il provider di accesso ha rifiutato il codice (%d %s)": "the sign-in provider refused the code (%d %s)",
   "il provider ha rifiutato il contenuto (HTTP %d)": "the provider refused the content (HTTP %d)",
+  "il provider ha smesso di mandare dati": "the provider stopped sending data",
   "il provider non indica la dimensione del file": "the provider doesn't report the file size",
   "il provider non permette di leggere il file a pezzi": "the provider doesn't allow reading the file in parts",
   "il servizio \"assistant\" non risponde: avvialo con  docker compose --profile assistant up -d": "the \"assistant\" service doesn't answer: start it with  docker compose --profile assistant up -d",

@@ -367,3 +367,33 @@ func TestMyList(t *testing.T) {
 		t.Fatalf("after removing: %s", l)
 	}
 }
+
+// A provider that keeps the connection open and sends nothing: the
+// recording reconnects instead of waiting until the stop time.
+func TestRecordingReconnectsWhenStalled(t *testing.T) {
+	e, p := tvSetup(t)
+	e.svc.SetRecordStall(300 * time.Millisecond)
+	p.mu.Lock()
+	p.stalls = map[string]bool{"101.ts": true}
+	p.mu.Unlock()
+	rai := channels(t, e, "?section=tv")[0]
+	now := time.Now().Unix()
+	if code, body := e.do(t, "POST", "/api/v1/recordings",
+		map[string]any{"channel_id": rai.ID, "start": now, "stop": now + 5, "title": "Ferma"}, true); code != 201 {
+		t.Fatalf("schedule: %d %s", code, body)
+	}
+	time.Sleep(6 * time.Second) // stall after 0.3 s, reconnection 3 s later
+	p.mu.Lock()
+	opened := strings.Count(strings.Join(p.opened, ","), "101.ts")
+	p.mu.Unlock()
+	_, body := e.do(t, "GET", "/api/v1/recordings", nil, true)
+	var list []struct {
+		Status string
+		Bytes  int64
+		Error  string
+	}
+	json.Unmarshal(body, &list)
+	if opened < 2 || len(list) != 1 || list[0].Bytes <= 188*20 || !strings.Contains(list[0].Error, "smesso di mandare dati") {
+		t.Fatalf("stalled stream: opened %d times, %s", opened, body)
+	}
+}
