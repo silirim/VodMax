@@ -132,3 +132,26 @@ func TestAddressesHideSecrets(t *testing.T) {
 		t.Fatalf("server with credentials: %d %s", code, body)
 	}
 }
+
+// A provider that does not answer is not a fault of VodMax: 502, not 500.
+func TestSyncProviderDownIs502(t *testing.T) {
+	e := setup(t, true)
+	e.do(t, "POST", "/api/v1/vpn", map[string]string{"name": "VPN", "config": wgConf(t)}, true)
+	e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "Giù", "kind": "xtream", "vpn_id": 1,
+		"server": "http://127.0.0.1:1", "username": "u", "password": "p"}, true)
+	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code != http.StatusBadGateway {
+		t.Fatalf("sync with the provider down: %d %s", code, body)
+	}
+}
+
+// Two subscriptions with one name: a clear refusal, not a database error.
+func TestSubscriptionNameTaken(t *testing.T) {
+	e := setup(t, true)
+	e.do(t, "POST", "/api/v1/vpn", map[string]string{"name": "VPN", "config": wgConf(t)}, true)
+	sub := map[string]any{"name": "Casa", "kind": "xtream", "vpn_id": 1, "server": "http://127.0.0.1:1", "username": "u", "password": "p"}
+	e.do(t, "POST", "/api/v1/subscriptions", sub, true)
+	code, body := e.do(t, "POST", "/api/v1/subscriptions", sub, true)
+	if code != 400 || strings.Contains(string(body), "UNIQUE") || !strings.Contains(string(body), "nome") {
+		t.Fatalf("same name: %d %s", code, body)
+	}
+}

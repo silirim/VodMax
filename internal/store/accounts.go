@@ -107,6 +107,9 @@ func (s *Store) DeleteVPN(ctx context.Context, id int64) error {
 }
 
 // AddSubscription stores a subscription; seal is called with the new id.
+// ErrSubscriptionName: two subscriptions or collections with one name.
+var ErrSubscriptionName = errors.New("esiste già un abbonamento o una raccolta con questo nome")
+
 func (s *Store) AddSubscription(ctx context.Context, sub Subscription, seal func(id int64) []byte) (int64, error) {
 	tx, err := s.w.BeginTx(ctx, nil)
 	if err != nil {
@@ -116,6 +119,9 @@ func (s *Store) AddSubscription(ctx context.Context, sub Subscription, seal func
 	res, err := tx.ExecContext(ctx,
 		`INSERT INTO subscription (name, kind, vpn_id, settings, secret, created_at) VALUES (?, ?, ?, ?, x'', ?)`,
 		sub.Name, sub.Kind, nullID(sub.VPNID), string(sub.Settings), time.Now().Unix())
+	if isUnique(err) {
+		return 0, ErrSubscriptionName
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -217,6 +223,9 @@ func (s *Store) UpdateSubscription(ctx context.Context, id int64, name *string, 
 	res, err := s.w.ExecContext(ctx, `UPDATE subscription SET name = coalesce(?, name), vpn_id = coalesce(?, vpn_id),
 		settings = coalesce(?, settings), secret = coalesce(?, secret) WHERE id = ?`,
 		name, vpnID, nullable(settings), secret, id)
+	if isUnique(err) {
+		return ErrSubscriptionName
+	}
 	if err != nil {
 		return err
 	}

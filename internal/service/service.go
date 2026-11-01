@@ -530,6 +530,14 @@ func (s *Service) DeleteSubscription(ctx context.Context, id int64) error {
 	return err
 }
 
+// ProviderError is a failure of the provider or of its VPN (refused
+// credentials, an answer that cannot be read, a host that does not
+// answer): not a fault of VodMax (HTTP 502, not 500).
+type ProviderError struct{ Err error }
+
+func (e *ProviderError) Error() string { return e.Err.Error() }
+func (e *ProviderError) Unwrap() error { return e.Err }
+
 // ErrBusy means a synchronisation of the same subscription is running.
 var ErrBusy = errors.New("sincronizzazione già in corso")
 
@@ -586,7 +594,11 @@ func (s *Service) Sync(ctx context.Context, id int64, allowDrop bool) (SyncResul
 			account = snap.Account
 		}
 		s.st.SetSyncResult(context.Background(), id, "error", err.Error(), account)
-		return SyncResult{}, err
+		var bad ErrInvalid
+		if errors.As(err, &bad) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return SyncResult{}, err
+		}
+		return SyncResult{}, &ProviderError{Err: err}
 	}
 	res, err := s.st.ReplaceCatalog(ctx, id, snap.Kinds, snap.Categories, snap.Items, allowDrop)
 	if err != nil {

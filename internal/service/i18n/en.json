@@ -70,6 +70,7 @@
   "download non riuscito: risposta %d": "download failed: answer %d",
   "durata massima di una registrazione: 6 ore": "a recording can last 6 hours at most",
   "errore: %s": "error: %s",
+  "esiste già un abbonamento o una raccolta con questo nome": "a subscription or collection with this name already exists",
   "esiste già un profilo con questo nome": "a profile with this name already exists",
   "fascia oraria non valida (ore 0-23, inizio diverso dalla fine)": "invalid time window (hours 0-23, start different from end)",
   "file MP4 vuoto": "empty MP4 file",

@@ -271,6 +271,8 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusBadRequest
 	case errors.Is(err, store.ErrNotFound):
 		status = http.StatusNotFound
+	case errors.Is(err, store.ErrSubscriptionName):
+		status = http.StatusBadRequest
 	case errors.As(err, &busy) && busy.Recording:
 		// Held by recordings: nobody can take it over (409 offers to).
 		status = http.StatusLocked
@@ -301,6 +303,8 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusBadGateway
 	case errors.Is(err, context.DeadlineExceeded):
 		status = http.StatusGatewayTimeout
+	case errors.As(err, new(*service.ProviderError)):
+		status = http.StatusBadGateway
 	}
 	if status == http.StatusInternalServerError {
 		a.log.Error("richiesta fallita", "path", r.URL.Path, "err", err)

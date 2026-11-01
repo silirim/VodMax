@@ -70,6 +70,7 @@
   "download non riuscito: risposta %d": "download non riuscito: risposta %d",
   "durata massima di una registrazione: 6 ore": "durata massima di una registrazione: 6 ore",
   "errore: %s": "errore: %s",
+  "esiste già un abbonamento o una raccolta con questo nome": "esiste già un abbonamento o una raccolta con questo nome",
   "esiste già un profilo con questo nome": "esiste già un profilo con questo nome",
   "fascia oraria non valida (ore 0-23, inizio diverso dalla fine)": "fascia oraria non valida (ore 0-23, inizio diverso dalla fine)",
   "file MP4 vuoto": "file MP4 vuoto",
