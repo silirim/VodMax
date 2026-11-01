@@ -61,6 +61,9 @@ window.VodMax = (() => {
     for (const old of document.querySelectorAll(".setup-panel")) old.remove();
     const box = Object.assign(document.createElement("section"), { id, className: "panel setup-panel" });
     box.append(...children.filter((c) => c != null && c !== false));
+    // The remote moves inside the panel (not to the menu behind it); Back
+    // does what the panel says (box.back), e.g. from a PIN to the profiles.
+    panelKeys(box, () => { if (box.back) box.back(); });
     document.body.append(box);
     return box;
   }
@@ -170,6 +173,8 @@ window.VodMax = (() => {
       form.addEventListener("submit", (e) => { e.preventDefault(); select(p, pin.value, msg); });
       box.replaceChildren(el("h1", {}, p.name), el("p", {}, t("PIN del profilo")), form, msg,
         el("button", { type: "button", className: "link", onclick: () => showProfiles() }, t("← Altri profili")));
+      box.back = () => showProfiles();
+      pin.setAttribute("enterkeyhint", "go");
       pin.focus();
     }
     async function select(p, pin, msg) {
@@ -241,8 +246,10 @@ window.VodMax = (() => {
         const b = x.getBoundingClientRect(), dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
         const ok = { ArrowLeft: dx < -4, ArrowRight: dx > 4, ArrowUp: dy < -4, ArrowDown: dy > 4 }[key];
         if (!ok) continue;
-        const along = key === "ArrowLeft" || key === "ArrowRight" ? Math.abs(dx) : Math.abs(dy);
-        const across = key === "ArrowLeft" || key === "ArrowRight" ? Math.abs(dy) : Math.abs(dx);
+        const horizontal = key === "ArrowLeft" || key === "ArrowRight";
+        const along = horizontal ? Math.abs(dx) : Math.abs(dy);
+        const across = horizontal ? Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom))
+          : Math.max(0, Math.max(a.left, b.left) - Math.min(a.right, b.right));
         const sc = along + across * 3;
         if (sc < score) { score = sc; best = x; }
       }
@@ -287,8 +294,7 @@ window.VodMax = (() => {
       el("p", {}, t("Ci sono altri profili: senza un PIN chiunque potrebbe entrare in “{name}” e cambiare le impostazioni. Scegli un PIN: lo chiederà una volta su ogni dispositivo.", { name: p.name })),
       pinForm(false, (pin) => reselect(p, pin)),
       el("button", { type: "button", className: "link focusable", onclick: () => { store.set("profile", ""); showProfiles(); } }, t("← Altri profili")));
-    box.classList.add("modal");
-    panelKeys(box, null);
+    box.classList.add("modal"); // keys: overlay() already moves inside it
     const first = box.querySelector("input");
     if (first) first.focus();
   }

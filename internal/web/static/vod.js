@@ -172,7 +172,9 @@
       const card = e.target.closest(".card");
       if (!card || !card.hero) return;
       clearTimeout(heroTimer);
-      heroTimer = setTimeout(() => showHero(hero, card.hero), 350);
+      // Only if the focus is still on that card (moving on quickly with
+      // the remote must not redraw the hero under the new focus).
+      heroTimer = setTimeout(() => { if (document.activeElement === card) showHero(hero, card.hero); }, 350);
     });
   }
 
@@ -201,8 +203,11 @@
     });
     const plot = el("p", { className: "hero-plot" });
     const art = el("div", { className: "hero-art" });
+    // A focused hero button keeps the focus on the new one in its place.
+    const had = hero.contains(document.activeElement) ? [...hero.querySelectorAll("button")].indexOf(document.activeElement) : -1;
     hero.replaceChildren(art, el("div", { className: "hero-text" }, el("h1", {}, h.title),
       el("p", { className: "hero-meta" }, h.meta.filter(Boolean).join(" · ")), plot, el("div", { className: "hero-actions" }, ...buttons)));
+    if (had >= 0 && buttons.length) buttons[Math.min(had, buttons.length - 1)].focus();
     if (h.logo) art.style.backgroundImage = "url(" + JSON.stringify(h.logo) + ")";
     const d = await detailsOf(h.id);
     if (heroShown !== h) return;
@@ -755,6 +760,8 @@
   }
 
   async function openDetail(item) {
+    // Back returns to what opened it (the card in a long grid, a pick).
+    if (!state.detail) state.detailFrom = document.activeElement;
     state.detail = item;
     $("detail-title").textContent = item.display_title;
     $("detail-meta").textContent = [item.year, { 4: "4K", 3: "Full HD", 2: "HD", 1: "SD" }[item.quality],
@@ -877,7 +884,12 @@
   function closeDetail() {
     $("detail").hidden = true;
     state.detail = null;
-    focusFirst($("content"));
+    const from = state.detailFrom;
+    state.detailFrom = null;
+    if (from && document.body.contains(from) && from.offsetParent !== null) {
+      from.focus({ preventScroll: true });
+      from.scrollIntoView({ block: "nearest" });
+    } else focusFirst($("content"));
   }
 
   // ---- Player ----
@@ -1444,6 +1456,7 @@
     const a = current.getBoundingClientRect();
     const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
     let best = null, bestScore = Infinity;
+    const horizontal = dir === "ArrowLeft" || dir === "ArrowRight";
     for (const e of all) {
       if (e === current) continue;
       const b = e.getBoundingClientRect();
@@ -1451,8 +1464,11 @@
       const dx = bx - ax, dy = by - ay;
       const ok = { ArrowLeft: dx < -4, ArrowRight: dx > 4, ArrowUp: dy < -4, ArrowDown: dy > 4 }[dir];
       if (!ok) continue;
-      const along = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dx) : Math.abs(dy);
-      const across = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dy) : Math.abs(dx);
+      // Across: the gap between the two boxes (0 when they line up), so a
+      // field to the side of its label is not skipped for a button below.
+      const along = horizontal ? Math.abs(dx) : Math.abs(dy);
+      const across = horizontal ? Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom))
+        : Math.max(0, Math.max(a.left, b.left) - Math.min(a.right, b.right));
       const score = along + across * 3;
       if (score < bestScore) { bestScore = score; best = e; }
     }
@@ -1492,7 +1508,25 @@
     }
     const active = document.activeElement;
     if (key === "OK" && active && active.type === "checkbox") { active.click(); e.preventDefault(); return; }
-    if (active && active.tagName === "INPUT" && active !== $("search")) return; // e.g. the token form
+    // Text fields (rule form, "Stasera"): Up and Down leave them, ◀ ▶ leave
+    // them at the start or the end of the text, Back leaves them; lists
+    // (select) open with OK.
+    const field = active && active !== $("search") && (active.tagName === "INPUT" || active.tagName === "SELECT" || active.tagName === "TEXTAREA");
+    if (field && !active.closest(".setup-panel")) {
+      const text = active.tagName !== "SELECT" && typeof active.selectionStart === "number";
+      const atStart = !text || (active.selectionStart === 0 && active.selectionEnd === 0);
+      const atEnd = !text || active.selectionEnd === active.value.length;
+      if (key === "ArrowUp" || key === "ArrowDown" || (key === "ArrowLeft" && atStart) || (key === "ArrowRight" && atEnd)) {
+        moveFocus(key);
+        e.preventDefault();
+      } else if (key === "Back") {
+        moveFocus("ArrowDown");
+        if (document.activeElement === active) moveFocus("ArrowUp");
+        e.preventDefault();
+      }
+      return;
+    }
+    if (field) return; // a full-screen panel's form (token, PIN)
     const typing = active === $("search");
     if (typing && !["ArrowDown", "Back", "OK"].includes(key)) return;
     if (key.startsWith("Arrow")) { moveFocus(key); e.preventDefault(); return; }
@@ -1518,7 +1552,7 @@
   for (const tab of document.querySelectorAll(".tab[data-view]")) {
     tab.onclick = () => { state.view = tab.dataset.view; state.query = ""; $("search").value = ""; closeDetailSilently(); render(); };
   }
-  function closeDetailSilently() { $("detail").hidden = true; state.detail = null; }
+  function closeDetailSilently() { $("detail").hidden = true; state.detail = null; state.detailFrom = null; }
 
   let searchTimer;
   $("search").addEventListener("input", () => {
