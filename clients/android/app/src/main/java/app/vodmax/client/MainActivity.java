@@ -333,6 +333,12 @@ public class MainActivity extends Activity {
                         }
 
                         @Override
+                        public void note(String text) {
+                            if (web != null) web.evaluateJavascript("window.VodMaxUpdateNote && window.VodMaxUpdateNote("
+                                + JSONObject.quote(text) + ")", null);
+                        }
+
+                        @Override
                         public void done(String error) {
                             if (web != null) web.evaluateJavascript("window.VodMaxUpdateDone && window.VodMaxUpdateDone("
                                 + (error == null ? "null" : JSONObject.quote(error)) + ")", null);

@@ -155,3 +155,22 @@ func TestSubscriptionNameTaken(t *testing.T) {
 		t.Fatalf("same name: %d %s", code, body)
 	}
 }
+
+// The LG app's start page (file://) reads the health check: allowed for
+// every origin, and only there.
+func TestHealthReadableFromTheTVApp(t *testing.T) {
+	e := setup(t, true)
+	resp, err := http.Get(e.srv.URL + "/api/v1/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.Header.Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatal("health check not readable by the TV app")
+	}
+	resp, _ = http.Get(e.srv.URL + "/api/v1/subscriptions")
+	resp.Body.Close()
+	if resp.Header.Get("Access-Control-Allow-Origin") != "" {
+		t.Fatal("other routes readable from any origin")
+	}
+}

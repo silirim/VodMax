@@ -82,12 +82,14 @@
   });
   $("retry").addEventListener("click", function () { open(normalize($("server").value)); });
 
-  // Remote: Up/Down between the field and the buttons.
+  // Remote: Up/Down between the field and the buttons, Left/Right between
+  // the buttons.
   document.addEventListener("keydown", function (e) {
     var order = [$("server"), $("connect"), $("retry")].filter(function (el) { return !el.hidden; });
     var i = order.indexOf(document.activeElement);
-    if (e.keyCode === 40 && i < order.length - 1) { order[i + 1].focus(); e.preventDefault(); }
-    if (e.keyCode === 38 && i > 0) { order[i - 1].focus(); e.preventDefault(); }
+    var onButton = document.activeElement !== $("server");
+    if ((e.keyCode === 40 || (e.keyCode === 39 && onButton)) && i < order.length - 1) { order[i + 1].focus(); e.preventDefault(); }
+    if ((e.keyCode === 38 || (e.keyCode === 37 && onButton && i > 1)) && i > 0) { order[i - 1].focus(); e.preventDefault(); }
   });
 
   var saved = null;

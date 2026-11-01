@@ -32,6 +32,9 @@ final class AppUpdater {
 
         /** null when the installer was opened (or the permission asked). */
         void done(String error);
+
+        /** Something to do before it goes on (not an error). */
+        void note(String text);
     }
 
     private final Activity activity;
@@ -57,8 +60,9 @@ final class AppUpdater {
                 download(url, apk, sha256, listener);
                 activity.runOnUiThread(() -> {
                     pending = apk;
-                    install();
-                    listener.done(null);
+                    String error = install();
+                    if (waitingPermission) listener.note(activity.getString(R.string.update_allow_installs));
+                    else listener.done(error);
                 });
             } catch (Exception e) {
                 activity.runOnUiThread(() -> listener.done(String.valueOf(e.getMessage())));
@@ -104,23 +108,37 @@ final class AppUpdater {
         }
     }
 
-    /** Opens the installer, after asking to allow installing apps if needed. */
-    private void install() {
-        if (pending == null) return;
+    /**
+     * Opens the installer, after asking to allow installing apps if needed.
+     * Returns an error for the page, or null. Some TVs and Fire TVs lack
+     * these system screens: that is said instead of closing the app.
+     */
+    private String install() {
+        if (pending == null) return null;
         if (Build.VERSION.SDK_INT >= 26 && !activity.getPackageManager().canRequestPackageInstalls()) {
             waitingPermission = true;
             try {
                 activity.startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                     Uri.parse("package:" + activity.getPackageName())));
             } catch (Exception e) {
-                activity.startActivity(new Intent(Settings.ACTION_SECURITY_SETTINGS));
+                try {
+                    activity.startActivity(new Intent(Settings.ACTION_SECURITY_SETTINGS));
+                } catch (Exception again) {
+                    waitingPermission = false;
+                    return activity.getString(R.string.update_no_permission_screen);
+                }
             }
-            return;
+            return null;
         }
-        Uri uri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".updates", pending);
-        activity.startActivity(new Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, "application/vnd.android.package-archive")
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            Uri uri = FileProvider.getUriForFile(activity, activity.getPackageName() + ".updates", pending);
+            activity.startActivity(new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception e) {
+            return activity.getString(R.string.update_no_installer);
+        }
+        return null;
     }
 
     /** Back from the permission screen: install if it was granted. */
@@ -128,6 +146,6 @@ final class AppUpdater {
         if (!waitingPermission) return;
         if (Build.VERSION.SDK_INT >= 26 && !activity.getPackageManager().canRequestPackageInstalls()) return;
         waitingPermission = false;
-        install();
+        install(); // the installer opens; nothing left to tell the page
     }
 }

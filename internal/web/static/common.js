@@ -472,6 +472,7 @@ window.VodMax = (() => {
     if (!apk) return;
     status(t("Scaricamento dell'aggiornamento…"));
     window.VodMaxUpdateProgress = (p) => status(t("Scaricamento dell'aggiornamento… {pct}%", { pct: p }));
+    window.VodMaxUpdateNote = (text) => status(text, false);
     window.VodMaxUpdateDone = (err) => status(err ? t("Aggiornamento non riuscito: {error}", { error: err })
       : t("Conferma l'installazione nella finestra di Android."), Boolean(err));
     native.update(JSON.stringify({ url: apk.url, sha256: apk.sha256, version: info.latest }));

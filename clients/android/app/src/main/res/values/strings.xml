@@ -15,6 +15,9 @@
     <string name="local_failed">VodMax non si è avviato su questo dispositivo</string>
     <string name="local_exited">il server interno si è fermato (codice %1$d)</string>
     <string name="local_no_answer">il server interno non risponde</string>
+    <string name="update_no_permission_screen">questo dispositivo non ha la schermata per permettere l\'installazione di app: installa l\'APK a mano</string>
+    <string name="update_allow_installs">permetti a VodMax di installare app, poi torna qui: l\'aggiornamento continua</string>
+    <string name="update_no_installer">questo dispositivo non ha il programma di installazione delle app: installa l\'APK a mano</string>
     <string name="local_port_busy">la porta 8095 è occupata da un\'altra app: chiudila o riavvia il dispositivo</string>
     <string name="save_unavailable">questo dispositivo non permette di scegliere dove salvare il file</string>
     <string name="save_cancelled">salvataggio annullato</string>

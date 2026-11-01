@@ -15,6 +15,9 @@
     <string name="local_failed">VodMax couldn\'t start on this device</string>
     <string name="local_exited">the built-in server stopped (code %1$d)</string>
     <string name="local_no_answer">the built-in server isn\'t responding</string>
+    <string name="update_no_permission_screen">this device has no screen to allow installing apps: install the APK by hand</string>
+    <string name="update_allow_installs">allow VodMax to install apps, then come back: the update goes on</string>
+    <string name="update_no_installer">this device has no app installer: install the APK by hand</string>
     <string name="local_port_busy">port 8095 is taken by another app: close it or restart the device</string>
     <string name="save_unavailable">this device does not let you choose where to save the file</string>
     <string name="save_cancelled">saving cancelled</string>

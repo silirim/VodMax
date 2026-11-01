@@ -27,6 +27,9 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	a := &api{svc: svc, log: log}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
+		// The LG app's start page (a file:// page) checks the server here
+		// before opening it: nothing private, so any origin may read it.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 	protected := http.NewServeMux()
