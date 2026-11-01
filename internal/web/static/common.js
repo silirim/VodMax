@@ -596,7 +596,9 @@ window.VodMax = (() => {
   // seeking into such gaps. So: a larger start-up buffer, no chasing, and
   // a watchdog that steps over gaps and resumes a stall the user did not
   // ask for.
-  function tsPlayer(video, url, { live, onError, onStart } = {}) {
+  // onEnd: a live stream ended (taken by another device, or stopped by the
+  // provider); onSilent: no picture after a while (nothing decodable).
+  function tsPlayer(video, url, { live, onError, onStart, onEnd, onSilent } = {}) {
     const player = mpegts.createPlayer({ type: "mpegts", isLive: live, url }, {
       enableWorker: false,
       enableStashBuffer: true,
@@ -609,6 +611,8 @@ window.VodMax = (() => {
     player.attachMediaElement(video);
     player.on(mpegts.Events.ERROR, (type, detail, info) => { if (!destroyed && onError) onError(type, detail, info); });
     player.on(mpegts.Events.MEDIA_INFO, () => { if (!destroyed && onStart) onStart(); });
+    player.on(mpegts.Events.LOADING_COMPLETE, () => { if (!destroyed && live && onEnd) onEnd(); });
+    const silent = setTimeout(() => { if (!destroyed && !userPaused && video.readyState < 2 && onSilent) onSilent(); }, 15000);
     player.load();
     const tryPlay = () => { const p = video.play(); if (p && p.catch) p.catch(() => {}); };
     tryPlay();
@@ -651,6 +655,7 @@ window.VodMax = (() => {
       destroy() {
         destroyed = true;
         clearInterval(watchdog);
+        clearTimeout(silent);
         try { player.pause(); player.unload(); player.detachMediaElement(); player.destroy(); } catch { /* already gone */ }
       },
     };

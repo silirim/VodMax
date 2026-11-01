@@ -1,6 +1,7 @@
 {
   " (%d nuove)": " (%d nuove)",
   "%d in programma": "%d in programma",
+  "%w: ffmpeg non avviabile: %v": "%w: ffmpeg non avviabile: %v",
   ", %d annullate a mano": ", %d annullate a mano",
   ", %d repliche saltate": ", %d repliche saltate",
   "; non registrabili per mancanza di connessioni: %s": "; non registrabili per mancanza di connessioni: %s",

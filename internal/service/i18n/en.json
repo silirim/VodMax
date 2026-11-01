@@ -1,6 +1,7 @@
 {
   " (%d nuove)": " (%d new)",
   "%d in programma": "%d scheduled",
+  "%w: ffmpeg non avviabile: %v": "%w: ffmpeg cannot start: %v",
   ", %d annullate a mano": ", %d cancelled manually",
   ", %d repliche saltate": ", %d reruns skipped",
   "; non registrabili per mancanza di connessioni: %s": "; can't be recorded, not enough connections: %s",

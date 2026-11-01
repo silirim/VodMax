@@ -710,5 +710,8 @@
   "Cast e regia noti per {known} titoli su {total}: servono per richieste come «un film con…». VodMax completa l'elenco di notte, a poco a poco, finché l'assistente è acceso.": "Cast and director known for {known} of {total} titles: they are used for requests like “a film with…”. VodMax completes the list at night, a little at a time, while the assistant is on.",
   "file non leggibile": "file not readable",
   "Tutte le connessioni dell'abbonamento sono occupate da una registrazione in corso": "All the subscription's connections are taken by a recording in progress",
-  "Ci sono modifiche non salvate. Uscire lo stesso?": "There are unsaved changes. Leave anyway?"
+  "Ci sono modifiche non salvate. Uscire lo stesso?": "There are unsaved changes. Leave anyway?",
+  "La diretta si è interrotta": "The live stream stopped",
+  "La diretta si è interrotta: la riapro…": "The live stream stopped: opening it again…",
+  "Il canale non manda immagini: riprova o scegli un altro canale": "The channel sends no picture: try again or pick another channel"
 }

@@ -87,6 +87,21 @@
     const player = window.VodMax.tsPlayer($("video"), url + (force ? "?force=1" : ""), {
       live: true,
       onStart: () => { delete state.retries[channel.id]; },
+      // The stream closed: another device took the connection, or the
+      // provider stopped it. Tuning again says which (it asks to take the
+      // connection back when it is busy).
+      onEnd: () => {
+        if (state.player !== player) return;
+        stopPlayer();
+        const attempt = (state.retries[channel.id] || 0) + 1;
+        state.retries[channel.id] = attempt;
+        if (attempt > 2) { flash(t("La diretta si è interrotta")); return; }
+        flash(t("La diretta si è interrotta: la riapro…"));
+        state.timers.retry = setTimeout(() => state.current === channel && tune(channel), 1500);
+      },
+      onSilent: () => {
+        if (state.player === player) flash(t("Il canale non manda immagini: riprova o scegli un altro canale"));
+      },
       onError: (type, detail, info) => {
         if (state.player !== player) return;
         stopPlayer();

@@ -124,6 +124,11 @@ func (s *Service) StartTimeshift(ctx context.Context, itemID int64, viewer strin
 	if free, _, ok := diskSpace(root); ok && free < minFreeTimeshift {
 		return TimeshiftSession{}, fmt.Errorf("%w: disco quasi pieno", ErrNoTimeshift)
 	}
+	// Before taking a connection (maybe from another viewer): without
+	// ffmpeg there is no buffer, and the player uses the direct stream.
+	if _, err := exec.LookPath(s.ffmpegBin()); err != nil {
+		return TimeshiftSession{}, fmt.Errorf("%w: ffmpeg non avviabile: %v", ErrNoTimeshift, err)
+	}
 	ls, err := s.LiveSettings(ctx)
 	if err != nil {
 		return TimeshiftSession{}, err
@@ -168,7 +173,9 @@ func (s *Service) StartTimeshift(ctx context.Context, itemID int64, viewer strin
 		first.Close()
 		cancel()
 		os.RemoveAll(sess.dir)
-		return TimeshiftSession{}, fmt.Errorf("ffmpeg non avviabile: %w", err)
+		// Without ffmpeg the channel still plays, without pause: the
+		// player falls back to the direct stream (ErrNoTimeshift).
+		return TimeshiftSession{}, fmt.Errorf("%w: ffmpeg non avviabile: %v", ErrNoTimeshift, err)
 	}
 	s.ts.mu.Lock()
 	s.ts.sessions[sess.id] = sess

@@ -61,7 +61,11 @@
     $("mv-layout").lastChild.textContent = state.layout === 4 ? t("2 canali") : t("4 canali");
   }
 
+  // A box's message stays until its channel changes or plays again
+  // (moving the focus redraws every box).
   function render(cell, message) {
+    if (message !== undefined) cell.message = message;
+    message = cell.message;
     for (const old of cell.box.querySelectorAll(".mv-label, .mv-empty")) old.remove();
     const c = channel(state.ids[cell.i]);
     if (!c) {
@@ -83,6 +87,7 @@
   // emptied frees its own.
   async function play(cell) {
     stop(cell);
+    cell.message = "";
     const c = channel(state.ids[cell.i]);
     if (!c) return;
     let url;
@@ -102,6 +107,8 @@
           : type === mpegts.ErrorTypes.MEDIA_ERROR ? t("Questo dispositivo non riesce a decodificare il canale ({detail})", { detail })
             : t("Canale non disponibile ({code})", { code: code || detail }));
       },
+      onEnd: () => { if (cell.player === player) { stop(cell); render(cell, t("La diretta si è interrotta")); } },
+      onSilent: () => { if (cell.player === player) render(cell, t("Il canale non manda immagini: riprova o scegli un altro canale")); },
     });
     cell.player = player;
     cell.video.muted = cell.i !== state.active;
@@ -120,6 +127,7 @@
 
   function setChannel(i, id) {
     state.ids[i] = id;
+    state.cells[i].message = "";
     store.set("multiview", state.ids);
     render(state.cells[i]);
     play(state.cells[i]);
