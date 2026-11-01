@@ -61,6 +61,7 @@
         b.style.width = "calc(" + (pct(end) - pct(p.start)) + "% - 3px)";
         b.dataset.row = ri;
         b.dataset.start = p.start;
+        b.dataset.stop = p.stop;
         b.dataset.key = r.channel.id + ":" + p.start;
         b.onclick = () => openProgramme(r, p);
         line.append(b);
@@ -77,8 +78,16 @@
     });
     $("guide").replaceChildren(head, ...(rows.length ? rows : [el("p", { className: "empty" },
       state.list === "favorites" ? t("Nessun preferito con la guida in questo orario.") : t("Nessun programma in guida in questo orario."))]));
-    const target = (focusKey && document.querySelector('.prog[data-key="' + focusKey + '"]')) || document.querySelector(".prog.on-air") || document.querySelector(".prog");
-    if (target) target.focus({ preventScroll: false });
+    // focusKey: a programme ("channel:start"), or the row and the side the
+    // window moved to (the same channel, at the new edge).
+    let target = typeof focusKey === "string" && document.querySelector('.prog[data-key="' + focusKey + '"]');
+    if (focusKey && typeof focusKey === "object") {
+      const list = [...document.querySelectorAll('.prog[data-row="' + Math.min(focusKey.row, state.rows.length - 1) + '"]')];
+      const inside = list.filter((b) => Number(b.dataset.start) < from + span && Number(b.dataset.stop) > from);
+      target = focusKey.dir === "ArrowRight" ? inside[0] : inside[inside.length - 1];
+    }
+    target = target || document.querySelector(".prog.on-air") || document.querySelector(".prog");
+    if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: "nearest" }); }
   }
 
   // ---- A programme ----
@@ -140,9 +149,9 @@
       const list = inRow(row);
       const i = list.indexOf(cur) + (dir === "ArrowRight" ? 1 : -1);
       if (i >= 0 && i < list.length) { list[i].focus(); return; }
-      // Past the edge of the window: move it.
+      // Past the edge of the window: move it, staying on the channel.
       state.from += (dir === "ArrowRight" ? 2 : -2) * 3600;
-      load();
+      load({ row, dir });
       return;
     }
     const target = row + (dir === "ArrowDown" ? 1 : -1);
@@ -158,9 +167,28 @@
     const key = keyOf(e);
     if (!$("programme").hidden) {
       if (key === "Back") { close(); e.preventDefault(); }
+      // The panel's buttons in a row: the arrows go along them.
+      const buttons = [...$("programme").querySelectorAll("button")];
+      const i = buttons.indexOf(document.activeElement);
+      if (key.startsWith("Arrow") && buttons.length) {
+        const d = key === "ArrowRight" || key === "ArrowDown" ? 1 : -1;
+        buttons[Math.max(0, Math.min(buttons.length - 1, (i < 0 ? 0 : i + d)))].focus();
+        e.preventDefault();
+      }
       return;
     }
     if (document.activeElement && document.activeElement.tagName === "INPUT") return;
+    // The header: ◀ ▶ along its buttons, Down to the grid.
+    const header = document.querySelector("header.top");
+    if (header.contains(document.activeElement) && key.startsWith("Arrow")) {
+      const items = [...header.querySelectorAll(".focusable")].filter((b) => b.offsetParent);
+      const i = items.indexOf(document.activeElement);
+      if (key === "ArrowLeft" && i > 0) items[i - 1].focus();
+      else if (key === "ArrowRight" && i < items.length - 1) items[i + 1].focus();
+      else if (key === "ArrowDown") { const f = document.querySelector(".prog.on-air") || document.querySelector(".prog"); if (f) f.focus(); }
+      e.preventDefault();
+      return;
+    }
     if (key.startsWith("Arrow") && (!document.activeElement || document.activeElement.classList.contains("prog") || key === "ArrowDown")) {
       if (!document.activeElement || !document.activeElement.classList.contains("prog")) {
         const f = document.querySelector(".prog.on-air") || document.querySelector(".prog");
