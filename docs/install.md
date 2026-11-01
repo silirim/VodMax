@@ -17,7 +17,7 @@ Packages are in the [releases](https://github.com/silirim/VodMax/releases):
 | `vodmax-server_<v>_linux_armv7.tar.gz` | Server on 32-bit ARM boards |
 | `VodMax-<v>.apk` | Android phones and tablets, Android TV, Google TV, Fire TV |
 | `app.vodmax.client_<v>_all.ipk` | LG TVs with webOS |
-| `SHA256SUMS` | Checksums: `sha256sum -c SHA256SUMS` |
+| `SHA256SUMS` | Checksums: `sha256sum -c --ignore-missing SHA256SUMS` (only the files you downloaded) |
 
 ## 1. Server
 
@@ -61,6 +61,7 @@ The image `ghcr.io/silirim/vodmax` (x86-64, ARM64, ARMv7) contains the
 server and ffmpeg. With [`docker-compose.yml`](../packaging/docker-compose.yml):
 
 ```sh
+curl -fLO https://raw.githubusercontent.com/silirim/VodMax/main/packaging/docker-compose.yml
 mkdir vodmax-data && sudo chown 1000:1000 vodmax-data
 docker compose up -d
 docker compose exec vodmax cat /var/lib/vodmax/admin.token

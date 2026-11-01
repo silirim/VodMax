@@ -36,7 +36,7 @@ telecomando.
 - **La diretta prima di tutto**: numeri dei canali, P+/P−, preferiti, banner
   con "ora" e "a seguire", pausa e riavvolgimento, programmi già andati in
   onda e registrazioni.
-- **Tutto in un posto**: playlist (M3U, Xtream Codes: le playlist IPTV che
+- **Tutto in un posto**: playlist (M3U, Xtream Codes: le playlist TV che
   hai diritto di usare) e cartelle di film e serie nella stessa Home, ricerca
   e "Continua a guardare".
 - **Riservato**: il traffico verso le playlist passa solo da una VPN (quella
@@ -108,10 +108,10 @@ registrazioni e MKV/AVI nel browser. Per aggiornare poi: `sudo vodmax-update`
 **Docker**: `ghcr.io/silirim/vodmax` (x86-64, ARM64, ARMv7, con ffmpeg):
 
 ```sh
-docker run -d --name vodmax -p 8095:8095 -v ./vodmax-data:/var/lib/vodmax ghcr.io/silirim/vodmax
+docker run -d --name vodmax --restart unless-stopped -p 8095:8095 -v vodmax-data:/var/lib/vodmax ghcr.io/silirim/vodmax
 ```
 
-(la cartella dei dati deve appartenere all'uid 1000; c'è un
+(i dati restano nel volume `vodmax-data`; c'è un
 [file Compose](packaging/docker-compose.yml) pronto).
 
 **Android / Android TV / Fire TV**: installa `VodMax-<versione>.apk`, poi

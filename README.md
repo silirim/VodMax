@@ -36,7 +36,7 @@ decoder with the remote.
   copies.
 - **Live TV first** — channel numbers, P+/P−, favourites, now/next banner,
   pause and rewind, catch-up and recordings.
-- **One place** — playlists (M3U, Xtream Codes: the IPTV playlists you are
+- **One place** — playlists (M3U, Xtream Codes: the TV playlists you are
   entitled to use) and local folders of movies and series in the same home,
   search and "continue watching".
 - **Private by design** — playlist traffic goes only through a VPN (the
@@ -114,10 +114,10 @@ their updates by themselves).
 **Docker** — `ghcr.io/silirim/vodmax` (x86-64, ARM64, ARMv7, ffmpeg included):
 
 ```sh
-docker run -d --name vodmax -p 8095:8095 -v ./vodmax-data:/var/lib/vodmax ghcr.io/silirim/vodmax
+docker run -d --name vodmax --restart unless-stopped -p 8095:8095 -v vodmax-data:/var/lib/vodmax ghcr.io/silirim/vodmax
 ```
 
-(the data folder must belong to uid 1000; a
+(the data stays in the `vodmax-data` volume; a
 [compose file](packaging/docker-compose.yml) is ready).
 
 **Android / Android TV / Fire TV** — install `VodMax-<version>.apk`, then enter

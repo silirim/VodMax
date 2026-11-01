@@ -68,7 +68,7 @@
   <div class="grid downloads">
     <article><h3><span data-l="en">Server</span><span data-l="it">Server</span> · Linux</h3><p><span data-l="en">A mini PC, a NAS, a Raspberry Pi or a container keeps catalog, guide and recordings for the whole home.</span><span data-l="it">Un mini PC, un NAS, un Raspberry Pi o un container tiene catalogo, guida e registrazioni per tutta la casa.</span></p>
       <p class="links"><a data-asset="_linux_amd64.tar.gz" href="https://github.com/silirim/VodMax/releases">x86-64</a> <a data-asset="_linux_arm64.tar.gz" href="https://github.com/silirim/VodMax/releases">ARM64</a> <a data-asset="_linux_armv7.tar.gz" href="https://github.com/silirim/VodMax/releases">ARMv7</a> <a href="https://github.com/silirim/VodMax/pkgs/container/vodmax">Docker</a></p>
-      <pre class="cmd">docker run -d -p 8095:8095 -v ./vodmax-data:/var/lib/vodmax ghcr.io/silirim/vodmax</pre></article>
+      <pre class="cmd">docker run -d --name vodmax --restart unless-stopped -p 8095:8095 -v vodmax-data:/var/lib/vodmax ghcr.io/silirim/vodmax</pre></article>
     <article><h3>Android · Android TV · Fire TV</h3><p><span data-l="en">Native player for every format. Works with your server or on its own; updates itself.</span><span data-l="it">Player nativo per ogni formato. Funziona con il tuo server o da solo; si aggiorna da sé.</span></p>
       <p class="links"><a data-asset=".apk" href="https://github.com/silirim/VodMax/releases">APK</a></p></article>
     <article><h3>LG webOS</h3><p><span data-l="en">The TV app, for LG TVs in Developer Mode. Other TVs: the browser.</span><span data-l="it">L'app per le TV LG in Modalità sviluppatore. Altre TV: il browser.</span></p>
