@@ -84,7 +84,8 @@ func hasWordOrAlias(text, word string) bool {
 // spec asks for. On the rule's own channel its name counts as part of every
 // title: "F1" on Sky Sport F1 is also "GP Messico: Qualifiche".
 func ruleMatches(spec store.RuleSpec, p store.Programme, group string) bool {
-	text := fold(p.Title + " " + p.Subtitle)
+	title := fold(p.Title + " " + p.Subtitle)
+	text := title
 	if spec.Channel != "" && group == spec.Channel {
 		text += " " + fold(group)
 	}
@@ -105,8 +106,8 @@ func ruleMatches(spec store.RuleSpec, p store.Programme, group string) bool {
 			return false
 		}
 	}
-	for _, w := range spec.None {
-		if hasWordOrAlias(text, w) {
+	for _, w := range spec.None { // the title only: "sport" must not exclude all of Sky Sport
+		if hasWordOrAlias(title, w) {
 			return false
 		}
 	}
@@ -294,7 +295,7 @@ func (s *Service) applyRules(ctx context.Context, log *slog.Logger) {
 		if !r.Enabled || ctx.Err() != nil {
 			continue
 		}
-		note, err := s.applyRule(ctx, r)
+		note, err := s.applyRule(ctx, r, false)
 		if err != nil {
 			note = T(ctx, "errore: %s", err.Error())
 			log.Warn("regola di registrazione", "regola", r.Name, "err", err)
@@ -306,9 +307,16 @@ func (s *Service) applyRules(ctx context.Context, log *slog.Logger) {
 	s.mu.Unlock()
 }
 
-func (s *Service) applyRule(ctx context.Context, r store.RecordingRule) (string, error) {
+// applyRule schedules what the rule asks for. edited: the person has just
+// changed it, so what it no longer asks for goes even if nothing matches.
+func (s *Service) applyRule(ctx context.Context, r store.RecordingRule, edited bool) (string, error) {
 	list, err := s.ruleCandidates(ctx, r.Spec)
 	if err != nil {
+		return "", err
+	}
+	// First: a moved programme must find its old recording gone, or it
+	// looks already scheduled and is left with none until the next pass.
+	if err := s.dropStale(ctx, r, list, edited); err != nil {
 		return "", err
 	}
 	added, already, cancelled, reruns := 0, 0, 0, 0
@@ -342,9 +350,6 @@ func (s *Service) applyRule(ctx context.Context, r store.RecordingRule) (string,
 			added++
 		}
 	}
-	if err := s.dropStale(ctx, r, list); err != nil {
-		return "", err
-	}
 	note := T(ctx, "%d in programma", added+already)
 	if added > 0 {
 		note += T(ctx, " (%d nuove)", added)
@@ -366,9 +371,9 @@ func (s *Service) applyRule(ctx context.Context, r store.RecordingRule) (string,
 
 // dropStale removes the rule's recordings that have not started and that
 // no programme of the guide asks for any more (moved, or the rule was
-// changed). Only on channels whose guide has programmes for the rule now:
-// a guide that failed to load removes nothing.
-func (s *Service) dropStale(ctx context.Context, r store.RecordingRule, list []RuleMatch) error {
+// changed). In the periodic runs only on channels whose guide has
+// programmes for the rule now: a guide that failed to load removes nothing.
+func (s *Service) dropStale(ctx context.Context, r store.RecordingRule, list []RuleMatch, edited bool) error {
 	recs, err := s.st.RecordingsInState(ctx, "scheduled")
 	if err != nil {
 		return err
@@ -389,11 +394,11 @@ func (s *Service) dropStale(ctx context.Context, r store.RecordingRule, list []R
 			}
 			continue
 		}
-		if !guided[rec.GroupKey] {
+		if !guided[rec.GroupKey] && !edited {
 			continue
 		}
 		wanted := slices.ContainsFunc(list, func(m RuleMatch) bool {
-			return m.group == rec.GroupKey && m.Start+60 >= rec.Start && m.Stop-60 <= rec.Stop
+			return m.State != "rerun" && m.group == rec.GroupKey && m.Start+60 >= rec.Start && m.Stop-60 <= rec.Stop
 		})
 		if !wanted {
 			if err := s.st.DeleteRecording(ctx, rec.ID); err != nil {
@@ -501,7 +506,7 @@ func (s *Service) runRule(ctx context.Context, id int64) {
 	}
 	// The stored result is in Italian, like the periodic runs.
 	ctx = WithLang(ctx, "it")
-	note, err := s.applyRule(ctx, r)
+	note, err := s.applyRule(ctx, r, true)
 	if err != nil {
 		note = T(ctx, "errore: %s", err.Error())
 	}

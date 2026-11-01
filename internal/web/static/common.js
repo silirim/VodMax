@@ -63,7 +63,7 @@ window.VodMax = (() => {
     const b = document.body;
     b.classList.toggle("with-player", shown("player"));
     b.classList.toggle("with-detail", shown("detail"));
-    b.classList.toggle("with-panel", Boolean(document.querySelector(".setup-panel, #my-profile, #update-banner, #picker")));
+    b.classList.toggle("with-panel", shown("programme") || Boolean(document.querySelector(".setup-panel, #my-profile, #update-banner, #picker")));
   };
   new MutationObserver(syncOpen).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"] });
 

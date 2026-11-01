@@ -36,6 +36,7 @@ func TestRuleMatching(t *testing.T) {
 		{onF1, "GP Messico: Qualifiche", "sky sport f1", true},
 		{onF1, "GP Messico: Qualifiche", "sky sport 1", false},
 		{onF1, "Inside the Team", "sky sport f1", false},
+		{store.RuleSpec{Any: []string{"qualifiche"}, None: []string{"sport"}, Channel: "sky sport f1"}, "Qualifiche", "sky sport f1", true}, // "none" reads the title only
 	}
 	for _, c := range cases {
 		if got := ruleMatches(c.spec, store.Programme{Title: c.title}, c.group); got != c.want {

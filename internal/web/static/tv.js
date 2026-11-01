@@ -100,7 +100,7 @@
         state.timers.retry = setTimeout(() => state.current === channel && tune(channel), 1500);
       },
       onSilent: () => {
-        if (state.player === player) flash(t("Il canale non manda immagini: riprova o scegli un altro canale"));
+        if (state.player === player) flash(t("Il canale non manda immagini: riprova o scegli un altro canale"), true);
       },
       onError: (type, detail, info) => {
         if (state.player !== player) return;
@@ -266,6 +266,7 @@
   // screens the whole list scrolls and a tap picks the channel.
   const touch = window.matchMedia("(pointer: coarse), (max-width: 800px)");
   async function openList(listIndex) {
+    hideControls();
     const list = LISTS[listIndex];
     let channels;
     try { channels = await load(list); } catch (e) { flash(e.message); return; }
@@ -496,12 +497,13 @@
   }
 
   // ---- Messages ----
-  function flash(text) {
+  // keep: stays until the next message (nothing else explains a black screen).
+  function flash(text, keep) {
     const el = $("status");
     el.textContent = text;
     el.hidden = false;
     clearTimeout(state.timers.status);
-    state.timers.status = setTimeout(() => { el.hidden = true; }, 3500);
+    if (!keep) state.timers.status = setTimeout(() => { el.hidden = true; }, 3500);
   }
 
   let dialogAction = null;
@@ -518,6 +520,13 @@
   }
   $("dialog-yes").onclick = () => closeDialog(true);
   $("dialog-no").onclick = () => closeDialog(false);
+
+  // Play only plays, Pause only pauses; Play/Pause and Space alternate.
+  function playKey(key) {
+    const paused = state.player && state.player.paused;
+    if ((key === "Play" && !paused) || (key === "Pause" && paused)) { showControls(); return; }
+    actions.toggle();
+  }
 
   // ---- Keys: browser, LG webOS and Android TV ----
   function keyOf(e) {
@@ -556,6 +565,7 @@
     // In the controls bar (at the top): the arrows move along it, OK
     // presses, Down and Back leave it.
     const bar = $("controls");
+    let passOn = false;
     if (!bar.hidden && bar.contains(document.activeElement)) {
       const buttons = [...bar.querySelectorAll("button")].filter((b) => b.offsetParent);
       const i = buttons.indexOf(document.activeElement);
@@ -568,14 +578,21 @@
         if (!bar.hidden && !bar.contains(document.activeElement) && buttons[i]) buttons[i].focus();
       } else if (key === "Back" || key === "ArrowDown") {
         document.activeElement.blur();
-        hideControls();
+        // While paused it stays: it is the way back to playing.
+        if (!(state.player && state.player.userPaused)) hideControls();
       } else if (key === "ArrowUp") {
         // already at the top
       } else if (key === " " || key === "PlayPause" || key === "Play" || key === "Pause") {
-        actions.toggle();
-      } else return;
-      e.preventDefault();
-      return;
+        playKey(key);
+      } else if (["Tab", "Shift", "Control", "Alt", "Meta"].includes(key)) {
+        return;
+      } else {
+        // Any other key (P+, numbers, colours) does its job: the bar closes.
+        document.activeElement.blur();
+        hideControls();
+        passOn = true;
+      }
+      if (!passOn) { e.preventDefault(); return; }
     }
 
     if (/^[0-9]$/.test(key)) { if (state.overlay) closeList(); digit(key); e.preventDefault(); return; }
@@ -623,7 +640,7 @@
         case "Guide": stopPlayer(); location.href = "/guide.html"; break;
         case "Blue": record(state.browse !== null ? state.channels[state.browse] : state.current); break;
         case "Info": showBanner(state.current, false); focusControls(); break;
-        case " ": case "PlayPause": case "Play": case "Pause": actions.toggle(); break;
+        case " ": case "PlayPause": case "Play": case "Pause": playKey(key); break;
         case "ArrowLeft": actions.back10(); break;
         case "ArrowRight": actions.fwd30(); break;
         default: handled = false;

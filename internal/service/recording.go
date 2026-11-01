@@ -85,6 +85,9 @@ func (s *Service) StartRecorder(ctx context.Context, dir string, log *slog.Logge
 		switch {
 		case time.Now().Unix() < r.Stop:
 			r.Status, r.Error = "scheduled", "" // resumed by scheduleDue
+			if log != nil {
+				log.Info("registrazione ripresa dopo il riavvio", "id", r.ID, "byte", r.Bytes)
+			}
 			s.rec.resumed = append(s.rec.resumed, r.ID)
 		case r.Bytes > 0:
 			r.Status, r.Error = "completed", "registrazione parziale: interrotta da un riavvio del server"
@@ -273,6 +276,9 @@ func (s *Service) record(ctx context.Context, a *activeRec) error {
 			break
 		}
 		gap = err
+		if err != nil && s.rec.log != nil {
+			s.rec.log.Info("registrazione interrotta: mi ricollego", "id", a.rec.ID, "err", err)
+		}
 		select {
 		case <-ctx.Done():
 		case <-time.After(3 * time.Second): // reconnect

@@ -44,6 +44,7 @@
   .guide-row .name { gap: 0.3rem; padding: 0 0.3rem; font-size: 0; }
   .guide-row .name b { font-size: 0.85rem; min-width: 1.8rem; }
   .guide-row .name img { width: 1.8rem; height: 1.8rem; }
+  .guide-row .name.no-logo { font-size: 0.7rem; white-space: normal; line-height: 1.1; } /* no logo: the name */
   .guide-times .scale span { font-size: 0.75rem; }
   .prog { font-size: 0.85rem; padding: 0.2rem 0.35rem; }
 }

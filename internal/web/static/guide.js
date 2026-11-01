@@ -72,7 +72,7 @@
         n.style.left = pct(now) + "%";
         line.append(n);
       }
-      const name = el("div", { className: "name" }, el("b", {}, r.channel.number || ""),
+      const name = el("div", { className: "name" + (r.channel.logo ? "" : " no-logo") }, el("b", {}, r.channel.number || ""),
         r.channel.logo ? el("img", { src: r.channel.logo, alt: "", loading: "lazy" }) : null, r.channel.name,
         r.channel.catchup_days ? el("small", { className: "archive", title: t("Archivio di {days} giorni", { days: r.channel.catchup_days }) }, "↺") : null);
       return el("div", { className: "guide-row" }, name, line);
@@ -87,6 +87,8 @@
       const inside = list.filter((b) => Number(b.dataset.start) < from + span && Number(b.dataset.stop) > from);
       target = focusKey.dir === "ArrowRight" ? inside[0] : inside[inside.length - 1];
     }
+    // A header button pressed by remote keeps the focus: "2 ore ▶" repeats.
+    if (!target && document.activeElement && document.querySelector("header.top").contains(document.activeElement)) return;
     target = target || document.querySelector(".prog.on-air") || document.querySelector(".prog");
     if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: "nearest" }); }
   }

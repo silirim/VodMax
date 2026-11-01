@@ -211,3 +211,20 @@ func TestRuleDropsStaleRecordings(t *testing.T) {
 		}
 	}
 }
+
+// Changing a rule's words removes what it no longer asks for, even when
+// nothing matches any more; the channel's name does not count for "none".
+func TestEditedRuleDropsItsRecordings(t *testing.T) {
+	e, _ := tvSetup(t)
+	film := map[string]any{"name": "Film", "all": []string{"film"}, "none": []string{"replica"}}
+	code, body := e.do(t, "POST", "/api/v1/recording-rules", film, true)
+	var rule struct{ ID int64 }
+	if code != 201 || json.Unmarshal(body, &rule) != nil {
+		t.Fatalf("add: %d %s", code, body)
+	}
+	film["all"] = []string{"zzzz"}
+	e.do(t, "PUT", "/api/v1/recording-rules/"+strconv.FormatInt(rule.ID, 10), film, true)
+	if _, body := e.do(t, "GET", "/api/v1/recordings", nil, true); strings.TrimSpace(string(body)) != "[]" {
+		t.Fatalf("recordings left: %s", body)
+	}
+}
