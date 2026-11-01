@@ -707,5 +707,6 @@
   "Usa questo": "Use this",
   "Va bene qualsiasi server con l'API compatibile OpenAI: Ollama, LM Studio, llama.cpp. Con un server in casa non esce nulla dalla tua rete.": "Any server with the OpenAI-compatible API works: Ollama, LM Studio, llama.cpp. With a server at home nothing leaves your network.",
   "VodMax scarica e fa girare il modello qui. Niente esce di casa.": "VodMax downloads and runs the model here. Nothing leaves home.",
-  "Cast e regia noti per {known} titoli su {total}: servono per richieste come «un film con…». VodMax completa l'elenco di notte, a poco a poco, finché l'assistente è acceso.": "Cast and director known for {known} of {total} titles: they are used for requests like “a film with…”. VodMax completes the list at night, a little at a time, while the assistant is on."
+  "Cast e regia noti per {known} titoli su {total}: servono per richieste come «un film con…». VodMax completa l'elenco di notte, a poco a poco, finché l'assistente è acceso.": "Cast and director known for {known} of {total} titles: they are used for requests like “a film with…”. VodMax completes the list at night, a little at a time, while the assistant is on.",
+  "file non leggibile": "file not readable"
 }

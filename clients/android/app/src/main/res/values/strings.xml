@@ -16,6 +16,9 @@
     <string name="local_exited">il server interno si è fermato (codice %1$d)</string>
     <string name="local_no_answer">il server interno non risponde</string>
     <string name="local_port_busy">la porta 8095 è occupata da un\'altra app: chiudila o riavvia il dispositivo</string>
+    <string name="save_unavailable">questo dispositivo non permette di scegliere dove salvare il file</string>
+    <string name="save_cancelled">salvataggio annullato</string>
+    <string name="save_failed">file non salvato</string>
     <string name="update_refused">aggiornamento rifiutato: non viene dalle release di VodMax</string>
     <string name="update_bad_checksum">il file scaricato non corrisponde alla release (checksum diverso)</string>
     <string name="skip_intro">Salta intro</string>

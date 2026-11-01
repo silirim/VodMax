@@ -13,6 +13,7 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -43,10 +44,16 @@ public class MainActivity extends Activity {
     private static final String KEY_LOCAL = "local";
     private static final String KEY_LOCAL_TOKEN = "localToken";
     private static final int PLAY = 1;
+    private static final int PICK = 2;
+    private static final int SAVE = 3;
 
     private WebView web;
     private String server;
     private final AppUpdater updater = new AppUpdater(this);
+    // A file the page is choosing (VPN configuration, backup to restore),
+    // and one it is saving (backup).
+    private ValueCallback<Uri[]> picking;
+    private byte[] saving;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -182,7 +189,23 @@ public class MainActivity extends Activity {
         s.setUserAgentString(s.getUserAgentString() + " VodMaxAndroid/" + BuildConfig.VERSION_NAME);
         web.setBackgroundColor(0xFF0B0C10);
         web.addJavascriptInterface(new Bridge(), "VodMaxNative");
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            // <input type=file> does nothing in a WebView without this.
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (picking != null) picking.onReceiveValue(null);
+                picking = callback;
+                Intent i = new Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
+                try {
+                    startActivityForResult(i, PICK);
+                } catch (Exception e) {
+                    picking = null;
+                    callback.onReceiveValue(null);
+                    return false;
+                }
+                return true;
+            }
+        });
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -300,15 +323,56 @@ public class MainActivity extends Activity {
             });
         }
 
+        /** A file made by the page (a backup): the person chooses where it goes. */
+        @JavascriptInterface
+        public void saveFile(String name, String mime, String base64) {
+            runOnUiThread(() -> {
+                try {
+                    saving = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+                    Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType(mime).putExtra(Intent.EXTRA_TITLE, name);
+                    startActivityForResult(i, SAVE);
+                } catch (Exception e) {
+                    saving = null;
+                    saveDone(getString(R.string.save_unavailable));
+                }
+            });
+        }
+
         @JavascriptInterface
         public void changeServer() {
             runOnUiThread(() -> showSetup(null));
         }
     }
 
+    private void saveDone(String error) {
+        if (web != null) web.evaluateJavascript("window.VodMaxSaveDone && window.VodMaxSaveDone("
+            + (error == null ? "null" : JSONObject.quote(error)) + ")", null);
+    }
+
     @Override
     protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == PICK) {
+            if (picking != null) picking.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
+            picking = null;
+            return;
+        }
+        if (request == SAVE) {
+            byte[] bytes = saving;
+            saving = null;
+            if (result != RESULT_OK || data == null || data.getData() == null || bytes == null) {
+                saveDone(getString(R.string.save_cancelled));
+                return;
+            }
+            try (java.io.OutputStream out = getContentResolver().openOutputStream(data.getData())) {
+                out.write(bytes);
+                saveDone(null);
+            } catch (Exception e) {
+                saveDone(getString(R.string.save_failed));
+            }
+            return;
+        }
         if (request != PLAY || web == null) return;
         long position = data == null ? 0 : data.getLongExtra(PlayerActivity.POSITION, 0);
         long duration = data == null ? 0 : data.getLongExtra(PlayerActivity.DURATION, 0);

@@ -1069,12 +1069,28 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       throw new Error(data && data.error ? data.error : t("errore {status}", { status: res.status }));
     }
     const name = (/filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "") || [])[1] || "vodmax.vodmaxbackup";
-    const url = URL.createObjectURL(await res.blob());
+    const blob = await res.blob();
+    // The Android app's WebView does not save blob: links: the app asks
+    // where to save the file and writes it.
+    if (window.VodMaxNative && window.VodMaxNative.saveFile) return saveNative(name, blob);
+    const url = URL.createObjectURL(blob);
     const a = el("a", { href: url, download: name });
     document.body.append(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  function saveNative(name, blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onerror = () => reject(new Error(t("file non leggibile")));
+      r.onload = () => {
+        window.VodMaxSaveDone = (error) => (error ? reject(new Error(error)) : resolve());
+        window.VodMaxNative.saveFile(name, blob.type || "application/octet-stream", String(r.result).split(",")[1] || "");
+      };
+      r.readAsDataURL(blob);
+    });
   }
 
   async function restoreFrom(send) {
