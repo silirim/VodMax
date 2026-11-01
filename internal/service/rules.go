@@ -39,8 +39,10 @@ func fold(s string) string {
 	return strings.Join(strings.Fields(nonWord.ReplaceAllString(s, " ")), " ")
 }
 
-// hasWord: a single word matches a word of text that starts with it; a
-// phrase matches as written, on word boundaries.
+// hasWord: a single word matches the same word of text, or one with up to
+// two more letters (plurals: "film", "films"); not any word that starts
+// with it ("inter" is not "internazionali"). A phrase matches as written,
+// on word boundaries.
 func hasWord(text, word string) bool {
 	w := fold(word)
 	if w == "" {
@@ -50,7 +52,7 @@ func hasWord(text, word string) bool {
 		return strings.Contains(" "+text+" ", " "+w+" ")
 	}
 	for _, t := range strings.Fields(text) {
-		if strings.HasPrefix(t, w) {
+		if strings.HasPrefix(t, w) && len(t)-len(w) <= 2 {
 			return true
 		}
 	}
@@ -61,6 +63,7 @@ func hasWord(text, word string) bool {
 var wordAliases = map[string][]string{
 	"formula 1": {"f1"}, "formula uno": {"f1", "formula 1"}, "f1": {"formula 1"},
 	"motogp": {"moto gp"}, "moto gp": {"motogp"},
+	"juve": {"juventus"},
 }
 
 // hasWordOrAlias is hasWord, also trying the other names of word.
@@ -76,8 +79,14 @@ func hasWordOrAlias(text, word string) bool {
 	return false
 }
 
-func ruleMatches(spec store.RuleSpec, p store.Programme) bool {
+// ruleMatches tells whether p, on the channel of group key group, is what
+// spec asks for. On the rule's own channel its name counts as part of every
+// title: "F1" on Sky Sport F1 is also "GP Messico: Qualifiche".
+func ruleMatches(spec store.RuleSpec, p store.Programme, group string) bool {
 	text := fold(p.Title + " " + p.Subtitle)
+	if spec.Channel != "" && group == spec.Channel {
+		text += " " + fold(group)
+	}
 	for _, w := range spec.All {
 		if !hasWordOrAlias(text, w) {
 			return false
@@ -180,7 +189,7 @@ func (s *Service) ruleCandidates(ctx context.Context, spec store.RuleSpec) ([]Ru
 	if spec.LiveOnly {
 		for _, c := range channels {
 			for _, p := range progs[c.GuideID] {
-				if ruleMatches(spec, p) {
+				if ruleMatches(spec, p, c.GroupKey) {
 					aired.add(p, c.Name)
 				}
 			}
@@ -198,7 +207,7 @@ func (s *Service) ruleCandidates(ctx context.Context, spec store.RuleSpec) ([]Ru
 			continue
 		}
 		for _, p := range progs[c.GuideID] {
-			if p.Stop <= soon || !ruleMatches(spec, p) {
+			if p.Stop <= soon || !ruleMatches(spec, p, c.GroupKey) {
 				continue
 			}
 			event := fold(p.Title) + "|" + fmt.Sprint(p.Start/600)
@@ -332,6 +341,9 @@ func (s *Service) applyRule(ctx context.Context, r store.RecordingRule) (string,
 			added++
 		}
 	}
+	if err := s.dropStale(ctx, r, list); err != nil {
+		return "", err
+	}
 	note := T(ctx, "%d in programma", added+already)
 	if added > 0 {
 		note += T(ctx, " (%d nuove)", added)
@@ -349,6 +361,46 @@ func (s *Service) applyRule(ctx context.Context, r store.RecordingRule) (string,
 		note += T(ctx, "; non registrabili per mancanza di connessioni: %s", strings.Join(conflicts, ", "))
 	}
 	return note, nil
+}
+
+// dropStale removes the rule's recordings that have not started and that
+// no programme of the guide asks for any more (moved, or the rule was
+// changed). Only on channels whose guide has programmes for the rule now:
+// a guide that failed to load removes nothing.
+func (s *Service) dropStale(ctx context.Context, r store.RecordingRule, list []RuleMatch) error {
+	recs, err := s.st.RecordingsInState(ctx, "scheduled")
+	if err != nil {
+		return err
+	}
+	guided := map[string]bool{}
+	for _, m := range list {
+		guided[m.group] = true
+	}
+	later := time.Now().Add(10 * time.Minute).Unix()
+	for _, rec := range recs {
+		if rec.RuleID != r.ID || rec.Start <= later {
+			continue
+		}
+		if r.Spec.Channel != "" && rec.GroupKey != r.Spec.Channel {
+			// The rule was moved to another channel.
+			if err := s.st.DeleteRecording(ctx, rec.ID); err != nil {
+				return err
+			}
+			continue
+		}
+		if !guided[rec.GroupKey] {
+			continue
+		}
+		wanted := slices.ContainsFunc(list, func(m RuleMatch) bool {
+			return m.group == rec.GroupKey && m.Start+60 >= rec.Start && m.Stop-60 <= rec.Stop
+		})
+		if !wanted {
+			if err := s.st.DeleteRecording(ctx, rec.ID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // ---- Rule management ----
@@ -375,10 +427,13 @@ type RuleInput struct {
 	Any       []string `json:"any"`
 	None      []string `json:"none"`
 	ChannelID int64    `json:"channel_id"`
-	Section   string   `json:"section"`
-	LiveOnly  bool     `json:"live_only"`
-	Keep      int      `json:"keep"`
-	Enabled   *bool    `json:"enabled"`
+	// Channel is the group key of a rule's channel, kept as it is when the
+	// rule is changed without choosing the channel again (Sospendi).
+	Channel  string `json:"channel"`
+	Section  string `json:"section"`
+	LiveOnly bool   `json:"live_only"`
+	Keep     int    `json:"keep"`
+	Enabled  *bool  `json:"enabled"`
 }
 
 func (s *Service) ruleFromInput(ctx context.Context, in RuleInput) (store.RecordingRule, error) {
@@ -390,6 +445,11 @@ func (s *Service) ruleFromInput(ctx context.Context, in RuleInput) (store.Record
 			return r, invalid("canale inesistente")
 		}
 		r.Spec.Channel = g
+	} else if in.Channel != "" {
+		if _, err := s.st.ChannelForGroup(ctx, in.Channel); err != nil {
+			return r, invalid("canale inesistente")
+		}
+		r.Spec.Channel = in.Channel
 	}
 	return r, s.checkRule(&r)
 }

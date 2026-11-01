@@ -571,7 +571,7 @@
 
   function ruleInput(r, extra) {
     return { name: r.name, all: r.spec.all, any: r.spec.any || [], none: r.spec.none || [], section: r.spec.section || "", live_only: !!r.spec.live_only, keep: r.keep,
-      channel_id: 0, enabled: r.enabled, ...extra };
+      channel_id: 0, channel: r.spec.channel || "", enabled: r.enabled, ...extra };
   }
 
   let channelsCache;

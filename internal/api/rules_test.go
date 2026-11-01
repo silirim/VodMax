@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -127,4 +128,86 @@ func addKids(t *testing.T, e *env) kidsLogin {
 	dev := pair(t, e, "Tablet", nil)
 	_, tok := selectProfile(t, e, dev, p.ID, "")
 	return kidsLogin{dev, tok}
+}
+
+// Sospendi / Riattiva send the rule back with its channel's key: the rule
+// keeps recording only on its channel.
+func TestRuleSuspendKeepsChannel(t *testing.T) {
+	e, _ := tvSetup(t)
+	rai := channels(t, e, "?section=tv")[0]
+	code, body := e.do(t, "POST", "/api/v1/recording-rules", map[string]any{"name": "Film", "all": []string{"film"}, "channel_id": rai.ID}, true)
+	var rule struct {
+		ID   int64
+		Spec struct{ Channel string }
+	}
+	if code != 201 || json.Unmarshal(body, &rule) != nil || rule.Spec.Channel == "" {
+		t.Fatalf("add: %d %s", code, body)
+	}
+	id := strconv.FormatInt(rule.ID, 10)
+	for _, enabled := range []bool{false, true} {
+		toggle := map[string]any{"name": "Film", "all": []string{"film"}, "channel_id": 0, "channel": rule.Spec.Channel, "enabled": enabled}
+		if code, body := e.do(t, "PUT", "/api/v1/recording-rules/"+id, toggle, true); code != 200 {
+			t.Fatalf("toggle %v: %d %s", enabled, code, body)
+		}
+	}
+	_, body = e.do(t, "GET", "/api/v1/recording-rules", nil, true)
+	if !strings.Contains(string(body), `"channel":"`+rule.Spec.Channel+`"`) {
+		t.Fatalf("channel lost: %s", body)
+	}
+	bad := map[string]any{"name": "Film", "all": []string{"film"}, "channel": "nessun canale"}
+	if code, _ := e.do(t, "PUT", "/api/v1/recording-rules/"+id, bad, true); code != 400 {
+		t.Fatalf("unknown channel key accepted: %d", code)
+	}
+}
+
+// A programme the guide moved: the rule's old recording goes, the new time
+// is scheduled. A rule moved to another channel drops the old channel's.
+func TestRuleDropsStaleRecordings(t *testing.T) {
+	e, _ := tvSetup(t)
+	film := map[string]any{"name": "Film", "all": []string{"film"}, "none": []string{"replica"}}
+	code, body := e.do(t, "POST", "/api/v1/recording-rules", film, true)
+	var rule struct{ ID int64 }
+	if code != 201 || json.Unmarshal(body, &rule) != nil {
+		t.Fatalf("add: %d %s", code, body)
+	}
+	id := strconv.FormatInt(rule.ID, 10)
+	list := func() []struct {
+		Title       string
+		Start, Stop int64
+	} {
+		_, body := e.do(t, "GET", "/api/v1/recordings", nil, true)
+		var l []struct {
+			Title       string
+			Start, Stop int64
+		}
+		json.Unmarshal(body, &l)
+		return l
+	}
+	before := list()
+	if len(before) != 1 {
+		t.Fatalf("recordings: %+v", before)
+	}
+	// As if the guide had the film three hours later when it was scheduled.
+	db, err := sql.Open("sqlite", e.dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`UPDATE recording SET start = start + 10800, stop = stop + 10800`); err != nil {
+		t.Fatal(err)
+	}
+	e.do(t, "PUT", "/api/v1/recording-rules/"+id, film, true)
+	if after := list(); len(after) != 1 || after[0].Start != before[0].Start {
+		t.Fatalf("after the guide moved the film: %+v (was %+v)", after, before)
+	}
+
+	// The rule on another channel: nothing left on the first one.
+	other := channels(t, e, "?section=tv")[1]
+	film["channel_id"] = other.ID
+	e.do(t, "PUT", "/api/v1/recording-rules/"+id, film, true)
+	for _, r := range list() {
+		if r.Start == before[0].Start {
+			t.Fatalf("recording on the old channel kept: %+v", list())
+		}
+	}
 }
