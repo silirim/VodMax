@@ -12,7 +12,8 @@
     e.append(...children.filter((c) => c !== null && c !== undefined && c !== false));
     return e;
   };
-  const HOURS = 3;
+  // A narrower window on phones, so programmes stay readable.
+  const HOURS = window.matchMedia("(max-width: 600px)").matches ? 1.5 : 3;
   const state = { from: slot(Date.now() / 1000), list: store.get("guideList", "all"), rows: [], me: null };
   let statusTimer;
   function flash(text) {
@@ -52,7 +53,7 @@
       r.programmes.forEach((p, pi) => {
         const b = el("button", { className: "prog focusable" + (p.start <= now && p.stop > now ? " on-air" : "") + (p.stop <= now ? " past" : "") +
           (p.recording ? " rec" : "") + (p.stop <= now && r.channel.catchup_days ? " replay" : "") },
-          p.title, el("small", {}, hhmm(p.start) + "–" + hhmm(p.stop)));
+          p.title, el("small", {}, hhmm(p.start) + "–" + hhmm(p.stop) + (p.stop <= now && r.channel.catchup_days ? " · ↺ " + t("riguarda") : "")));
         // Provider guides overlap at times: drawn up to the next start, so
         // no programme hides another.
         const next = r.programmes[pi + 1];
@@ -90,6 +91,14 @@
     if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: "nearest" }); }
   }
 
+  // Icons from the bundled set: the symbols ⏺ ⏮ are missing from the
+  // fonts of some TVs (an empty box).
+  function iconButton(className, icon, text, onclick) {
+    const b = el("button", { className, onclick });
+    window.VodMax.label(b, icon, text);
+    return b;
+  }
+
   // ---- A programme ----
   function openProgramme(row, p) {
     const panel = $("programme");
@@ -101,10 +110,10 @@
       location.href = "/?" + new URLSearchParams({ catchup: row.channel.id, start: p.start, stop: p.stop, title: p.title, back: "/guide.html" });
     };
     if (p.start <= now && p.stop > now) {
-      buttons.push(el("button", { className: "button focusable", onclick: () => { location.href = "/tv.html?channel=" + row.channel.id; } }, "▶ " + t("Guarda")));
-      if (archive) buttons.push(el("button", { className: "button secondary focusable", onclick: replay }, "⏮ " + t("Dall'inizio")));
+      buttons.push(iconButton("button focusable", "play", t("Guarda"), () => { location.href = "/tv.html?channel=" + row.channel.id; }));
+      if (archive) buttons.push(iconButton("button secondary focusable", "undo-2", t("Dall'inizio"), replay));
     } else if (archive) {
-      buttons.push(el("button", { className: "button focusable", onclick: replay }, "▶ " + t("Riguarda")));
+      buttons.push(iconButton("button focusable", "play", t("Riguarda"), replay));
     }
     if (p.recording && !kids) {
       buttons.push(el("button", { className: "button secondary focusable", onclick: async () => {
@@ -119,12 +128,13 @@
           close();
           load(row.channel.id + ":" + p.start);
         } catch (e) { flash(e.message); }
-      } }, "⏺ " + t("Registra")));
+      } }, t("Registra")));
+      window.VodMax.label(buttons[buttons.length - 1], "circle-dot", t("Registra"));
     }
     buttons.push(el("button", { className: "button secondary focusable", onclick: () => close() }, t("Chiudi")));
     panel.replaceChildren(...[el("h2", {}, p.title),
       el("p", { className: "meta" }, row.channel.name + " · " + dayName(p.start) + " " + hhmm(p.start) + "–" + hhmm(p.stop) +
-        (p.category ? " · " + p.category : "") + (p.recording ? " · ⏺ " + t("in registrazione") : "")),
+        (p.category ? " · " + p.category : "") + (p.recording ? " · ● " + t("in registrazione") : "")),
       p.subtitle ? el("p", {}, p.subtitle) : null,
       p.description ? el("p", {}, p.description) : null,
       el("div", { className: "buttons" }, ...buttons)].filter(Boolean));

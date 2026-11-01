@@ -10,7 +10,7 @@
 .guide-row .name { display: flex; align-items: center; gap: 0.6rem; padding: 0 0.6rem; overflow: hidden; white-space: nowrap; }
 .guide-row .name b { color: var(--soft); font-weight: 500; min-width: 2.2rem; }
 .guide-row .name img { width: 2rem; height: 2rem; object-fit: contain; }
-.guide-row .line { position: relative; }
+.guide-row .line { position: relative; overflow: hidden; } /* nothing past the window */
 .guide-row .empty-line { color: var(--soft); font-size: 0.85rem; padding: 1rem; }
 .prog {
   position: absolute; top: 0.25rem; bottom: 0.25rem;
@@ -20,22 +20,33 @@
 }
 .prog small { display: block; color: var(--soft); font-size: 0.78rem; }
 .prog.on-air { background: #24262e; }
-.prog.rec::before { content: "⏺ "; color: var(--rec); }
+/* A red dot: the ⏺ symbol is missing from some TV fonts. */
+.prog.rec::before { content: ""; display: inline-block; width: 0.55em; height: 0.55em; margin-right: 0.35em; border-radius: 50%; background: var(--rec); vertical-align: 0.05em; }
 .prog:focus, .prog:hover { outline: none; border-color: var(--text); background: #2b2e37; z-index: 1; }
 .now-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); pointer-events: none; }
 
 .programme-panel {
   position: fixed; left: 50%; bottom: 4vh; z-index: 10; transform: translateX(-50%);
   width: min(92vw, 44rem); padding: 1.4rem 1.6rem;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; /* opaque: the grid does not show through */
 }
 .programme-panel h2 { margin: 0 0 0.3rem; }
 .programme-panel p { margin: 0.4rem 0; }
 .programme-panel .buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
 .prog.past { opacity: 0.55; }
 .prog.past.replay { opacity: 0.85; }
-.prog.past.replay small::after { content: " · ↺ riguarda"; }
 .guide-row .name .archive { color: var(--soft); margin-left: 0.3rem; }
+
+/* Phones: the channel column keeps number and logo, the names go; the
+   window is 1.5 hours (guide.js), labels every 30 minutes still fit. */
+@media (max-width: 600px) {
+  .guide { --name: 5.2rem; --row: 3.6rem; }
+  .guide-row .name { gap: 0.3rem; padding: 0 0.3rem; font-size: 0; }
+  .guide-row .name b { font-size: 0.85rem; min-width: 1.8rem; }
+  .guide-row .name img { width: 1.8rem; height: 1.8rem; }
+  .guide-times .scale span { font-size: 0.75rem; }
+  .prog { font-size: 0.85rem; padding: 0.2rem 0.35rem; }
+}
 
 /* Wide screens: the list tabs keep their full width, the time controls
    take the rest (and wrap), so longer labels are never cut. */
