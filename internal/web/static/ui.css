@@ -43,7 +43,7 @@ body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); 
 
 /* ---- Focus: visible from across the room ---- */
 :focus { outline: none; }
-.focusable:focus-visible, .focusable:focus {
+.focusable:focus {
   outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
@@ -69,13 +69,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .button.secondary { background: rgba(255, 255, 255, 0.1); }
 .button:hover, .btn:hover { background: rgba(255, 255, 255, 0.24); }
 .button.primary:hover { background: #fff; }
-.button:focus, .btn:focus, .button:focus-visible, .btn:focus-visible {
+.button:focus, .btn:focus {
   outline: none;
   color: #0b0c10;
   background: var(--focus);
   transform: scale(1.06);
   box-shadow: 0 0.6em 1.8em rgba(0, 0, 0, 0.55);
 }
+
+/* ":focus-visible" is left out of these rules on purpose: browsers before
+   Chromium 86 (old Android WebViews) drop a whole rule they cannot read. */
 
 /* ---- Header with tabs ---- */
 .top {
@@ -110,7 +113,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--text); background: var(--raised); }
-.tab:focus, .tab:focus-visible { outline: none; color: #0b0c10; background: var(--focus); transform: scale(1.05); }
+.tab:focus { outline: none; color: #0b0c10; background: var(--focus); transform: scale(1.05); }
 
 #search {
   margin-left: auto;
@@ -155,6 +158,8 @@ button.small.danger { color: var(--bad); }
 button.small:disabled { opacity: 0.5; cursor: wait; }
 button.small:hover { border-color: var(--text); }
 button.small:focus { outline: none; color: #0b0c10; background: var(--focus); border-color: var(--focus); }
+/* A primary button is already white: the focus is a ring around it. */
+button.small.primary:focus { box-shadow: 0 0 0 3px var(--accent); }
 .empty { color: var(--soft); }
 
 /* ---- Rows of cards (scroll sideways; focus scrolls them) ---- */
@@ -196,7 +201,7 @@ button.small:focus { outline: none; color: #0b0c10; background: var(--focus); bo
 a.chip { text-decoration: none; }
 .chip.active { color: #0b0c10; background: #d9dae0; }
 .chip:hover { color: var(--text); }
-.chip:focus, .chip:focus-visible { outline: none; color: #0b0c10; background: var(--focus); transform: scale(1.06); }
+.chip:focus { outline: none; color: #0b0c10; background: var(--focus); transform: scale(1.06); }
 .chip-label { color: var(--faint); font-size: 0.85rem; margin: 0 0.2rem 0 0.6rem; }
 .chip-label:first-child { margin-left: 0; }
 
@@ -234,7 +239,7 @@ a.chip { text-decoration: none; }
 .card .sub { font-size: 0.8rem; color: var(--faint); }
 .card .bar { height: 4px; background: rgba(255, 255, 255, 0.15); border-radius: 2px; overflow: hidden; }
 .card .bar div { height: 100%; background: var(--accent-grad); }
-.card:focus, .card:focus-visible { outline: none; }
+.card:focus { outline: none; }
 .card:focus .poster, .card:hover .poster {
   transform: scale(1.06);
   box-shadow: 0 0 0 3px var(--focus), 0 1rem 2.4rem rgba(0, 0, 0, 0.6);

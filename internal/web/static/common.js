@@ -56,6 +56,15 @@ window.VodMax = (() => {
   function profileToken() { return store.get("profile", ""); }
   const handled = (msg) => Object.assign(new Error(msg), { handled: true });
 
+  // Android keyboards close without sending a form unless the field says
+  // what Enter does: every text field gets one, set before the keyboard
+  // opens.
+  document.addEventListener("focusin", (e) => {
+    const i = e.target;
+    if (i.tagName !== "INPUT" || i.hasAttribute("enterkeyhint")) return;
+    if (/^(text|search|password|number|email|url|tel)$/.test(i.type)) i.setAttribute("enterkeyhint", i.type === "search" ? "search" : "done");
+  }, true);
+
   // A full-screen panel (pairing, profile choice, token): one at a time.
   function overlay(id, ...children) {
     for (const old of document.querySelectorAll(".setup-panel")) old.remove();

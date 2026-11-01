@@ -1534,6 +1534,10 @@
     if (key === "Back" || (key === "Backspace" && !typing)) {
       if (!$("detail").hidden) closeDetail();
       else if (state.query) { state.query = ""; $("search").value = ""; render(); }
+      // As on Android: Back goes to Home, and from Home leaves the TV app
+      // (webOS hands Back to the page and closes the app on window.close).
+      else if (!window.VodMax.native && state.view !== "home") { state.view = "home"; render(); }
+      else if (/Web0S|webOS/.test(navigator.userAgent) && state.view === "home") window.close();
       e.preventDefault();
       return;
     }

@@ -122,7 +122,19 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
   }
 
   // Phone: from a section back to the list; otherwise back to the menu.
+  // Fields changed and not saved yet, in the page: a field the person
+  // changed is marked; saving redraws the page with new fields.
+  document.addEventListener("input", (e) => { if (e.target.closest("main")) e.target.dataset.changed = "1"; }, true);
+  document.addEventListener("submit", (e) => {
+    for (const i of e.target.querySelectorAll("[data-changed]")) delete i.dataset.changed;
+  }, true);
+  const unsaved = () => document.querySelector("main [data-changed]") !== null;
+
   function back() {
+    // An open folder picker closes first; changes not saved are asked about.
+    const picker = document.querySelector(".picker-panel");
+    if (picker && picker.close) { picker.close(); return; }
+    if (unsaved() && !confirm(t("Ci sono modifiche non salvate. Uscire lo stesso?"))) return;
     if (phone.matches && state.view) {
       const was = state.view;
       state.view = null;
@@ -315,6 +327,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     (opener.closest(".path-field") || opener).after(panel);
     opener.disabled = true;
     const close = () => { panel.remove(); opener.disabled = false; opener.focus(); };
+    panel.close = close; // Back closes it (see back())
     const show = async (dir) => {
       let list;
       try { list = await api("GET", "/api/v1/folders?path=" + encodeURIComponent(dir || "")); }
