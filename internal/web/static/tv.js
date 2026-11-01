@@ -178,6 +178,15 @@
     const list = state.channels;
     if (list.length === 0) return;
     let i = list.findIndex((c) => state.current && c.id === state.current.id);
+    if (i < 0 && state.current) {
+      // A channel typed by number from another list: the nearest number.
+      const n = state.current.number;
+      let j = -1; // findLastIndex is too new for webOS 22
+      if (delta > 0) j = list.findIndex((c) => c.number > n);
+      else for (let k = list.length - 1; k >= 0 && j < 0; k--) if (list[k].number < n) j = k;
+      tune(list[j >= 0 ? j : delta > 0 ? 0 : list.length - 1]);
+      return;
+    }
     i = i < 0 ? 0 : (i + delta + list.length) % list.length;
     tune(list[i]);
   }
@@ -294,7 +303,7 @@
     }
     // Remote: a window around the selection (lists can hold hundreds of
     // channels). Touch: all of them, the browser scrolls.
-    const rows = touch.matches ? o.channels.length : Math.max(5, Math.floor((window.innerHeight * 0.8) / 64));
+    const rows = touch.matches ? o.channels.length : o.rows || Math.max(5, Math.floor((window.innerHeight * 0.8) / 64));
     const start = Math.max(0, Math.min(o.selected - Math.floor(rows / 2), o.channels.length - rows));
     const items = o.channels.slice(start, start + rows).map((c, k) => {
       const li = document.createElement("li");
@@ -312,6 +321,17 @@
       return li;
     });
     ol.replaceChildren(...items);
+    // Rows are taller on big screens than the first guess: as many as fit
+    // above the hint, so the selection is never hidden behind it.
+    if (!touch.matches && !o.rows && items.length) {
+      const hint = $("list").querySelector(".hint");
+      const bottom = hint && hint.offsetParent ? hint.getBoundingClientRect().top : $("list").getBoundingClientRect().bottom;
+      const top = ol.getBoundingClientRect().top, h = items[0].getBoundingClientRect().height;
+      if (h > 0) {
+        o.rows = Math.max(3, Math.floor((bottom - top) / h));
+        if (o.rows < rows) renderList();
+      }
+    }
   }
 
   function closeList() {
@@ -381,6 +401,11 @@
       if (state.player && state.player.userPaused) { state.timers.controls = setTimeout(hide, 1000); return; }
       hideControls();
     }, 5000);
+  }
+  // The bar with the keyboard focus on Pause / Riprendi.
+  function focusControls() {
+    showControls();
+    $("ctl-toggle").focus();
   }
   function hideControls() {
     clearTimeout(state.timers.controls);
@@ -482,11 +507,13 @@
   // ---- Keys: browser, LG webOS and Android TV ----
   function keyOf(e) {
     const byCode = { 33: "ChannelUp", 34: "ChannelDown", 403: "Red", 404: "Green", 405: "Yellow", 406: "Blue",
-      457: "Info", 458: "Guide", 461: "Back", 427: "ChannelUp", 428: "ChannelDown" };
+      457: "Info", 458: "Guide", 461: "Back", 427: "ChannelUp", 428: "ChannelDown",
+      415: "Play", 19: "Pause", 10252: "PlayPause", 179: "PlayPause", 93: "Info" };
     if (byCode[e.keyCode]) return byCode[e.keyCode];
     const byKey = { PageUp: "ChannelUp", PageDown: "ChannelDown", "+": "ChannelUp", "-": "ChannelDown",
       ColorF0Red: "Red", ColorF1Green: "Green", ColorF2Yellow: "Yellow", ColorF3Blue: "Blue",
       Escape: "Back", Backspace: "Back", BrowserBack: "Back", GoBack: "Back", Enter: "OK",
+      MediaPlayPause: "PlayPause", MediaPlay: "Play", MediaPause: "Pause", ContextMenu: "Info", Info: "Info",
       f: "Yellow", F: "Yellow", p: "Red", P: "Red", i: "Info", I: "Info", g: "Green", G: "Green", r: "Blue", R: "Blue", e: "Guide", E: "Guide" };
     return byKey[e.key] || e.key;
   }
@@ -511,7 +538,32 @@
       return;
     }
 
-    if (/^[0-9]$/.test(key)) { digit(key); e.preventDefault(); return; }
+    // In the controls bar (at the top): the arrows move along it, OK
+    // presses, Down and Back leave it.
+    const bar = $("controls");
+    if (!bar.hidden && bar.contains(document.activeElement)) {
+      const buttons = [...bar.querySelectorAll("button")].filter((b) => b.offsetParent);
+      const i = buttons.indexOf(document.activeElement);
+      if (key === "ArrowLeft" || key === "ArrowRight") {
+        const next = buttons[Math.min(buttons.length - 1, Math.max(0, i + (key === "ArrowRight" ? 1 : -1)))];
+        if (next) next.focus();
+        showControls();
+      } else if (key === "OK") {
+        document.activeElement.click();
+        if (!bar.hidden && !bar.contains(document.activeElement) && buttons[i]) buttons[i].focus();
+      } else if (key === "Back" || key === "ArrowDown") {
+        document.activeElement.blur();
+        hideControls();
+      } else if (key === "ArrowUp") {
+        // already at the top
+      } else if (key === " " || key === "PlayPause" || key === "Play" || key === "Pause") {
+        actions.toggle();
+      } else return;
+      e.preventDefault();
+      return;
+    }
+
+    if (/^[0-9]$/.test(key)) { if (state.overlay) closeList(); digit(key); e.preventDefault(); return; }
     if (state.digits && key === "OK") { commitDigits(); e.preventDefault(); return; }
 
     const o = state.overlay;
@@ -534,8 +586,13 @@
         // P+ goes to the next number up, as on a set-top box.
         case "ChannelUp": endBrowse(); step(1); break;
         case "ChannelDown": endBrowse(); step(-1); break;
-        case "ArrowUp": browseStep(-1); break;
-        case "ArrowDown": browseStep(1); break;
+        // With the controls on screen (after a pause or a skip), Up and
+        // Down go into them; otherwise they browse the channels.
+        case "ArrowUp":
+        case "ArrowDown":
+          if (!$("controls").hidden && state.browse === null) focusControls();
+          else browseStep(key === "ArrowUp" ? -1 : 1);
+          break;
         case "OK":
           if (state.browse !== null) { const c = state.channels[state.browse]; endBrowse(); tune(c); }
           else openList(state.favoritesOnly ? 1 : state.listIndex);
@@ -550,7 +607,7 @@
         case "Green": stopPlayer(); location.href = "/"; break;
         case "Guide": stopPlayer(); location.href = "/guide.html"; break;
         case "Blue": record(state.browse !== null ? state.channels[state.browse] : state.current); break;
-        case "Info": showBanner(state.current, false); showControls(); break;
+        case "Info": showBanner(state.current, false); focusControls(); break;
         case " ": case "PlayPause": case "Play": case "Pause": actions.toggle(); break;
         case "ArrowLeft": actions.back10(); break;
         case "ArrowRight": actions.fwd30(); break;
