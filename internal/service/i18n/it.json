@@ -205,6 +205,7 @@
   "questo account non è collegato a nessun profilo di VodMax: chiedi a chi gestisce il server": "questo account non è collegato a nessun profilo di VodMax: chiedi a chi gestisce il server",
   "questo canale non ha l'archivio del provider": "questo canale non ha l'archivio del provider",
   "questo sistema usa musl (Alpine): avvia il servizio \"assistant\" del docker-compose, oppure usa un servizio online": "questo sistema usa musl (Alpine): avvia il servizio \"assistant\" del docker-compose, oppure usa un servizio online",
+  "registrazione parziale: interrotta da un riavvio del server": "registrazione parziale: interrotta da un riavvio del server",
   "relay locale non disponibile": "relay locale non disponibile",
   "richiesta troppo lunga (max 200 caratteri)": "richiesta troppo lunga (max 200 caratteri)",
   "scegli chi sta guardando": "scegli chi sta guardando",

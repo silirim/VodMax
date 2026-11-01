@@ -397,3 +397,38 @@ func TestRecordingReconnectsWhenStalled(t *testing.T) {
 		t.Fatalf("stalled stream: opened %d times, %s", opened, body)
 	}
 }
+
+// A restart (an update) during a recording: the recording carries on in
+// the same file once the server is back, if the programme is still on.
+func TestRecordingCarriesOnAfterRestart(t *testing.T) {
+	e, _ := tvSetup(t)
+	rai := channels(t, e, "?section=tv")[0]
+	now := time.Now().Unix()
+	if code, body := e.do(t, "POST", "/api/v1/recordings",
+		map[string]any{"channel_id": rai.ID, "start": now, "stop": now + 6, "title": "Partita"}, true); code != 201 {
+		t.Fatalf("schedule: %d %s", code, body)
+	}
+	time.Sleep(2 * time.Second)
+	e.stop()
+	files, _ := os.ReadDir(e.recordings)
+	if len(files) != 1 {
+		t.Fatalf("files before restart: %v", files)
+	}
+	first, _ := files[0].Info()
+	time.Sleep(time.Second)
+	e.start()
+	time.Sleep(5 * time.Second)
+	_, body := e.do(t, "GET", "/api/v1/recordings", nil, true)
+	var list []struct {
+		Status string
+		Bytes  int64
+		Error  string
+	}
+	json.Unmarshal(body, &list)
+	if len(list) != 1 || list[0].Status != "completed" || list[0].Bytes <= first.Size() || !strings.Contains(list[0].Error, "riavvio") {
+		t.Fatalf("after restart (first part %d bytes): %s", first.Size(), body)
+	}
+	if files, _ := os.ReadDir(e.recordings); len(files) != 1 {
+		t.Fatalf("files after restart: %v", files)
+	}
+}

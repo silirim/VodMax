@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/silirim/vodmax/internal/secret"
 	"github.com/silirim/vodmax/internal/service"
@@ -83,6 +84,8 @@ type env struct {
 	tunnel     *fakeTunnel
 	dbPath     string
 	recordings string
+	stop       func() // stops the server like a restart (see restart)
+	start      func() // starts it again on the same data
 }
 
 func setup(t *testing.T, tunnelComesUp bool) *env {
@@ -93,23 +96,34 @@ func setup(t *testing.T, tunnelComesUp bool) *env {
 		t.Fatal(err)
 	}
 	e := &env{tunnel: &fakeTunnel{}, dbPath: filepath.Join(dir, "vodmax.db")}
-	st, err := store.Open(e.dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	svc := service.New(st, box, func(ctx context.Context, cfg *vpn.Config) (service.Tunnel, error) {
-		e.tunnel.up.Store(tunnelComesUp)
-		return e.tunnel, nil
-	})
-	e.svc = svc
 	e.recordings = filepath.Join(dir, "recordings")
-	svc.SetBackupDir(filepath.Join(dir, "backups"))
-	ctx, cancel := context.WithCancel(context.Background())
-	if err := svc.StartRecorder(ctx, e.recordings, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
-		t.Fatal(err)
+	e.start = func() {
+		st, err := store.Open(e.dbPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		svc := service.New(st, box, func(ctx context.Context, cfg *vpn.Config) (service.Tunnel, error) {
+			e.tunnel.up.Store(tunnelComesUp)
+			return e.tunnel, nil
+		})
+		e.svc = svc
+		svc.SetBackupDir(filepath.Join(dir, "backups"))
+		ctx, cancel := context.WithCancel(context.Background())
+		if err := svc.StartRecorder(ctx, e.recordings, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
+			t.Fatal(err)
+		}
+		e.srv = httptest.NewServer(Handler(svc, token, slog.New(slog.NewTextHandler(io.Discard, nil))))
+		e.stop = func() {
+			cancel()
+			svc.WaitRecorder(5 * time.Second)
+			e.srv.Close()
+			svc.Close()
+			st.Close()
+			e.stop = func() {}
+		}
 	}
-	e.srv = httptest.NewServer(Handler(svc, token, slog.New(slog.NewTextHandler(io.Discard, nil))))
-	t.Cleanup(func() { cancel(); e.srv.Close(); svc.Close(); st.Close() })
+	e.start()
+	t.Cleanup(func() { e.stop() })
 	return e
 }
 

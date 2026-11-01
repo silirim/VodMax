@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,7 +46,9 @@ type recorderState struct {
 	log     *slog.Logger
 	tickets map[string]recTicket
 	comskip string
-	stall   time.Duration // no data for this long: reconnect (0: recordStall)
+	resumed []int64         // recordings carried on after a restart
+	ctx     context.Context // the recorder's: it ends when the server stops
+	stall   time.Duration   // no data for this long: reconnect (0: recordStall)
 }
 
 // recordStall is how long a recording waits for data before it reconnects:
@@ -57,27 +60,36 @@ type recTicket struct {
 	expires time.Time
 }
 
-// StartRecorder runs the scheduler until ctx ends. Recordings left
-// "recording" by a previous run (crash, restart) are marked failed with
-// what they managed to save.
 // SetRecordStall changes how long a recording waits for data (tests).
 func (s *Service) SetRecordStall(d time.Duration) { s.rec.stall = d }
 
+// StartRecorder runs the scheduler until ctx ends. Recordings left
+// "recording" by a previous run (crash, restart, update) carry on in the
+// same file if their programme is still on; the others keep what they
+// managed to save.
 func (s *Service) StartRecorder(ctx context.Context, dir string, log *slog.Logger) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 	s.rec.mu.Lock()
-	s.rec.dir, s.rec.log, s.rec.running = dir, log, map[int64]*activeRec{}
+	s.rec.dir, s.rec.log, s.rec.running, s.rec.ctx = dir, log, map[int64]*activeRec{}, ctx
 	s.rec.mu.Unlock()
 	interrupted, err := s.st.RecordingsInState(ctx, "recording")
 	if err != nil {
 		return err
 	}
 	for _, r := range interrupted {
-		r.Status, r.Error = "failed", "interrotta da un riavvio del server"
 		if fi, err := os.Stat(r.File); err == nil && fi.Size() > 0 {
 			r.Bytes = fi.Size()
+		}
+		switch {
+		case time.Now().Unix() < r.Stop:
+			r.Status, r.Error = "scheduled", "" // resumed by scheduleDue
+			s.rec.resumed = append(s.rec.resumed, r.ID)
+		case r.Bytes > 0:
+			r.Status, r.Error = "completed", "registrazione parziale: interrotta da un riavvio del server"
+		default:
+			r.Status, r.Error = "failed", "interrotta da un riavvio del server"
 		}
 		s.st.UpdateRecording(ctx, r)
 	}
@@ -101,9 +113,30 @@ func (s *Service) StartRecorder(ctx context.Context, dir string, log *slog.Logge
 	return nil
 }
 
+// WaitRecorder waits, at most d, for the recordings to save their state
+// after the recorder's context ended (server stopping).
+func (s *Service) WaitRecorder(d time.Duration) {
+	s.rec.mu.Lock()
+	var done []chan struct{}
+	for _, a := range s.rec.running {
+		a.cancel()
+		done = append(done, a.done)
+	}
+	s.rec.mu.Unlock()
+	until := time.After(d)
+	for _, c := range done {
+		select {
+		case <-c:
+		case <-until:
+			return
+		}
+	}
+}
+
 func (s *Service) scheduleDue(ctx context.Context) {
 	s.rec.mu.Lock()
 	started := s.rec.running != nil
+	parent := s.rec.ctx
 	s.rec.mu.Unlock()
 	if !started {
 		return // recorder not running (tests, tools)
@@ -122,7 +155,9 @@ func (s *Service) scheduleDue(ctx context.Context) {
 		_, already := s.rec.running[r.ID]
 		s.rec.mu.Unlock()
 		if !already {
-			s.startRecording(ctx, r)
+			// Recordings belong to the recorder, not to the request that
+			// scheduled them: they end when the server stops.
+			s.startRecording(parent, r)
 		}
 	}
 }
@@ -137,6 +172,12 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 	a := &activeRec{rec: r, cancel: cancel, done: make(chan struct{})}
 	r.Status = "recording"
 	r.File = filepath.Join(s.rec.dir, fmt.Sprintf("%d-%s.ts", r.ID, time.Unix(r.Start, 0).Format("20060102-1504")))
+	s.rec.mu.Lock()
+	resumed := slices.Contains(s.rec.resumed, r.ID)
+	s.rec.mu.Unlock()
+	if fi, err := os.Stat(r.File); err == nil && resumed {
+		a.bytes = fi.Size() // the file continues (record appends)
+	}
 	a.rec = r
 	s.st.UpdateRecording(parent, r)
 	s.rec.mu.Lock()
@@ -153,6 +194,16 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 		final := a.rec
 		final.Bytes = a.bytes
 		a.mu.Unlock()
+		// The server is stopping (restart, update) while the programme is
+		// still on: the recording stays "recording" and the next start
+		// carries on in the same file.
+		if final.Status != "cancelled" && parent.Err() != nil && time.Now().Unix() < final.Stop {
+			s.st.UpdateRecording(context.Background(), final)
+			if s.rec.log != nil {
+				s.rec.log.Info("registrazione sospesa per l'arresto del server", "id", r.ID, "byte", final.Bytes)
+			}
+			return
+		}
 		switch {
 		case final.Status == "cancelled":
 		case final.Bytes == 0:
@@ -166,6 +217,8 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 			final.Status = "completed"
 			if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 				final.Error = "registrazione parziale: " + err.Error()
+			} else if resumed {
+				final.Error = "registrazione parziale: interrotta da un riavvio del server"
 			}
 		}
 		if final.Status == "completed" {

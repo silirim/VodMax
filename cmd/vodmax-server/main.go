@@ -129,6 +129,9 @@ func run(data, listen, recordings, downloads, ffmpeg, ffprobe string, device boo
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
+	// Recordings in progress note where they got to, to carry on at the
+	// next start.
+	svc.WaitRecorder(15 * time.Second)
 	return nil
 }
 
