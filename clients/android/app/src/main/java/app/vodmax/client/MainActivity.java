@@ -54,6 +54,7 @@ public class MainActivity extends Activity {
     // and one it is saving (backup).
     private ValueCallback<Uri[]> picking;
     private byte[] saving;
+    private boolean signingIn;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -210,7 +211,14 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
-                if (u.toString().startsWith(server)) return false;
+                // The home login goes to the account's site and comes back
+                // with a code: the whole round trip stays in the app.
+                if (u.toString().startsWith(server + "/auth/sso/")) signingIn = true;
+                if (u.toString().startsWith(server + "/") || u.toString().equals(server)) {
+                    if (!u.getPath().startsWith("/auth/sso/")) signingIn = false;
+                    return false;
+                }
+                if (signingIn) return false;
                 // Trailers and other sites open outside the app.
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, u));
@@ -284,6 +292,20 @@ public class MainActivity extends Activity {
                     i.putExtra(PlayerActivity.LIVE, o.optBoolean("live", false));
                     i.putExtra(PlayerActivity.EPISODE, o.optBoolean("episode", false));
                     i.putExtra(PlayerActivity.NEXT, o.optString("next", ""));
+                    i.putExtra(PlayerActivity.AUDIO_LANGUAGE, o.optString("audio_language", ""));
+                    JSONObject pr = o.optJSONObject("progress");
+                    if (pr != null) {
+                        i.putExtra(PlayerActivity.PROGRESS_URL, server + pr.optString("url"));
+                        i.putExtra(PlayerActivity.PROGRESS_TOKEN, pr.optString("token"));
+                        i.putExtra(PlayerActivity.PROGRESS_PROFILE, pr.optString("profile"));
+                    }
+                    JSONObject rs = o.optJSONObject("restart");
+                    if (rs != null) {
+                        String r = rs.optString("url");
+                        i.putExtra(PlayerActivity.RESTART_URL, r.startsWith("/") ? server + r : r);
+                        i.putExtra(PlayerActivity.RESTART_OFFSET, (long) (rs.optDouble("offset", 0) * 1000));
+                        i.putExtra(PlayerActivity.KNOWN_DURATION, (long) (rs.optDouble("duration", 0) * 1000));
+                    }
                     JSONObject m = o.optJSONObject("markers");
                     if (m != null) {
                         i.putExtra(PlayerActivity.INTRO_START, m.optInt("intro_start", 0));

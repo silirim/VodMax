@@ -24,6 +24,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.OptIn;
+import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.common.ForwardingPlayer;
 import androidx.media3.common.MediaItem;
@@ -52,12 +53,24 @@ public class PlayerActivity extends Activity {
     static final String URL = "url", TITLE = "title", START = "start", LIVE = "live";
     static final String POSITION = "position", DURATION = "duration", ERROR = "error";
     static final String EPISODE = "episode", NEXT = "next", INTRO_START = "intro_start", INTRO_END = "intro_end", CREDITS = "credits";
+    static final String AUDIO_LANGUAGE = "audio_language";
+    static final String PROGRESS_URL = "progress_url", PROGRESS_TOKEN = "progress_token", PROGRESS_PROFILE = "progress_profile";
+    static final String RESTART_URL = "restart_url", RESTART_OFFSET = "restart_offset", KNOWN_DURATION = "known_duration";
 
     private static final int ACCENT = 0xFF00D6CA, PANEL = 0xEB13151B, LINE = 0x1FFFFFFF, TEXT = 0xFFF5F5F7, SOFT = 0xFFA9ABB5;
 
     private ExoPlayer player;
     private PlayerView view;
     private String error;
+
+    // The position is saved on the server every few seconds, not only on
+    // the way out: the TV may be switched off with the player open.
+    private String progressUrl, progressToken, progressProfile;
+    private long lastSaved;
+    // A converted stream (no byte ranges) cannot seek: it is reopened from
+    // the new time; positions are then offset by where it starts.
+    private String restartUrl;
+    private long offsetMs, firstOffsetMs, knownDurationMs;
 
     // Episodes
     private boolean episode;
@@ -75,6 +88,7 @@ public class PlayerActivity extends Activity {
         @Override
         public void run() {
             updateEpisodeExtras();
+            if (System.currentTimeMillis() - lastSaved > 15_000) saveProgress();
             ticker.postDelayed(this, 500);
         }
     };
@@ -100,43 +114,94 @@ public class PlayerActivity extends Activity {
         introStart = in.getIntExtra(INTRO_START, 0);
         introEnd = in.getIntExtra(INTRO_END, 0);
         credits = in.getIntExtra(CREDITS, 0);
+        progressUrl = in.getStringExtra(PROGRESS_URL);
+        progressToken = in.getStringExtra(PROGRESS_TOKEN);
+        progressProfile = in.getStringExtra(PROGRESS_PROFILE);
+        restartUrl = in.getStringExtra(RESTART_URL);
+        offsetMs = firstOffsetMs = in.getLongExtra(RESTART_OFFSET, 0);
+        knownDurationMs = in.getLongExtra(KNOWN_DURATION, 0);
+        lastSaved = System.currentTimeMillis();
         DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory()
             .setUserAgent("VodMaxAndroid/" + BuildConfig.VERSION_NAME)
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(15000)
             .setReadTimeoutMs(30000);
+        // Other sounds (a call, another app) pause it; unplugged headphones
+        // pause it instead of going on through the speaker.
         player = new ExoPlayer.Builder(this)
             .setMediaSourceFactory(new DefaultMediaSourceFactory(http))
             .setSeekBackIncrementMs(10000)
             .setSeekForwardIncrementMs(30000)
+            .setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
+            .setHandleAudioBecomingNoisy(true)
             .build();
+        String language = in.getStringExtra(AUDIO_LANGUAGE);
+        if (language != null && !language.isEmpty()) {
+            player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon().setPreferredAudioLanguage(language).build());
+        }
         view = new PlayerView(this);
         // The next episode is the controller's own ⏭ button: an overlay of
         // ours over the controls fought with them (only the time bar left).
-        view.setPlayer(nextTitle == null ? player : new ForwardingPlayer(player) {
+        boolean restarts = restartUrl != null && !restartUrl.isEmpty();
+        view.setPlayer(nextTitle == null && !restarts ? player : new ForwardingPlayer(player) {
             @Override
             public boolean isCommandAvailable(int command) {
-                return command == COMMAND_SEEK_TO_NEXT || super.isCommandAvailable(command);
+                if (command == COMMAND_SEEK_TO_NEXT && nextTitle != null) return true;
+                if (restarts && (command == COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM || command == COMMAND_SEEK_BACK || command == COMMAND_SEEK_FORWARD)) return true;
+                return super.isCommandAvailable(command);
             }
 
             @Override
             public Player.Commands getAvailableCommands() {
-                return super.getAvailableCommands().buildUpon().add(COMMAND_SEEK_TO_NEXT).build();
+                Player.Commands.Builder b = super.getAvailableCommands().buildUpon();
+                if (nextTitle != null) b.add(COMMAND_SEEK_TO_NEXT);
+                if (restarts) b.addAll(COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM, COMMAND_SEEK_BACK, COMMAND_SEEK_FORWARD);
+                return b.build();
             }
 
             @Override
             public boolean hasNextMediaItem() {
-                return true;
+                return nextTitle != null || super.hasNextMediaItem();
             }
 
             @Override
             public void seekToNext() {
-                playNext(true);
+                if (nextTitle != null) playNext(true);
+                else super.seekToNext();
             }
 
             @Override
             public void seekToNextMediaItem() {
-                playNext(true);
+                if (nextTitle != null) playNext(true);
+                else super.seekToNextMediaItem();
+            }
+
+            @Override
+            public long getCurrentPosition() {
+                return restarts ? offsetMs + super.getCurrentPosition() : super.getCurrentPosition();
+            }
+
+            @Override
+            public long getDuration() {
+                return restarts && knownDurationMs > 0 ? knownDurationMs : super.getDuration();
+            }
+
+            @Override
+            public void seekTo(long positionMs) {
+                if (restarts) reopenAt(positionMs);
+                else super.seekTo(positionMs);
+            }
+
+            @Override
+            public void seekBack() {
+                if (restarts) reopenAt(getCurrentPosition() - 10_000);
+                else super.seekBack();
+            }
+
+            @Override
+            public void seekForward() {
+                if (restarts) reopenAt(getCurrentPosition() + 30_000);
+                else super.seekForward();
             }
         });
         view.setShowSubtitleButton(true);
@@ -192,6 +257,53 @@ public class PlayerActivity extends Activity {
         player.play();
         view.requestFocus();
         ticker.post(tick);
+    }
+
+    /** A converted stream reopened at positionMs (from its own start). */
+    private void reopenAt(long positionMs) {
+        if (player == null) return;
+        long max = knownDurationMs > 0 ? knownDurationMs - 5_000 : Long.MAX_VALUE;
+        long target = Math.max(0, Math.min(positionMs, max));
+        offsetMs = target / 1000 * 1000;
+        MediaItem current = player.getCurrentMediaItem();
+        MediaItem.Builder b = new MediaItem.Builder().setUri(Uri.parse(restartUrl + offsetMs / 1000));
+        if (current != null) b.setMediaMetadata(current.mediaMetadata);
+        player.setMediaItem(b.build());
+        player.prepare();
+        player.play();
+    }
+
+    /** Absolute position in the title, also for reopened streams. */
+    private long position() {
+        return player == null ? 0 : offsetMs + player.getCurrentPosition();
+    }
+
+    private void saveProgress() {
+        lastSaved = System.currentTimeMillis();
+        if (player == null || progressUrl == null || progressUrl.isEmpty()) return;
+        long pos = position() / 1000;
+        long d = knownDurationMs > 0 ? knownDurationMs / 1000 : player.getDuration() == C.TIME_UNSET ? 0 : player.getDuration() / 1000;
+        if (pos <= 5 || d <= 0) return;
+        String url = progressUrl, token = progressToken, profile = progressProfile;
+        String body = "{\"position\":" + pos + ",\"duration\":" + d + "}";
+        new Thread(() -> {
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                c.setRequestMethod("PUT");
+                c.setConnectTimeout(5000);
+                c.setReadTimeout(5000);
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/json");
+                if (token != null && !token.isEmpty()) c.setRequestProperty("Authorization", "Bearer " + token);
+                if (profile != null && !profile.isEmpty()) c.setRequestProperty("X-Profile", profile);
+                try (java.io.OutputStream out = c.getOutputStream()) {
+                    out.write(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                }
+                c.getResponseCode();
+                c.disconnect();
+            } catch (Exception ignored) {
+            }
+        }).start();
     }
 
     // ---- Episodes ----
@@ -252,7 +364,8 @@ public class PlayerActivity extends Activity {
         skipIntro.setVisibility(View.GONE);
         skipIntro.setOnClickListener(v -> {
             skipping = true;
-            player.seekTo(introEnd * 1000L);
+            if (restartUrl != null && !restartUrl.isEmpty()) reopenAt(introEnd * 1000L);
+            else player.seekTo(introEnd * 1000L);
             skipping = false;
             hide(skipIntro);
         });
@@ -268,7 +381,7 @@ public class PlayerActivity extends Activity {
         card.setStroke(dp(1), LINE);
         nextCard.setBackground(card);
         nextCard.setVisibility(View.GONE);
-        TextView label = text(getString(R.string.next_episode).toUpperCase(), 13, ACCENT, true);
+        TextView label = text(getString(R.string.next_episode).toUpperCase(java.util.Locale.ROOT), 13, ACCENT, true);
         label.setLetterSpacing(0.06f);
         nextCard.addView(label);
         nextCard.addView(text(nextTitle == null ? "" : nextTitle, 17, TEXT, true));
@@ -322,7 +435,7 @@ public class PlayerActivity extends Activity {
 
     private void updateEpisodeExtras() {
         if (player == null || skipIntro == null) return;
-        long pos = player.getCurrentPosition(), d = player.getDuration();
+        long pos = position(), d = knownDurationMs > 0 ? knownDurationMs : player.getDuration();
         if (introEnd > 0 && pos >= introStart * 1000L && pos < introEnd * 1000L - 2000) reveal(skipIntro);
         else hide(skipIntro);
         if (nextTitle == null || d == C.TIME_UNSET || d <= 0 || nextCancelled) {
@@ -359,8 +472,10 @@ public class PlayerActivity extends Activity {
     /** byPerson: chosen during the credits, which then are this long. */
     private void playNext(boolean byPerson) {
         if (player == null || goNext) return;
-        long d = player.getDuration(), left = d == C.TIME_UNSET ? 0 : d - player.getCurrentPosition();
-        if (byPerson && left >= 15_000 && left <= 600_000) learnedCredits = (int) (left / 1000);
+        long d = knownDurationMs > 0 ? knownDurationMs : player.getDuration(), left = d == C.TIME_UNSET ? 0 : d - position();
+        // Credits are the last minutes (the interface also wants two
+        // episodes to agree before keeping them).
+        if (byPerson && left >= 15_000 && left <= Math.min(300_000, d * 15 / 100)) learnedCredits = (int) (left / 1000);
         goNext = true;
         finishWithResult();
     }
@@ -388,6 +503,11 @@ public class PlayerActivity extends Activity {
             if (event.getAction() == KeyEvent.ACTION_UP) finishWithResult();
             return true;
         }
+        // Play/pause and the other media keys always go to the player, also
+        // while "Skip intro" or the next-episode card has the focus.
+        if (KeyEvent.isMediaSessionKey(event.getKeyCode())) {
+            return view.dispatchKeyEvent(event) || super.dispatchKeyEvent(event);
+        }
         View f = getCurrentFocus();
         if (f instanceof Button && (f == skipIntro || (nextCard != null && f.getParent() != null
                 && f.getParent().getParent() == nextCard))) {
@@ -400,9 +520,10 @@ public class PlayerActivity extends Activity {
         if (player == null) return;
         ticker.removeCallbacksAndMessages(null);
         if (chainStart >= 0) learnIntro.run();
+        saveProgress();
         Intent out = new Intent();
-        long position = player.getCurrentPosition();
-        long duration = player.getDuration();
+        long position = position() - firstOffsetMs; // the interface adds where it asked to start
+        long duration = knownDurationMs > 0 ? knownDurationMs : player.getDuration();
         out.putExtra(POSITION, Math.max(0, position));
         out.putExtra(DURATION, duration == C.TIME_UNSET ? 0 : duration);
         if (error != null) out.putExtra(ERROR, error);
@@ -421,7 +542,10 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onStop() {
         super.onStop();
-        if (player != null && !isFinishing()) player.pause();
+        if (player != null && !isFinishing()) {
+            player.pause();
+            saveProgress();
+        }
     }
 
     @Override

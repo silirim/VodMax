@@ -927,8 +927,20 @@
       start = 0;
     }
     $("status").hidden = true;
+    // The language chosen for this profile, as in the browser; the player
+    // also saves the position itself while playing (the TV may be switched
+    // off with the player open).
+    const audio = ctx.sess.audio && ctx.sess.audio.find((tr) => tr.index === chooseTracks(ctx.sess).audio);
+    const progress = (ctx.media === "movie" || ctx.media === "episode") ? {
+      url: "/api/v1/progress/" + ctx.media + "/" + ctx.id, token: window.VodMax.token(),
+      profile: window.VodMax.store.get("profile", ""), offset: ctx.offset || 0, duration: ctx.sess.duration || 0,
+    } : null;
+    // A converted stream cannot seek: the player reopens it from the new time.
+    const restart = ctx.sess.mode === "remux"
+      ? { url: ctx.sess.url + "?audio=" + (ctx.sess.default_audio || 0) + "&sub=-1&t=", offset: ctx.offset || 0, duration: ctx.sess.duration || 0 } : null;
     window.VodMax.native.play(JSON.stringify({ url, title: ctx.title, start, live: Boolean(ctx.live),
-      episode: ctx.media === "episode", next: ctx.sess.next ? ctx.sess.next.title : "", markers: ctx.sess.markers || null }));
+      episode: ctx.media === "episode", next: ctx.sess.next ? ctx.sess.next.title : "", markers: ctx.sess.markers || null,
+      audio_language: audio && audio.language ? audio.language : "", progress, restart }));
   }
   window.VodMaxNativeDone = (r) => {
     const c = nativeCtx;
@@ -943,8 +955,12 @@
     }
     if (c.media === "catchup" && state.catchupBack) location.href = state.catchupBack;
     if (c.media === "episode" && c.sess.series_id) {
-      if (r.intro_end) saveMarkers(c.sess, { intro_start: r.intro_start || 0, intro_end: r.intro_end });
-      if (r.credits) saveMarkers(c.sess, { credits: r.credits });
+      // The same care as in the browser (guessMarker): two episodes agree.
+      const p = { sess: c.sess, id: c.id };
+      if (r.intro_end && r.intro_end <= Math.min(600, total * 0.25) && guessMarker(p, "intro", r.intro_end, 10)) {
+        saveMarkers(c.sess, { intro_start: r.intro_start || 0, intro_end: r.intro_end });
+      }
+      if (r.credits && r.credits <= Math.min(300, total * 0.15) && guessMarker(p, "credits", r.credits, 20)) saveMarkers(c.sess, { credits: r.credits });
       if (r.next && c.sess.next) play("episode", c.sess.next.id, c.sess.next.title, 0);
     }
   };
