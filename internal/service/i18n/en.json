@@ -242,6 +242,7 @@
   "titoli di coda non validi": "invalid end credits",
   "troppe parole (max %d)": "too many words (max %d)",
   "troppi PIN errati: riprova tra qualche minuto": "too many wrong PINs: try again in a few minutes",
+  "troppi codici di abbinamento da questo indirizzo: riprova tra qualche minuto": "too many pairing codes from this address: try again in a few minutes",
   "tutte le connessioni dell'abbonamento (%d) sono occupate da una registrazione in corso": "all the subscription's connections (%d) are taken by a recording in progress",
   "tutte le connessioni dell'abbonamento sono in uso (%d): chiudi un'altra visione o prendi il controllo": "all the subscription's connections are in use (%d): stop another stream or take over",
   "un profilo amministratore deve avere un PIN quando ci sono altri profili": "an admin profile must have a PIN when there are other profiles",

@@ -32,6 +32,7 @@ var (
 	ErrForbidden       = errors.New("operazione riservata a un profilo amministratore")
 	ErrPIN             = errors.New("PIN errato")
 	ErrPINLocked       = errors.New("troppi PIN errati: riprova tra qualche minuto")
+	ErrPairingLimit    = errors.New("troppi codici di abbinamento da questo indirizzo: riprova tra qualche minuto")
 	ErrPairing         = errors.New("codice di abbinamento sconosciuto o scaduto")
 	ErrAdminPIN        = errors.New("un profilo amministratore deve avere un PIN quando ci sono altri profili")
 	ErrCurrentPIN      = errors.New("il PIN attuale non è corretto")
@@ -505,7 +506,7 @@ func (s *Service) StartPairing(client string) (PairingRequest, error) {
 		}
 	}
 	if len(s.auth.pairing) >= pairingMax || perClient >= pairingPerClient {
-		return PairingRequest{}, ErrBusy
+		return PairingRequest{}, ErrPairingLimit
 	}
 	code := make([]byte, 6)
 	for i := range code {

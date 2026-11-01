@@ -287,7 +287,7 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusForbidden
 	case errors.Is(err, service.ErrAdminPIN):
 		status = http.StatusBadRequest
-	case errors.Is(err, service.ErrPINLocked):
+	case errors.Is(err, service.ErrPINLocked), errors.Is(err, service.ErrPairingLimit):
 		status = http.StatusTooManyRequests
 	case errors.Is(err, service.ErrPairing):
 		status = http.StatusNotFound

@@ -360,3 +360,17 @@ func TestDeletedProfileTokenAndLinks(t *testing.T) {
 		t.Fatalf("profile of a locked device deleted: %d %s", code, body)
 	}
 }
+
+// More pairing codes than allowed from one address: a clear refusal (429),
+// not "sincronizzazione già in corso".
+func TestPairingLimitMessage(t *testing.T) {
+	e := setup(t, true)
+	var code int
+	var body []byte
+	for range 6 {
+		code, body = e.call(t, "POST", "/api/v1/pair", nil, "", "")
+	}
+	if code != http.StatusTooManyRequests || !strings.Contains(string(body), "abbinamento") {
+		t.Fatalf("sixth code: %d %s", code, body)
+	}
+}

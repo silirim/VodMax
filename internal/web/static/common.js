@@ -60,7 +60,7 @@ window.VodMax = (() => {
   function overlay(id, ...children) {
     for (const old of document.querySelectorAll(".setup-panel")) old.remove();
     const box = Object.assign(document.createElement("section"), { id, className: "panel setup-panel" });
-    box.append(...children);
+    box.append(...children.filter((c) => c != null && c !== false));
     document.body.append(box);
     return box;
   }
@@ -89,16 +89,24 @@ window.VodMax = (() => {
 
   // Pairing: the device shows a code, an admin approves it elsewhere.
   let pairingTimer;
-  async function showPairing() {
+  async function showPairing(fresh) {
     clearTimeout(pairingTimer);
-    let req;
+    // The code of this device is kept while it is valid: moving between
+    // pages does not ask for new ones (the server allows a few per address).
+    let req = fresh ? null : store.get("pairing", null);
+    if (req && !(req.expires > Date.now() + 30000)) req = null;
     try {
-      const res = await fetch("/api/v1/pair", { method: "POST" });
-      req = await res.json();
-      if (!res.ok) throw new Error(req.error || t("errore {status}", { status: res.status }));
+      if (!req) {
+        const res = await fetch("/api/v1/pair", { method: "POST" });
+        req = await res.json();
+        if (!res.ok) throw new Error(req.error || t("errore {status}", { status: res.status }));
+        req.expires = Date.now() + req.expires_in * 1000;
+        store.set("pairing", req);
+      }
     } catch (e) {
+      const admin = el("button", { type: "button", className: "link", onclick: () => askToken() }, t("Ho il token di amministrazione"));
       overlay("pairing", el("h1", {}, "VodMax"), el("p", {}, t("Impossibile avviare l'abbinamento: {error}", { error: e.message })),
-        el("button", { type: "button", onclick: () => showPairing() }, t("Riprova")));
+        el("button", { type: "button", onclick: () => showPairing(true) }, t("Riprova")), admin);
       return;
     }
     const code = el("p", { className: "pair-code" }, req.code);
@@ -118,10 +126,11 @@ window.VodMax = (() => {
         if (res.status === 200) {
           store.set("token", (await res.json()).token);
           store.set("profile", "");
+          store.set("pairing", null);
           location.reload();
           return;
         }
-        if (res.status === 404) { showPairing(); return; }
+        if (res.status === 404) { store.set("pairing", null); showPairing(true); return; }
       } catch { /* network hiccup: keep polling */ }
       pairingTimer = setTimeout(poll, 3000);
     };
