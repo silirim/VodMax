@@ -12,6 +12,10 @@
 # Going back to the previous binary without downloading:
 #   sudo mv /usr/local/bin/vodmax-server.old /usr/local/bin/vodmax-server
 #   sudo systemctl restart vodmax
+# If the new version changed the database, the previous one refuses it
+# ("database creato da una versione più recente"): the server copied it
+# before changing it, in <data>/pre-upgrade/vodmax-schemaN-<date>.db; put
+# that copy in place of vodmax.db (service stopped) before going back.
 set -eu
 
 REPO=silirim/VodMax
@@ -70,8 +74,10 @@ base=https://github.com/$REPO/releases/download/$tag
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 echo "Scarico VodMax $tag ($arch)..."
-get "$base/$name.tar.gz" "$tmp/$name.tar.gz"
-get "$base/SHA256SUMS" "$tmp/SHA256SUMS"
+get "$base/$name.tar.gz" "$tmp/$name.tar.gz" ||
+  { echo "Versione $tag non trovata per $arch: niente è stato cambiato." >&2; exit 1; }
+get "$base/SHA256SUMS" "$tmp/SHA256SUMS" ||
+  { echo "SHA256SUMS di $tag non trovato: niente è stato cambiato." >&2; exit 1; }
 (cd "$tmp" && grep " $name.tar.gz\$" SHA256SUMS > check && [ -s check ] && sha256sum -c check >/dev/null) ||
   { echo "Checksum non valido: niente è stato cambiato." >&2; exit 1; }
 tar -xzf "$tmp/$name.tar.gz" -C "$tmp"
@@ -85,11 +91,18 @@ case $0 in */*) self=$0 ;; *) self=$(command -v "$0" || true) ;; esac
 [ -n "$self" ] && [ -f "$self" ] && [ -f "$tmp/$name/vodmax-update" ] && install -m 755 "$tmp/$name/vodmax-update" "$self"
 
 systemctl restart "$SERVICE"
-sleep 2
-if systemctl is-active --quiet "$SERVICE"; then
+# Running for a few seconds, not just started: a database it cannot open
+# stops it right away.
+ok=
+for _ in 1 2 3 4 5 6; do
+  sleep 1
+  systemctl is-active --quiet "$SERVICE" && ok=1 || { ok=; break; }
+done
+if [ -n "$ok" ]; then
   echo "Installato $("$BIN" -version). La versione precedente è in $BIN.old."
 else
   echo "Il servizio non è ripartito: controlla 'journalctl -u $SERVICE'. Per tornare indietro:" >&2
   echo "  sudo mv $BIN.old $BIN && sudo systemctl restart $SERVICE" >&2
+  echo "Se dice che il database è di una versione più recente, rimetti prima la copia in <dati>/pre-upgrade/." >&2
   exit 1
 fi

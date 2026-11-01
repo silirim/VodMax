@@ -9,15 +9,21 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"runtime"
+	"sort"
+	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
 
 // Store holds one writer connection and a pool of read-only connections.
 type Store struct {
-	w *sql.DB
-	r *sql.DB
+	w    *sql.DB
+	r    *sql.DB
+	path string
 }
 
 // ErrNotFound is returned when a row does not exist.
@@ -47,7 +53,7 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	r.SetMaxOpenConns(max(4, runtime.NumCPU()))
-	s := &Store{w: w, r: r}
+	s := &Store{w: w, r: r, path: path}
 	if err := s.migrate(context.Background()); err != nil {
 		s.Close()
 		return nil, err
@@ -410,10 +416,45 @@ func (s *Store) migrate(ctx context.Context) error {
 	if version > len(migrations) {
 		return fmt.Errorf("database creato da una versione più recente (schema %d)", version)
 	}
+	if version > 0 && version < len(migrations) {
+		if err := s.copyBeforeMigrating(ctx, version); err != nil {
+			return fmt.Errorf("copia del database prima dell'aggiornamento: %w", err)
+		}
+	}
 	for i := version; i < len(migrations); i++ {
 		if err := s.migrateOne(ctx, i+1, migrations[i]); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// keepPreUpgrade is how many copies made before migrating are kept.
+const keepPreUpgrade = 3
+
+// copyBeforeMigrating saves the database as it is, next to it in
+// pre-upgrade/, before a newer version changes its schema: the previous
+// version cannot open a migrated database, the copy it can.
+func (s *Store) copyBeforeMigrating(ctx context.Context, version int) error {
+	if s.path == "" || strings.HasPrefix(s.path, ":memory:") {
+		return nil
+	}
+	dir := filepath.Join(filepath.Dir(s.path), "pre-upgrade")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	name := filepath.Join(dir, fmt.Sprintf("vodmax-schema%d-%s.db", version, time.Now().Format("20060102-150405")))
+	if _, err := s.w.ExecContext(ctx, `VACUUM INTO ?`, name); err != nil {
+		return err
+	}
+	old, _ := filepath.Glob(filepath.Join(dir, "vodmax-schema*.db"))
+	sort.Slice(old, func(i, j int) bool {
+		a, _ := os.Stat(old[i])
+		b, _ := os.Stat(old[j])
+		return a != nil && b != nil && a.ModTime().After(b.ModTime())
+	})
+	for _, f := range old[min(len(old), keepPreUpgrade):] {
+		os.Remove(f)
 	}
 	return nil
 }

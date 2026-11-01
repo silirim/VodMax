@@ -206,3 +206,51 @@ func TestSubscriptionRebuildKeepsCatalog(t *testing.T) {
 		t.Fatalf("%d film rimasti dopo la cancellazione dell'abbonamento", n)
 	}
 }
+
+// Before a newer version migrates the schema, the database is copied as
+// it was: the copy opens with the older schema and holds the same data.
+func TestCopyBeforeMigrating(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "vodmax.db")
+	all := migrations
+	migrations = all[:16]
+	st, err := Open(path)
+	if err != nil {
+		migrations = all
+		t.Fatal(err)
+	}
+	vpnID, _ := st.AddVPN(ctx, "test", "wireguard", func(int64) []byte { return []byte("sealed") })
+	st.Close()
+	if copies, _ := filepath.Glob(filepath.Join(dir, "pre-upgrade", "*.db")); len(copies) != 0 {
+		migrations = all
+		t.Fatalf("copy of a new database: %v", copies)
+	}
+	migrations = all
+	st, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+	copies, _ := filepath.Glob(filepath.Join(dir, "pre-upgrade", "vodmax-schema16-*.db"))
+	if len(copies) != 1 {
+		t.Fatalf("pre-upgrade copies: %v", copies)
+	}
+	// The older version opens the copy.
+	migrations = all[:16]
+	old, err := Open(copies[0])
+	migrations = all
+	if err != nil {
+		t.Fatalf("older version on the copy: %v", err)
+	}
+	defer old.Close()
+	if _, err := old.VPN(ctx, vpnID); err != nil {
+		t.Fatalf("data in the copy: %v", err)
+	}
+	// Opening again without a newer schema makes no copy.
+	st, _ = Open(path)
+	st.Close()
+	if copies, _ := filepath.Glob(filepath.Join(dir, "pre-upgrade", "*.db")); len(copies) != 1 {
+		t.Fatalf("copies after a plain start: %v", copies)
+	}
+}

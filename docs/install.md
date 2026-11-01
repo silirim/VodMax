@@ -95,7 +95,12 @@ is out.
   `vodmax-server.old`, installs the new one and restarts the service.
   `sudo vodmax-update v0.4.0` installs a given version (also to go back).
   The database is upgraded automatically at start; a backup first is wise
-  (Settings → System → Backup).
+  (Settings → System → Backup). Before changing it the server keeps a copy
+  in `<data>/pre-upgrade/` (the last three): an older version refuses a
+  database upgraded by a newer one, so to go back stop the service, put
+  that copy in place of `vodmax.db`, then install the older version.
+  From 0.5.x, name the version (`sudo vodmax-update v0.6.0`): the 0.5.x
+  updater would also take a beta.
 - **Android apps** (phone, Android TV, Fire TV) offer the update by
   themselves: *Update*, then confirm in the Android window (the first time,
   allow VodMax to install apps). It works from version 0.4.0, the first
