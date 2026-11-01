@@ -1201,11 +1201,26 @@
   // ---- Episodes: skip the opening, go on to the next one ----
   // Where the opening ends and how long the credits are is learned from
   // the people watching: skipping ahead in the first minutes marks the
-  // opening, "Next episode" during the credits marks the credits. The
-  // server keeps them per series, for every device.
+  // opening, "Next episode" in the last minutes marks the credits. One gesture is
+  // not enough (skipping a boring scene, leaving an episode early): two
+  // episodes must agree before the server keeps it, per series, for every
+  // device.
   function saveMarkers(sess, m) {
     sess.markers = { ...(sess.markers || {}), ...m };
     api("PUT", "/api/v1/series/" + sess.series_id + "/markers", m).catch(() => {});
+  }
+
+  // guessMarker remembers a guess on this device; it returns true when a
+  // guess of another episode of the series is within tolerance.
+  function guessMarker(p, kind, value, tolerance) {
+    let all = {};
+    try { all = JSON.parse(localStorage.getItem("vodmax.markerGuess") || "{}") || {}; } catch { /* private mode */ }
+    const key = p.sess.series_id + ":" + kind, prev = all[key];
+    const agreed = !!prev && prev.episode !== p.id && Math.abs(prev.value - value) <= tolerance;
+    if (agreed) delete all[key];
+    else all[key] = { episode: p.id, value };
+    try { localStorage.setItem("vodmax.markerGuess", JSON.stringify(all)); } catch { /* private mode */ }
+    return agreed;
   }
 
   // Forward seeks close together are one skip; it marks the opening when
@@ -1220,8 +1235,8 @@
     p.chainTimer = setTimeout(() => {
       const c = p.chain;
       p.chain = null;
-      if (state.play !== p || !c || c.start > 300 || c.end - c.start < 20 || c.end > 600) return;
-      saveMarkers(p.sess, { intro_start: Math.round(c.start), intro_end: Math.round(c.end) });
+      if (state.play !== p || !c || c.start > 300 || c.end - c.start < 20 || c.end > Math.min(600, duration() * 0.25)) return;
+      if (guessMarker(p, "intro", c.end, 10)) saveMarkers(p.sess, { intro_start: Math.round(c.start), intro_end: Math.round(c.end) });
     }, 8000);
   }
 
@@ -1234,12 +1249,17 @@
     $("skip-intro").hidden = true;
   }
 
-  // byPerson: chosen during the credits, which then are this long.
+  // byPerson: chosen near the end, maybe during the credits (see
+  // guessMarker). Once only: if the next episode does not start, the
+  // error stays on screen instead of trying again at every frame.
   function playNext(byPerson) {
     const p = state.play;
-    if (!p || !p.sess.next) return;
+    if (!p || !p.sess.next || p.nextStarted) return;
+    p.nextStarted = true;
     const left = duration() - position();
-    if (byPerson && left >= 15 && left <= 600) saveMarkers(p.sess, { credits: Math.round(left) });
+    // Credits are the last minutes: not a skip from the middle.
+    const credits = byPerson && left >= 15 && left <= Math.min(300, duration() * 0.15);
+    if (credits && guessMarker(p, "credits", left, 20)) saveMarkers(p.sess, { credits: Math.round(left) });
     saveProgress();
     play("episode", p.sess.next.id, p.sess.next.title, 0);
   }
