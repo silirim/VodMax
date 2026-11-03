@@ -122,13 +122,16 @@ is out.
    `sudo cat /var/lib/vodmax/admin.token`.
 2. **Settings → Language**: Italian or English (per device; the profile
    screen has the same choice).
-3. **Settings → VPN**: VodMax contacts playlists **only through a VPN**.
-   Import the WireGuard `.conf` file of your VPN service (Proton VPN,
+3. **Settings → VPN**: by default VodMax contacts playlists **only through a
+   VPN**. Import the WireGuard `.conf` file of your VPN service (Proton VPN,
    Mullvad, NordVPN... — one file per device is best), or declare an
    *external VPN* if the server already goes out through a VPN on the
    router (then it is up to you that the traffic really goes through it).
+   Without a VPN, switch off *Contact providers only through a VPN*: a
+   subscription can then use the normal network.
 4. **Settings → Subscriptions**: add an M3U playlist (its URL) or an Xtream
-   Codes account (server, user, password), choose the VPN, then *Sync now*.
+   Codes account (server, user, password), choose the VPN (or *No VPN*),
+   then *Sync now*.
    The catalog and the guide are refreshed every night and the guide every
    few hours (Settings → System).
 5. **Settings → Selection** and **Categories**: keep only the countries,

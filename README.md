@@ -57,7 +57,7 @@ decoder with the remote.
 | 📡 **Sources** | Xtream Codes, M3U playlists and Stalker portals (MAC) |
 | 🧹 **Catalog selection** | Keep only the countries, years and categories you want, with a live preview |
 | 👪 **Profiles** | Per-person progress and favourites, kids profiles, devices paired with a short code or signed in with your home account (OpenID Connect: Authelia, Authentik, Keycloak…) |
-| ✨ **Assistant** | Optional: built in (VodMax downloads and runs the model at home), Claude and other online services with an API key, or your own server. Write a recording rule as a sentence, ask what to watch tonight |
+| ✨ **Assistant** | Optional: built in (VodMax downloads and runs the model at home), Claude and other online services with an API key, or your own server. Write a recording rule as a sentence, record "just once" ("tonight's film on Rai 1", "Feyenoord Inter"), ask what to watch tonight |
 | 🔌 **Other apps** | Plex, Jellyfin and Emby see VodMax as an HDHomeRun tuner; M3U playlist and XMLTV guide for TiviMate, Kodi, VLC |
 | 🔒 **Built-in VPN** | WireGuard in user space inside the server and the app: with *only through a VPN* on (the default), playlists are never contacted without it |
 | 💾 **Backups** | Encrypted backups and automatic copies, health warnings for VPN, playlists, guide and disk |
@@ -68,7 +68,7 @@ decoder with the remote.
 | Platform | |
 |---|---|
 | **Browser** | The full interface, made for the remote and the mouse |
-| **Android, Android TV, Fire TV** | Native player (Media3) for every format; can also run **standalone, without a server** |
+| **Android, Android TV, Fire TV** | Native player (Media3) for every format, picture in picture on phones and tablets; can also run **standalone, without a server** |
 | **LG webOS** | TV app (webOS 22+ recommended) |
 | **Linux server** | x86-64, ARM64 (Raspberry Pi 4/5), ARMv7; one binary, SQLite |
 

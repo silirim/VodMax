@@ -123,14 +123,16 @@ una versione nuova.
    `sudo cat /var/lib/vodmax/admin.token`.
 2. **Impostazioni → Lingua**: italiano o inglese (per dispositivo; la stessa
    scelta è nella schermata dei profili).
-3. **Impostazioni → VPN**: VodMax contatta le playlist **solo tramite una
-   VPN**. Importa il file WireGuard `.conf` del tuo servizio VPN (Proton
-   VPN, Mullvad, NordVPN…; meglio un file per ogni dispositivo), oppure
-   indica una *VPN esterna* se il server esce già da una VPN sul router (in
-   quel caso sta a te che il traffico passi davvero da lì).
+3. **Impostazioni → VPN**: in modo predefinito VodMax contatta le playlist
+   **solo tramite una VPN**. Importa il file WireGuard `.conf` del tuo
+   servizio VPN (Proton VPN, Mullvad, NordVPN…; meglio un file per ogni
+   dispositivo), oppure indica una *VPN esterna* se il server esce già da
+   una VPN sul router (in quel caso sta a te che il traffico passi davvero
+   da lì). Senza VPN, spegni *Contatta i provider solo tramite VPN*: un
+   abbonamento può allora usare la rete normale.
 4. **Impostazioni → Abbonamenti**: aggiungi una playlist M3U (il suo
    indirizzo) o un account Xtream Codes (server, utente, password), scegli
-   la VPN, poi *Sincronizza ora*. Catalogo e guida si aggiornano ogni notte,
+   la VPN (o *Nessuna VPN*), poi *Sincronizza ora*. Catalogo e guida si aggiornano ogni notte,
    la guida anche ogni poche ore (Impostazioni → Sistema).
 5. **Impostazioni → Selezione** e **Categorie**: tieni solo i paesi, gli
    anni e le categorie che vuoi; l'anteprima mostra l'effetto prima di

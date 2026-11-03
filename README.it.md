@@ -47,15 +47,18 @@ telecomando.
 
 | | |
 |---|---|
-| 📺 **Diretta** | Zapping da telecomando (numeri, P+/P−, solo preferiti), elenco dei canali, ora e a seguire, numerazione ufficiale, sezioni sport e radio |
+| 📺 **Diretta** | Zapping da telecomando (numeri, P+/P−, solo preferiti), elenco dei canali, ora e a seguire, numerazione ufficiale, sezioni sport e radio, **multivisione** (2 o 4 canali insieme) |
 | 🗓️ **Guida TV** | Griglia dei programmi da XMLTV (della playlist e fonti esterne); registra o riguarda dalla guida |
 | ⏸️ **Pausa e archivio** | Pausa e riavvolgimento della diretta, programma dall'inizio, archivio della playlist |
-| ⏺️ **Registrazioni** | Il programma in onda, dalla guida o per regola ("ogni partita", "il telegiornale"), con controllo di disco e connessioni |
-| 🎬 **Film e serie** | Locandine, trama e cast, continua a guardare, episodio successivo, lingua dell'audio e sottotitoli, MKV/AVI/HEVC convertiti al volo |
+| ⏺️ **Registrazioni** | Il programma in onda, dalla guida o per regola ("ogni partita", "il telegiornale", solo dirette), con controllo di disco e connessioni; "salta la pubblicità" con Comskip |
+| 🎬 **Film e serie** | Locandine, trama e cast, continua a guardare, episodio successivo, la mia lista, salta la sigla, lingua dell'audio e sottotitoli, MKV/AVI/HEVC convertiti al volo (anche con la scheda grafica: VAAPI, Quick Sync, NVENC) |
 | ⬇️ **Download** | Film, episodi, stagioni o serie intere copiati sul disco del server, da guardare senza la playlist; uno alla volta e solo con una connessione libera (chi guarda ha la precedenza), anche solo di notte |
 | 📁 **Raccolte locali** | Cartelle di film o serie con i nomi di Jellyfin/Kodi/Plex, file `.nfo` e immagini accanto ai video |
+| 📡 **Sorgenti** | Xtream Codes, playlist M3U e portali Stalker (MAC) |
 | 🧹 **Selezione del catalogo** | Solo i paesi, gli anni e le categorie che vuoi, con anteprima |
-| 👪 **Profili** | Avanzamenti e preferiti per persona, profili bambini, dispositivi abbinati con un codice |
+| 👪 **Profili** | Avanzamenti e preferiti per persona, profili bambini, dispositivi abbinati con un codice o con l'account di casa (OpenID Connect: Authelia, Authentik, Keycloak…) |
+| ✨ **Assistente** | Facoltativo: integrato (VodMax scarica e fa girare il modello in casa), Claude e altri servizi online con una chiave API, oppure un tuo server. Scrivi una regola di registrazione con una frase, registra "solo questa volta" ("il film di stasera su Rai 1", "Feyenoord Inter"), chiedi cosa guardare stasera |
+| 🔌 **Altre app** | Plex, Jellyfin ed Emby vedono VodMax come sintonizzatore HDHomeRun; playlist M3U e guida XMLTV per TiviMate, Kodi, VLC |
 | 🔒 **VPN interna** | WireGuard dentro server e app: con *solo tramite VPN* acceso (il predefinito), senza VPN le playlist non vengono mai contattate |
 | 💾 **Backup** | Backup cifrati e copie automatiche; avvisi su VPN, playlist, guida e disco |
 | 🖼️ **Schede** | Dalla playlist, dai file `.nfo` o da TMDB con una tua chiave |
@@ -65,7 +68,7 @@ telecomando.
 | Piattaforma | |
 |---|---|
 | **Browser** | L'interfaccia completa, per telecomando e mouse |
-| **Android, Android TV, Fire TV** | Player nativo (Media3) per ogni formato; funziona anche **da sola, senza server** |
+| **Android, Android TV, Fire TV** | Player nativo (Media3) per ogni formato, picture in picture su telefoni e tablet; funziona anche **da sola, senza server** |
 | **LG webOS** | App per TV (consigliato webOS 22 o successivo) |
 | **Server Linux** | x86-64, ARM64 (Raspberry Pi 4/5), ARMv7; un solo programma, SQLite |
 
