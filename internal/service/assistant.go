@@ -537,29 +537,30 @@ func (s *Service) onceCandidates(ctx context.Context, date, clock string, r stor
 		}
 	}
 	if channel.ID != 0 && channel.GuideID != "" && !at.IsZero() {
-		progs, err := s.st.GuideWindow(ctx, []string{channel.GuideID}, at.Add(-time.Minute), at.Add(30*time.Minute))
+		progs, err := s.st.GuideWindow(ctx, []string{channel.GuideID}, at.Add(-time.Minute), at.Add(time.Hour))
 		if err == nil {
-			// What starts nearest the time named (the news ending at 21 is
-			// not "the film at 21"), else what is on air then.
-			var best *store.Programme
-			dist := func(p store.Programme) int64 { return abs64(p.Start - at.Unix()) }
-			for i, pr := range progs[channel.GuideID] {
-				if pr.Stop <= now.Unix() || pr.Start < at.Add(-15*time.Minute).Unix() || pr.Start >= at.Add(30*time.Minute).Unix() {
+			// What starts nearest the time named (Italian prime time starts
+			// between 21:20 and 21:45 for "the film at 21"), then what is
+			// on air then: the person says which.
+			list := progs[channel.GuideID]
+			var next, onAir *store.Programme
+			for i, pr := range list {
+				if pr.Stop <= now.Unix() {
 					continue
 				}
-				if best == nil || dist(pr) < dist(*best) {
-					best = &progs[channel.GuideID][i]
+				// Short fillers (a news flash at 21:05) are not "the film at 21".
+				if pr.Stop-pr.Start >= 20*60 && pr.Start >= at.Add(-15*time.Minute).Unix() && pr.Start < at.Add(time.Hour).Unix() &&
+					(next == nil || abs64(pr.Start-at.Unix()) < abs64(next.Start-at.Unix())) {
+					next = &list[i]
+				}
+				if pr.Start < at.Unix() && pr.Stop > at.Unix() {
+					onAir = &list[i]
 				}
 			}
-			if best == nil {
-				for i, pr := range progs[channel.GuideID] {
-					if pr.Start <= at.Unix() && pr.Stop > at.Unix() && pr.Stop > now.Unix() {
-						best = &progs[channel.GuideID][i]
-					}
+			for _, pr := range []*store.Programme{next, onAir} {
+				if pr != nil {
+					add(RuleMatch{ChannelID: channel.ID, Channel: channel.Name, Start: pr.Start, Stop: pr.Stop, Title: pr.Title, State: "new"})
 				}
-			}
-			if best != nil {
-				add(RuleMatch{ChannelID: channel.ID, Channel: channel.Name, Start: best.Start, Stop: best.Stop, Title: best.Title, State: "new"})
 			}
 		}
 	}

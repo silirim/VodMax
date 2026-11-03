@@ -111,9 +111,10 @@ func TestAssistant(t *testing.T) {
 		t.Fatalf("no day or time named, nothing to record once: %s", body)
 	}
 
-	// A day and a time: the programme then on the channel named, whatever
-	// its title ("Film della sera" starts in 20 minutes on Rai 1), to
-	// record just once; without a title there is no rule to propose.
+	// A day and a time: the programmes then on the channel named, whatever
+	// their title, to record just once: first what starts nearest the time
+	// ("Film della sera", in 20 minutes on Rai 1), then what is on air
+	// (TG1). Without a title there is no rule to propose.
 	at := time.Now().Add(20 * time.Minute)
 	m.answer = func(system, user string) string {
 		if !strings.Contains(system, time.Now().Format("2006-01-02")) {
@@ -131,7 +132,8 @@ func TestAssistant(t *testing.T) {
 		}
 		RuleError string `json:"rule_error"`
 	}
-	if code != 200 || json.Unmarshal(body, &o) != nil || len(o.Once) != 1 || o.Once[0].Title != "Film della sera" || o.Once[0].ChannelID == 0 {
+	if code != 200 || json.Unmarshal(body, &o) != nil || len(o.Once) != 2 || o.Once[0].Title != "Film della sera" || o.Once[0].ChannelID == 0 ||
+		o.Once[1].Title != "TG1" {
 		t.Fatalf("once: %d %s", code, body)
 	}
 	// "Just this once" is the guide's own recording request.
