@@ -5,7 +5,7 @@ pensato e dove sta andando. Le scelte puntuali, con alternative e motivi,
 sono nelle [decisioni](decisioni/README.md); le istruzioni per chi ci
 lavora in [AGENTS.md](../AGENTS.md).
 
-*Aggiornato al 31 ottobre 2026 (0.6.0 in beta).*
+*Aggiornato al 3 novembre 2026 (0.6.0 stabile).*
 
 ## In una frase
 
@@ -125,10 +125,13 @@ beta".
 Le voci "deciso" hanno una decisione approvata; le altre sono candidate e
 diventano lavoro solo con una decisione.
 
-### Per la 0.6.0 stabile (deciso)
+### Rimasto dalla 0.6.0 (deciso)
 
-- Chiudere le prove delle beta in casa: lettore Android nelle serie, tasto
-  Invio dalle tastiere Android, assistente sulle richieste reali.
+La 0.6.0 è uscita stabile il 3 novembre 2026 per scelta del proprietario;
+queste prove restano da chiudere nelle 0.6.x:
+
+- Prove su dispositivi veri: lettore Android nelle serie, picture in
+  picture, tasto Invio dalle tastiere Android, app LG.
 - Lasciare che l'indice delle persone si riempia e controllare che il ritmo
   notturno non pesi sul provider.
 - Progetto Weblate per le traduzioni; template Unraid nelle Community Apps.
