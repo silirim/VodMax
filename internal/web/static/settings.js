@@ -1509,6 +1509,27 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     render();
   });
 
+  // Sticky menu: top is 1.5rem when it fits the screen, otherwise negative
+  // by what does not fit, so its end stays in view.
+  const side = $("side");
+  const placeSide = () => {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    side.style.setProperty("--side-top", Math.min(1.5 * rem, innerHeight - side.offsetHeight - 1.5 * rem) + "px");
+  };
+  addEventListener("resize", placeSide);
+  // A menu item reached with the remote while the page is scrolled down
+  // may sit above the screen (the menu is stuck by its end): scroll the
+  // page back up just enough to show it.
+  side.addEventListener("focusin", (e) => {
+    const r = e.target.getBoundingClientRect();
+    if (r.top >= 16 && r.bottom <= innerHeight - 16) return;
+    const naturalTop = $("content").getBoundingClientRect().top + scrollY; // the menu's place without sticking
+    const y = naturalTop + (r.top - side.getBoundingClientRect().top) - innerHeight / 3;
+    if (r.top < 16) window.scrollTo(0, Math.max(0, Math.min(scrollY, y)));
+  });
+  if (window.ResizeObserver) new ResizeObserver(placeSide).observe(side);
+  placeSide();
+
   window.VodMaxNativeBack = () => {
     if (window.VodMax.sheetOpen()) window.VodMax.closeSheet(); else back();
     return true;

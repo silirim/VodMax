@@ -75,7 +75,10 @@
 /* ---- Layout: sections on the left, the open one on the right; on a
    phone the list first, then the section with its own Back. ---- */
 .shell { display: grid; grid-template-columns: minmax(17rem, 22rem) 1fr; gap: 2.5rem; padding: 1.5rem var(--safe) 4rem; }
-.side { align-self: start; }
+/* The menu is taller than a TV screen: it scrolls with the page until its
+   end is in view, then stays (top set by settings.js), so a long section
+   never leaves the left column empty. */
+.side { position: sticky; top: var(--side-top, 1.5rem); align-self: start; }
 .side h1 { margin: 0.9rem 0 1.2rem; font-size: 1.7rem; font-weight: 700; }
 .side-back { display: inline-flex; align-items: center; gap: 0.45em; padding: 0.4em 0.9em 0.4em 0.6em; margin-left: -0.6em; color: var(--soft); text-decoration: none; border-radius: 999px; }
 .side-back:hover { color: var(--text); }
