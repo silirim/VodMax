@@ -324,6 +324,7 @@ public class MainActivity extends Activity {
                         i.putExtra(PlayerActivity.RESTART_URL, r.startsWith("/") ? server + r : r);
                         i.putExtra(PlayerActivity.RESTART_OFFSET, (long) (rs.optDouble("offset", 0) * 1000));
                         i.putExtra(PlayerActivity.KNOWN_DURATION, (long) (rs.optDouble("duration", 0) * 1000));
+                        i.putExtra(PlayerActivity.GROWS, rs.optBoolean("grows", false));
                     }
                     JSONObject m = o.optJSONObject("markers");
                     if (m != null) {

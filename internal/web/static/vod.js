@@ -1040,8 +1040,8 @@
       profile: window.VodMax.store.get("profile", ""), offset: ctx.offset || 0, duration: ctx.sess.duration || 0,
     } : null;
     // A converted stream cannot seek: the player reopens it from the new time.
-    const restart = ctx.sess.mode === "remux"
-      ? { url: ctx.sess.url + "?audio=" + (ctx.sess.default_audio || 0) + "&sub=-1&t=", offset: ctx.offset || 0, duration: ctx.sess.duration || 0 } : null;
+    const restart = ctx.restart || (ctx.sess.mode === "remux"
+      ? { url: ctx.sess.url + "?audio=" + (ctx.sess.default_audio || 0) + "&sub=-1&t=", offset: ctx.offset || 0, duration: ctx.sess.duration || 0 } : null);
     window.VodMax.native.play(JSON.stringify({ url, title: ctx.title, start, live: Boolean(ctx.live),
       episode: ctx.media === "episode", next: ctx.sess.next ? ctx.sess.next.title : "", markers: ctx.sess.markers || null,
       audio_language: audio && audio.language ? audio.language : "", progress, restart }));
@@ -1214,6 +1214,7 @@
   function duration() {
     const p = state.play;
     if (!p) return 0;
+    if (p.growing) return p.growing.recorded + (performance.now() - p.growing.at) / 1000;
     return p.sess.mode === "direct" && isFinite(video.duration) ? video.duration : p.duration;
   }
 
@@ -1236,6 +1237,7 @@
   function seek(delta) {
     const p = state.play;
     if (!p) return;
+    if (p.growing) { seekGrowing(position() + delta); return; }
     if (p.ts) { p.ts.seek(delta); showBar(); return; }
     const target = Math.max(0, Math.min(position() + delta, (duration() || Infinity) - 5));
     learnIntro(position(), target);
@@ -1249,6 +1251,7 @@
     const p = state.play;
     if (!p) return;
     const d = duration();
+    if (p.growing) { seekGrowing(target); return; }
     target = Math.max(0, Math.min(target, (d || Infinity) - 3));
     learnIntro(position(), target);
     if (p.ts) p.ts.seek(target - position());
@@ -1294,12 +1297,14 @@
     state.seekDragging = () => dragging;
   }
 
-  video.addEventListener("timeupdate", () => {
+  video.addEventListener("timeupdate", updateTime);
+  function updateTime() {
+    if (!state.play) return;
     const d = duration();
     $("player-pos").textContent = clock(position());
     $("player-dur").textContent = d ? clock(d) : "";
     if (!(state.seekDragging && state.seekDragging())) $("player-fill").style.width = d ? Math.min(100, (position() / d) * 100) + "%" : "0";
-  });
+  }
 
   video.addEventListener("error", async () => {
     const p = state.play;
@@ -1504,6 +1509,7 @@
   }
 
   function showBar() {
+    updateTime();
     $("player-bar").classList.remove("idle");
     $("player").classList.remove("cursor-hidden");
     updateToggle();
@@ -1516,33 +1522,92 @@
     }, 4000);
   }
 
+  // A small panel with a few choices: resolves to the chosen value, or
+  // null when closed (Back, a click outside).
+  function choose(title, options) {
+    return new Promise((resolve) => {
+      const back = document.activeElement;
+      const scrim = el("div", { className: "scrim" });
+      const buttons = options.map(([value, text, icon]) => {
+        const b = el("button", { className: "chip focusable" }, el("span", { className: "name" }, text));
+        if (icon) window.VodMax.label(b, icon, text);
+        b.onclick = () => close(value);
+        return b;
+      });
+      const panel = el("section", { className: "picker choice", id: "picker" }, el("h2", {}, title), el("div", { className: "options" }, ...buttons));
+      const close = (value) => { panel.remove(); scrim.remove(); if (back && value === null) back.focus(); resolve(value); };
+      scrim.onclick = () => close(null);
+      panel.close = () => close(null);
+      document.body.append(scrim, panel);
+      buttons[0].focus();
+    });
+  }
+
+  // Recordings in progress start from the beginning or from the live
+  // edge, and can be moved in up to what has been recorded so far: the
+  // server reopens the stream from the chosen second (?t=).
   async function playRecording(r) {
-    let url, breaks;
-    try { ({ url, commercials: breaks } = await api("POST", "/api/v1/recordings/" + r.id + "/ticket")); } catch (e) { flash(e.message); return; }
+    let from = 0;
+    if (r.status === "recording") {
+      from = await choose(t("Registrazione in corso"), [[0, t("Dall'inizio"), "undo-2"], ["live", t("In diretta"), "radio"]]);
+      if (from === null) return;
+    }
+    let url, breaks, recorded;
+    try { ({ url, commercials: breaks, recorded } = await api("POST", "/api/v1/recordings/" + r.id + "/ticket")); } catch (e) { flash(e.message); return; }
+    const growing = typeof recorded === "number";
+    if (!growing) from = 0; // finished in the meantime: a normal file
+    const startSec = from === "live" ? Math.max(0, recorded - 4) : 0;
     if (window.VodMax.native) {
-      playNative({ media: "recording", id: r.id, title: r.title + " · " + r.channel, sess: { mode: "direct", url }, startAt: 0, live: r.status === "recording" });
+      playNative({ media: "recording", id: r.id, title: r.title + " · " + r.channel, startAt: 0, live: growing,
+        sess: { mode: "direct", url: growing ? url + "?t=" + from : url },
+        restart: growing ? { url: url + "?t=", offset: startSec, duration: Math.max(1, recorded), grows: true } : null });
       return;
     }
     stopPlayback(false);
     state.play = { recording: r, title: r.title, sess: { mode: "direct", url }, offset: 0, duration: r.stop - r.start, breaks: breaks || [] };
+    if (growing) state.play.growing = { recorded, at: performance.now() };
     $("player-audio").hidden = $("player-subs").hidden = true;
     $("player-title").textContent = r.title + " · " + r.channel;
     $("player").hidden = false;
     // Finished recordings are MP4 (seekable); recordings in progress, or
     // left in MPEG-TS, go through mpegts.js.
-    const isTS = r.status === "recording" || !(await fetch(url, { headers: { Range: "bytes=0-0" } })
+    const isTS = growing || !(await fetch(url, { headers: { Range: "bytes=0-0" } })
       .then((res) => { res.body && res.body.cancel(); return (res.headers.get("Content-Type") || "").includes("mp4"); }).catch(() => false));
     if (isTS && window.mpegts && mpegts.isSupported()) {
-      state.play.ts = window.VodMax.tsPlayer(video, url, {
-        live: r.status === "recording",
-        onError: (type, detail) => flash(t("Registrazione non riproducibile ({detail})", { detail })),
-      });
-      $("player-live").hidden = r.status !== "recording";
+      if (growing) openGrowing(from);
+      else state.play.ts = window.VodMax.tsPlayer(video, url, { live: false, onError: recordingError });
+      $("player-live").hidden = !growing;
     } else {
       video.src = url;
       video.play().catch(() => flash(t("Premi OK per avviare")));
     }
     showBar();
+  }
+
+  function recordingError(type, detail) { flash(t("Registrazione non riproducibile ({detail})", { detail })); }
+
+  // Opens the recording in progress at a second (or "live").
+  function openGrowing(from) {
+    const p = state.play;
+    if (!p || !p.growing) return;
+    if (p.ts) p.ts.destroy();
+    p.offset = from === "live" ? Math.max(0, duration() - 4) : Math.max(0, from);
+    p.ts = window.VodMax.tsPlayer(video, p.sess.url + "?t=" + (from === "live" ? "live" : Math.floor(p.offset)), { live: true, onError: recordingError });
+    showBar();
+  }
+
+  // In a recording in progress: inside what the browser holds, a plain
+  // seek; elsewhere the stream is reopened there.
+  function seekGrowing(target) {
+    const p = state.play;
+    const d = duration();
+    if (target >= d - 8) { openGrowing("live"); return; }
+    target = Math.max(0, target);
+    const b = video.buffered, at = target - p.offset;
+    for (let i = 0; i < b.length; i++) {
+      if (at >= b.start(i) && at <= b.end(i) - 1) { p.ts.seek(target - position()); showBar(); return; }
+    }
+    openGrowing(target);
   }
 
   // ---- Remote control navigation ----
@@ -1682,7 +1747,11 @@
     ({
       close: () => stopPlayback(true), back10: () => seek(-10), fwd30: () => seek(30), toggle,
       audio: () => openMenu("audio"), subs: () => openMenu("subs"),
-      live: () => { if (state.play && state.play.ts) { state.play.ts.goLive(); showBar(); } },
+      live: () => {
+        const p = state.play;
+        if (p && p.growing && duration() - position() > 15) openGrowing("live");
+        else if (p && p.ts) { p.ts.goLive(); showBar(); }
+      },
       next: () => playNext(true),
     })[b.dataset.action]();
   });

@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -59,6 +60,7 @@ public class PlayerActivity extends Activity {
     static final String AUDIO_LANGUAGE = "audio_language";
     static final String PROGRESS_URL = "progress_url", PROGRESS_TOKEN = "progress_token", PROGRESS_PROFILE = "progress_profile";
     static final String RESTART_URL = "restart_url", RESTART_OFFSET = "restart_offset", KNOWN_DURATION = "known_duration";
+    static final String GROWS = "grows";
     static final String SUPERSEDED = "superseded";
 
     private static final int ACCENT = 0xFF00D6CA, PANEL = 0xEB13151B, LINE = 0x1FFFFFFF, TEXT = 0xFFF5F5F7, SOFT = 0xFFA9ABB5;
@@ -82,6 +84,9 @@ public class PlayerActivity extends Activity {
     // the new time; positions are then offset by where it starts.
     private String restartUrl;
     private long offsetMs, firstOffsetMs, knownDurationMs;
+    // A recording in progress: its length grows with the clock.
+    private boolean grows;
+    private final long openedAt = SystemClock.elapsedRealtime();
 
     // Episodes
     private boolean episode;
@@ -133,6 +138,7 @@ public class PlayerActivity extends Activity {
         restartUrl = in.getStringExtra(RESTART_URL);
         offsetMs = firstOffsetMs = in.getLongExtra(RESTART_OFFSET, 0);
         knownDurationMs = in.getLongExtra(KNOWN_DURATION, 0);
+        grows = in.getBooleanExtra(GROWS, false);
         lastSaved = System.currentTimeMillis();
         DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory()
             .setUserAgent("VodMaxAndroid/" + BuildConfig.VERSION_NAME)
@@ -211,7 +217,7 @@ public class PlayerActivity extends Activity {
 
             @Override
             public long getDuration() {
-                return restarts && knownDurationMs > 0 ? knownDurationMs : super.getDuration();
+                return restarts && knownDurationMs > 0 ? knownDuration() : super.getDuration();
             }
 
             @Override
@@ -375,7 +381,7 @@ public class PlayerActivity extends Activity {
     /** A converted stream reopened at positionMs (from its own start). */
     private void reopenAt(long positionMs) {
         if (player == null) return;
-        long max = knownDurationMs > 0 ? knownDurationMs - 5_000 : Long.MAX_VALUE;
+        long max = knownDurationMs > 0 ? knownDuration() - 5_000 : Long.MAX_VALUE;
         long target = Math.max(0, Math.min(positionMs, max));
         offsetMs = target / 1000 * 1000;
         MediaItem current = player.getCurrentMediaItem();
@@ -384,6 +390,11 @@ public class PlayerActivity extends Activity {
         player.setMediaItem(b.build());
         player.prepare();
         player.play();
+    }
+
+    /** The title's length; a recording in progress grows while it plays. */
+    private long knownDuration() {
+        return grows ? knownDurationMs + SystemClock.elapsedRealtime() - openedAt : knownDurationMs;
     }
 
     /** Absolute position in the title, also for reopened streams. */
@@ -395,7 +406,7 @@ public class PlayerActivity extends Activity {
         lastSaved = System.currentTimeMillis();
         if (player == null || progressUrl == null || progressUrl.isEmpty()) return;
         long pos = position() / 1000;
-        long d = knownDurationMs > 0 ? knownDurationMs / 1000 : player.getDuration() == C.TIME_UNSET ? 0 : player.getDuration() / 1000;
+        long d = knownDurationMs > 0 ? knownDuration() / 1000 : player.getDuration() == C.TIME_UNSET ? 0 : player.getDuration() / 1000;
         if (pos <= 5 || d <= 0) return;
         String url = progressUrl, token = progressToken, profile = progressProfile;
         String body = "{\"position\":" + pos + ",\"duration\":" + d + "}";
@@ -549,7 +560,7 @@ public class PlayerActivity extends Activity {
 
     private void updateEpisodeExtras() {
         if (player == null || skipIntro == null) return;
-        long pos = position(), d = knownDurationMs > 0 ? knownDurationMs : player.getDuration();
+        long pos = position(), d = knownDurationMs > 0 ? knownDuration() : player.getDuration();
         if (introEnd > 0 && pos >= introStart * 1000L && pos < introEnd * 1000L - 2000) reveal(skipIntro);
         else hide(skipIntro);
         if (nextTitle == null || d == C.TIME_UNSET || d <= 0 || nextCancelled) {
@@ -586,7 +597,7 @@ public class PlayerActivity extends Activity {
     /** byPerson: chosen during the credits, which then are this long. */
     private void playNext(boolean byPerson) {
         if (player == null || goNext) return;
-        long d = knownDurationMs > 0 ? knownDurationMs : player.getDuration(), left = d == C.TIME_UNSET ? 0 : d - position();
+        long d = knownDurationMs > 0 ? knownDuration() : player.getDuration(), left = d == C.TIME_UNSET ? 0 : d - position();
         // Credits are the last minutes (the interface also wants two
         // episodes to agree before keeping them).
         if (byPerson && left >= 15_000 && left <= Math.min(300_000, d * 15 / 100)) learnedCredits = (int) (left / 1000);
@@ -656,7 +667,7 @@ public class PlayerActivity extends Activity {
         saveProgress();
         Intent out = new Intent();
         long position = position() - firstOffsetMs; // the interface adds where it asked to start
-        long duration = knownDurationMs > 0 ? knownDurationMs : player.getDuration();
+        long duration = knownDurationMs > 0 ? knownDuration() : player.getDuration();
         out.putExtra(POSITION, Math.max(0, position));
         out.putExtra(DURATION, duration == C.TIME_UNSET ? 0 : duration);
         if (error != null) out.putExtra(ERROR, error);

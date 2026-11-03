@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -1139,11 +1140,25 @@ func (a *api) recordingTicket(w http.ResponseWriter, r *http.Request) {
 	if breaks == nil {
 		breaks = []service.Commercial{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"url": "/stream/recording/" + t, "commercials": breaks})
+	out := map[string]any{"url": "/stream/recording/" + t, "commercials": breaks}
+	// In progress: how much is there, to choose the start and move in it
+	// (the stream then takes ?t=seconds, or t=live).
+	if secs, ok := a.svc.RecordingInProgress(id); ok {
+		out["recorded"] = math.Floor(secs)
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (a *api) recordingStream(w http.ResponseWriter, r *http.Request) {
-	file, stream, rec, err := a.svc.OpenRecording(r.Context(), r.PathValue("ticket"))
+	from := 0.0
+	if v := r.URL.Query().Get("t"); v == "live" {
+		from = -1
+	} else if v != "" {
+		if n, err := strconv.ParseFloat(v, 64); err == nil && n > 0 && !math.IsInf(n, 0) {
+			from = n
+		}
+	}
+	file, stream, rec, err := a.svc.OpenRecording(r.Context(), r.PathValue("ticket"), from)
 	if err != nil {
 		a.fail(w, r, err)
 		return

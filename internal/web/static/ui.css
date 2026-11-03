@@ -489,3 +489,8 @@ body.with-player #server-problems, body.with-panel #server-problems { display: n
   /* The less used sections as icons, named when open (and as a tooltip). */
   #tabs .tab.compact:not(.active) .tab-text { display: none; }
 }
+
+/* A few choices (a recording in progress: from the start or live). */
+.picker.choice { width: min(92vw, 28rem); }
+.picker.choice .options { grid-template-columns: 1fr; overflow: visible; }
+.picker.choice .options .chip { justify-content: flex-start; gap: 0.6rem; }

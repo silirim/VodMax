@@ -37,6 +37,7 @@ type activeRec struct {
 	done   chan struct{}
 	mu     sync.Mutex
 	bytes  int64
+	began  time.Time // when the file started: with the size, how many bytes a second
 }
 
 type recorderState struct {
@@ -178,8 +179,10 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 	s.rec.mu.Lock()
 	resumed := slices.Contains(s.rec.resumed, r.ID)
 	s.rec.mu.Unlock()
+	a.began = time.Now()
 	if fi, err := os.Stat(r.File); err == nil && resumed {
 		a.bytes = fi.Size() // the file continues (record appends)
+		a.began = time.Unix(r.Start, 0)
 	}
 	a.rec = r
 	s.st.UpdateRecording(parent, r)
@@ -250,6 +253,54 @@ func (a *activeRec) size() int64 {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.bytes
+}
+
+// recorded is how many seconds the file holds so far.
+func (a *activeRec) recorded() float64 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.began.IsZero() {
+		return 0
+	}
+	return max(0, time.Since(a.began).Seconds())
+}
+
+// offsetAt is where, in bytes, the file reaches the given second
+// (negative: close to the live edge), at the start of a TS packet. The
+// rate is the average so far: the time is approximate, as with a seek in
+// any constant-rate stream.
+func (a *activeRec) offsetAt(f *os.File, second float64) int64 {
+	size, secs := a.size(), a.recorded()
+	if size <= 0 || secs <= 1 {
+		return 0
+	}
+	rate := float64(size) / secs
+	var off int64
+	if second < 0 || second >= secs-liveEdge {
+		off = size - int64(rate*liveEdge)
+	} else {
+		off = int64(rate * second)
+	}
+	off = max(0, min(off, size-188*3)) / 188 * 188
+	return tsSync(f, off)
+}
+
+// liveEdge is how far behind the end "live" starts, in seconds: enough to
+// reach a picture that can be decoded.
+const liveEdge = 4
+
+// tsSync returns the first offset from off where three TS packets in a row
+// start (a reconnection may have left the file out of step); off itself if
+// none is found nearby.
+func tsSync(f *os.File, off int64) int64 {
+	buf := make([]byte, 188*64)
+	n, _ := f.ReadAt(buf, off)
+	for i := 0; i+188*2 < n; i++ {
+		if buf[i] == 0x47 && buf[i+188] == 0x47 && buf[i+376] == 0x47 {
+			return off + int64(i)
+		}
+	}
+	return off
 }
 
 // record writes the channel to the file until ctx ends, reconnecting on
@@ -588,9 +639,22 @@ func (s *Service) RecordingTicket(ctx context.Context, id int64) (string, []Comm
 	return t, breaks, nil
 }
 
+// RecordingInProgress says how many seconds a running recording holds;
+// false when it is not running.
+func (s *Service) RecordingInProgress(id int64) (float64, bool) {
+	s.rec.mu.Lock()
+	a := s.rec.running[id]
+	s.rec.mu.Unlock()
+	if a == nil {
+		return 0, false
+	}
+	return a.recorded(), true
+}
+
 // OpenRecording returns the recording file (finished: seekable) or, if it
-// is still being recorded, a stream that follows it.
-func (s *Service) OpenRecording(ctx context.Context, ticket string) (*os.File, *Stream, store.Recording, error) {
+// is still being recorded, a stream that follows it from the given second
+// (negative: from the live edge).
+func (s *Service) OpenRecording(ctx context.Context, ticket string, from float64) (*os.File, *Stream, store.Recording, error) {
 	s.rec.mu.Lock()
 	tk, ok := s.rec.tickets[ticket]
 	s.rec.mu.Unlock()
@@ -608,6 +672,12 @@ func (s *Service) OpenRecording(ctx context.Context, ticket string) (*os.File, *
 		f, err := os.Open(r.File)
 		if err != nil {
 			return nil, nil, r, err
+		}
+		if from != 0 {
+			if _, err := f.Seek(a.offsetAt(f, from), io.SeekStart); err != nil {
+				f.Close()
+				return nil, nil, r, err
+			}
 		}
 		return nil, &Stream{ReadCloser: &follower{f: f, ctx: ctx, a: a}, ContentType: "video/mp2t", Title: r.Title}, r, nil
 	}

@@ -168,6 +168,27 @@ func TestRecordingWatchWhileRecordingAndDelete(t *testing.T) {
 	}
 	readSome(t, live)
 	live.Body.Close()
+	// The recording in progress says how much it holds and plays from the
+	// live edge or a chosen second.
+	_, body = e.do(t, "POST", "/api/v1/recordings/"+strconv.FormatInt(rec.ID, 10)+"/ticket", nil, true)
+	var running struct {
+		URL      string
+		Recorded *float64
+	}
+	if json.Unmarshal(body, &running) != nil || running.Recorded == nil {
+		t.Fatalf("ticket in progress: %s", body)
+	}
+	for _, at := range []string{"?t=live", "?t=0.5"} {
+		resp, err := http.Get(e.srv.URL + running.URL + at)
+		if err != nil || resp.StatusCode != 200 {
+			t.Fatalf("in progress %s: %v %v", at, err, resp)
+		}
+		first := make([]byte, 1)
+		if _, err := io.ReadFull(resp.Body, first); err != nil || first[0] != 0x47 {
+			t.Fatalf("in progress %s: %v %x", at, err, first)
+		}
+		resp.Body.Close()
+	}
 	// Another channel: the only connection is held by the recording.
 	busy, _ := openStream(t, e, ticket(t, e, tv[1].ID, "salotto-tv-01")+"?force=1")
 	body, _ = io.ReadAll(busy.Body)
