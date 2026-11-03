@@ -716,5 +716,9 @@
   "Il canale non manda immagini: riprova o scegli un altro canale": "Il canale non manda immagini: riprova o scegli un altro canale",
   "riguarda": "riguarda",
   "dispositivo non abbinato": "dispositivo non abbinato",
-  "scegli un profilo": "scegli un profilo"
+  "scegli un profilo": "scegli un profilo",
+  "Controllo…": "Controllo…",
+  "È disponibile l'app per Android {version}": "È disponibile l'app per Android {version}",
+  "È disponibile la versione {version}": "È disponibile la versione {version}",
+  "Nessun aggiornamento: hai già l'ultima versione": "Nessun aggiornamento: hai già l'ultima versione"
 }

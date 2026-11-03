@@ -189,12 +189,24 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     $("pane-title").textContent = TITLES[state.view] || "";
     store.set("settingsView", state.view);
     const main = $("content");
-    main.replaceChildren(el("p", { className: "note" }, t("Caricamento…")));
+    // Drawn again after a change (Save, Check now): the old content stays
+    // until the new one is ready, so that the page keeps its place, and
+    // the focus goes back to the same button (a remote would else jump to
+    // the menu).
+    const again = main.dataset.view === state.view;
+    main.dataset.view = state.view;
+    const was = again && main.contains(document.activeElement) ? document.activeElement : null;
+    const wasKey = was ? was.tagName + "|" + was.textContent.trim() : "";
+    if (!again) main.replaceChildren(el("p", { className: "note" }, t("Caricamento…")));
     try {
       await ({ subscriptions: renderSubscriptions, libraries: renderLibraries, vpn: renderVPN, rules: renderRules, categories: renderCategories, system: renderSystem, assistant: renderAssistant, profiles: renderProfiles, devices: renderDevices, guide: renderGuideSources, language: renderLanguage })[state.view](main);
       cards(main);
     } catch (e) {
       main.replaceChildren(el("p", { className: "note bad" }, e.message));
+    }
+    if (was && !main.contains(document.activeElement)) {
+      const same = [...main.querySelectorAll(was.tagName)].find((x) => x.tagName + "|" + x.textContent.trim() === wasKey);
+      if (same) same.focus({ preventScroll: true });
     }
     if (!document.activeElement || document.activeElement === document.body) {
       const item = document.querySelector(".item.active");
@@ -655,16 +667,8 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     if (update) parts.push(...updateSection(update));
     if (window.VodMax.native) {
       const appButtons = el("div", { className: "buttons" }, button(t("Cambia server"), () => window.VodMax.native.changeServer()));
-      const appStatus = el("p", { className: "note" });
-      if (window.VodMax.appUpdate(update)) {
-        const go = button(t("Aggiorna l'app a {version}", { version: update.latest.replace(/^v/, "") }), () => {
-          go.disabled = true;
-          window.VodMax.updateApp(update, (text, failed) => { appStatus.textContent = text; go.disabled = !failed; });
-        }, "primary");
-        appButtons.prepend(go);
-      }
       parts.push(el("h2", {}, "App"), el("p", { className: "note" }, t("VodMax per Android {version}, collegata a {server}.", { version: window.VodMax.native.version(), server: location.origin })),
-        appButtons, appStatus);
+        appButtons);
     }
     parts.push(...await downloadSection(), ...await liveSection(), ...await transcodeSection(), ...await outputSection(), ...await recordingLimits(), ...(await metadataSection()).filter(Boolean), ...await backupSection());
     main.replaceChildren(...parts);
@@ -691,14 +695,38 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     } else if (u.latest) {
       parts.push(el("p", { className: "ok" }, t("✓ Il server è aggiornato.")));
     }
+    // The app on this device, next to the server: "Check now" answers
+    // for both, as the home screen's banner does.
+    if (window.VodMax.appUpdate(u)) {
+      const status = el("p", { className: "note" });
+      const go = button(t("Aggiorna l'app a {version}", { version: u.latest.replace(/^v/, "") }), () => {
+        go.disabled = true;
+        window.VodMax.updateApp(u, (text, failed) => { status.textContent = text; go.disabled = !failed; });
+      }, "primary");
+      parts.push(el("section", { className: "box" }, el("h3", {}, t("È disponibile l'app per Android {version}", { version: u.latest.replace(/^v/, "") })),
+        el("div", { className: "buttons" }, go), status));
+    }
     const auto = input({ type: "checkbox", checked: u.enabled });
     auto.onchange = async () => {
       try { await api("PUT", "/api/v1/settings/updates", { enabled: auto.checked, beta: u.beta }); flash(auto.checked ? t("Controllo giornaliero attivo") : t("Controllo giornaliero disattivato")); }
       catch (e) { flash(e.message); auto.checked = !auto.checked; }
     };
+    // Not disabled while checking: a disabled button loses the focus, and
+    // the remote would jump back to the menu.
+    let checking = false;
     const check = button(t("Controlla ora"), async () => {
-      check.disabled = true;
-      try { await api("POST", "/api/v1/update/check"); } catch (e) { flash(e.message); }
+      if (checking) return;
+      checking = true;
+      check.setAttribute("aria-busy", "true");
+      check.textContent = t("Controllo…");
+      try {
+        const n = await api("POST", "/api/v1/update/check");
+        const app = window.VodMax.appUpdate(n);
+        if (n.error) flash(n.error);
+        else if (n.available || app) flash(t("È disponibile la versione {version}", { version: String(n.latest).replace(/^v/, "") }));
+        else flash(t("Nessun aggiornamento: hai già l'ultima versione"));
+      } catch (e) { flash(e.message); }
+      check.textContent = t("Controlla ora"); // found again after render
       render();
     });
     const beta = input({ type: "checkbox", checked: u.beta });

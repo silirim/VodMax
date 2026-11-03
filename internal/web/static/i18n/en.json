@@ -716,5 +716,9 @@
   "Il canale non manda immagini: riprova o scegli un altro canale": "The channel sends no picture: try again or pick another channel",
   "riguarda": "replay",
   "dispositivo non abbinato": "device not paired",
-  "scegli un profilo": "choose a profile"
+  "scegli un profilo": "choose a profile",
+  "Controllo…": "Checking…",
+  "È disponibile l'app per Android {version}": "Android app {version} is available",
+  "È disponibile la versione {version}": "Version {version} is available",
+  "Nessun aggiornamento: hai già l'ultima versione": "No updates: you already have the latest version"
 }
