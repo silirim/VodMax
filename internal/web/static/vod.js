@@ -66,6 +66,9 @@
   }
 
   async function render() {
+    // Typing in the search box: the results change under it, the focus
+    // stays there (on TVs moving it closes the on-screen keyboard).
+    const typing = document.activeElement === $("search");
     setTabs();
     $("search").placeholder = state.view === "tv" ? t("Cerca un canale (nome o numero)") : t("Cerca film e serie");
     store.set("vodView", state.view);
@@ -82,7 +85,7 @@
     } catch (e) {
       main.replaceChildren(el("p", { className: "empty" }, e.message));
     }
-    focusFirst(main);
+    if (!typing || document.activeElement !== $("search")) focusFirst(main);
   }
 
   // ---- TV: the channel list, then full screen ----
@@ -1737,7 +1740,7 @@
   let searchTimer;
   $("search").addEventListener("input", () => {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { state.query = $("search").value.trim(); render().then(() => $("search").focus()); }, 350);
+    searchTimer = setTimeout(() => { state.query = $("search").value.trim(); render(); }, 350);
   });
 
   // Mouse and touch: buttons in the bar, click on the picture to pause.
