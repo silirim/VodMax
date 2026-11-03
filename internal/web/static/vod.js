@@ -251,6 +251,8 @@
       ask.disabled = true;
       result.replaceChildren(el("p", { className: "empty" }, t("L'assistente sta scegliendo… (con un modello sul processore anche un minuto)")));
       try {
+        // "Registra il film delle 21 su…": a recording, not a suggestion.
+        if (RECORD.test(wish.value) && await recordWish(wish.value, result)) { ask.disabled = false; return; }
         const r = await api("POST", "/api/v1/assistant/tonight", { wish: wish.value });
         result.replaceChildren(r.intro ? el("p", { className: "tonight-intro" }, r.intro) : "", (r.picks || []).length ? el("div", { className: "row" }, ...r.picks.map(pickCard)) : "");
         focusFirst(result.querySelector(".row"));
@@ -260,10 +262,36 @@
     return el("section", { className: "tonight" }, el("h2", { className: "section" }, t("Stasera")), form, result);
   }
 
+  const RECORD = /(^|[^\p{L}])(registr|record)/iu;
+  let pendingRule = ""; // the sentence the rule form starts from
+
+  // A request to record, asked in the "tonight" box: the programmes the
+  // guide has at that time, to record once, or a rule for every airing.
+  // False when the assistant for rules cannot answer (a viewer, a kids
+  // profile): the box then suggests as usual.
+  async function recordWish(text, result) {
+    const who = await window.VodMax.me().catch(() => null);
+    if (who && who.profile && who.profile.kind === "kids") return false;
+    let p;
+    try { p = await api("POST", "/api/v1/assistant/rule", { text }); } catch (e) { return false; }
+    const once = p.once || [];
+    const every = el("button", { className: "small focusable", type: "button" }, t("Registra ogni volta che va in onda"));
+    every.onclick = () => { pendingRule = text; state.view = "recordings"; render(); };
+    result.replaceChildren(
+      el("p", { className: "tonight-intro" }, once.length === 1 ? t("Nella guida a quell'ora c'è questo programma. È quello che vuoi registrare?")
+        : once.length ? t("Nella guida a quell'ora ci sono questi programmi. È uno di questi?")
+        : t("Nella guida non ho trovato un programma a quell'ora: scrivi il canale e l'ora d'inizio, oppure crea una regola.")),
+      once.length ? el("div", { className: "row" }, ...once.map((m) => pickCard({ kind: "tv", title: m.title, channel_id: m.channel_id, channel: m.channel,
+        start: m.start, stop: m.stop, why: t("Solo questa volta") }, true))) : "",
+      el("div", { className: "actions" }, every));
+    focusFirst(result.querySelector(".row") || result);
+    return true;
+  }
+
   // Every pick is a wide card, TV or library alike. A film or series shows
   // its backdrop when it has one, otherwise the whole poster over a blurred
   // copy of itself.
-  function pickCard(p) {
+  function pickCard(p, record) {
     const why = el("span", { className: "why" }, p.why);
     if (p.kind !== "tv") {
       const item = { id: p.item_id, kind: p.kind, display_title: p.title, logo: p.image };
@@ -289,7 +317,7 @@
       el("span", { className: "label" }, p.title),
       el("span", { className: "sub" }, (onAir ? t("In onda ora") : hhmm(p.start)) + " · " + p.channel), why);
     card.onclick = async () => {
-      if (onAir) { location.href = "/tv.html?channel=" + p.channel_id; return; }
+      if (onAir && !record) { location.href = "/tv.html?channel=" + p.channel_id; return; }
       if (!confirm(t("Registrare “{title}” alle {time} su {channel}?", { title: p.title, time: hhmm(p.start), channel: p.channel }))) return;
       try {
         await api("POST", "/api/v1/recordings", { channel_id: p.channel_id, start: p.start, stop: p.stop, title: p.title, from_guide: true });
@@ -699,6 +727,7 @@
       text.setAttribute("enterkeyhint", "go");
       text.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go.click(); } });
       form.prepend(el("div", { className: "rule-ask" }, f(t("Descrivi la regola"), text), go, said, once));
+      if (pendingRule) { text.value = pendingRule; pendingRule = ""; text.scrollIntoView({ block: "center" }); go.click(); }
     });
     form.onsubmit = async (e) => {
       e.preventDefault();

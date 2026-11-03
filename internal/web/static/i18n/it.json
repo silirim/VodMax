@@ -726,5 +726,7 @@
   "Solo questa volta": "Solo questa volta",
   "Ogni volta che va in onda": "Ogni volta che va in onda",
   "Regola per “{title}”: controlla l'anteprima e salva.": "Regola per “{title}”: controlla l'anteprima e salva.",
-  "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.": "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde."
+  "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.": "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.",
+  "Registra ogni volta che va in onda": "Registra ogni volta che va in onda",
+  "Nella guida non ho trovato un programma a quell'ora: scrivi il canale e l'ora d'inizio, oppure crea una regola.": "Nella guida non ho trovato un programma a quell'ora: scrivi il canale e l'ora d'inizio, oppure crea una regola."
 }

@@ -726,5 +726,7 @@
   "Solo questa volta": "Just this once",
   "Ogni volta che va in onda": "Every time it airs",
   "Regola per “{title}”: controlla l'anteprima e salva.": "Rule for “{title}”: check the preview and save.",
-  "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.": "If it is none of these, the rule below records every matching programme."
+  "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.": "If it is none of these, the rule below records every matching programme.",
+  "Registra ogni volta che va in onda": "Record every time it airs",
+  "Nella guida non ho trovato un programma a quell'ora: scrivi il canale e l'ora d'inizio, oppure crea una regola.": "I found no programme at that time in the guide: write the channel and the start time, or create a rule."
 }
