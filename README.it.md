@@ -82,8 +82,12 @@ telecomando.
 | Elenco dei canali con i preferiti | Film |
 | <img src="docs/screenshots/detail.jpg" alt="Scheda di un film"> | <img src="docs/screenshots/series.jpg" alt="Serie con stagioni ed episodi"> |
 | Scheda di un film | Serie, stagioni e avanzamento |
-| <img src="docs/screenshots/settings.jpg" alt="Raccolte locali"> | <img src="docs/screenshots/phone-home.jpg" alt="Home sul telefono" width="45%"> <img src="docs/screenshots/phone-tv.jpg" alt="Canali sul telefono" width="45%"> |
+| <img src="docs/screenshots/settings.jpg" alt="Raccolte locali"> | <img src="docs/screenshots/phone-home.jpg" alt="Home sul telefono" width="30%"> <img src="docs/screenshots/phone-tv.jpg" alt="Canali sul telefono" width="30%"> <img src="docs/screenshots/phone-assistant.jpg" alt="Telefono: cosa guardo stasera" width="30%"> |
 | Raccolte, con la scelta della cartella | Sul telefono |
+| <img src="docs/screenshots/assistant-tonight.jpg" alt="Assistente: cosa guardo stasera"> | <img src="docs/screenshots/assistant-once.jpg" alt="Assistente: registra solo questa volta"> |
+| Assistente: cosa guardare stasera, tra TV e libreria, con il perché | Assistente: "registra il film di stasera", solo questa volta o ogni volta |
+| <img src="docs/screenshots/assistant-rule.jpg" alt="Assistente: una regola da una frase"> | <img src="docs/screenshots/assistant-settings.jpg" alt="Impostazioni dell'assistente"> |
+| Assistente: una regola di registrazione da una frase, da controllare prima di salvare | Impostazioni dell'assistente: integrato, servizio online o un tuo server |
 
 <sub>Dati di esempio: canali e guida inventati, titoli dei film open source
 del Blender Studio con immagini generate.</sub>

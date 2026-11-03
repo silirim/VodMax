@@ -82,8 +82,12 @@ decoder with the remote.
 | Channel list with favourites | Movies |
 | <img src="docs/screenshots/detail.jpg" alt="Movie details"> | <img src="docs/screenshots/series.jpg" alt="Series with seasons and episodes"> |
 | Movie details | Series, seasons and progress |
-| <img src="docs/screenshots/settings.jpg" alt="Local collections settings"> | <img src="docs/screenshots/phone-home.jpg" alt="Phone home" width="45%"> <img src="docs/screenshots/phone-tv.jpg" alt="Phone channel list" width="45%"> |
+| <img src="docs/screenshots/settings.jpg" alt="Local collections settings"> | <img src="docs/screenshots/phone-home.jpg" alt="Phone home" width="30%"> <img src="docs/screenshots/phone-tv.jpg" alt="Phone channel list" width="30%"> <img src="docs/screenshots/phone-assistant.jpg" alt="Phone: what to watch tonight" width="30%"> |
 | Local collections with the folder picker | On the phone |
+| <img src="docs/screenshots/assistant-tonight.jpg" alt="Assistant: what shall I watch tonight"> | <img src="docs/screenshots/assistant-once.jpg" alt="Assistant: record just once"> |
+| Assistant: what to watch tonight, from TV and your library, with the reason | Assistant: "record tonight's film", just once or every time it airs |
+| <img src="docs/screenshots/assistant-rule.jpg" alt="Assistant: a recording rule from a sentence"> | <img src="docs/screenshots/assistant-settings.jpg" alt="Assistant settings"> |
+| Assistant: a recording rule from a sentence, checked before saving | Assistant settings: built in, online service or your own server |
 
 <sub>Screenshots use demo data: invented channels and guide, and the titles
 of the Blender Studio open movies with generated artwork. The interface is in
