@@ -274,11 +274,26 @@
     if (who && who.profile && who.profile.kind === "kids") return false;
     let p;
     try { p = await api("POST", "/api/v1/assistant/rule", { text }); } catch (e) { return false; }
-    const once = p.once || [];
+    let once = p.once || [], fromRule = false;
+    // No day or time ("registra Feyenoord Inter"): the next airings of the
+    // rule, the live one first, are what to record once.
+    if (!once.length && p.rule && (p.rule.all || []).length) {
+      try {
+        const r = p.rule;
+        const m = await api("POST", "/api/v1/recording-rules/preview", { name: r.name || r.all.join(" "), all: r.all, any: r.any || [], none: r.none || [],
+          section: r.section || "", live_only: !!r.live_only, channel_id: r.channel_id || 0, keep: 0, enabled: true });
+        const live = (x) => (x.airing && x.airing.kind === "live" ? 0 : 1);
+        once = m.filter((x) => x.state === "new")
+          // At the same time, the title with least besides what was asked
+          // ("LIVE: Feyenoord - Inter" before "Radiocronaca - Feyenoord-Inter UCL").
+          .sort((a, b) => live(a) - live(b) || a.start - b.start || a.title.length - b.title.length).slice(0, 3);
+        fromRule = once.length > 0;
+      } catch (e) { /* the rule button below still works */ }
+    }
     const every = el("button", { className: "small focusable", type: "button" }, t("Registra ogni volta che va in onda"));
     every.onclick = () => { pendingRule = text; state.view = "recordings"; render(); };
     result.replaceChildren(
-      el("p", { className: "tonight-intro" }, once.length === 1 ? t("Nella guida a quell'ora c'è questo programma. È quello che vuoi registrare?")
+      el("p", { className: "tonight-intro" }, fromRule ? t("Nella guida ho trovato questi programmi: tocca quello da registrare.") : once.length === 1 ? t("Nella guida a quell'ora c'è questo programma. È quello che vuoi registrare?")
         : once.length ? t("Nella guida a quell'ora ci sono questi programmi. È uno di questi?")
         : t("Nella guida non ho trovato un programma a quell'ora: scrivi il canale e l'ora d'inizio, oppure crea una regola.")),
       once.length ? el("div", { className: "row" }, ...once.map((m) => pickCard({ kind: "tv", title: m.title, channel_id: m.channel_id, channel: m.channel,
