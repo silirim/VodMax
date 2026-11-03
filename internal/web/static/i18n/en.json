@@ -391,7 +391,6 @@
   "Cartella superiore": "Parent folder",
   "Nessuna sottocartella.": "No subfolders.",
   "Connessioni VPN": "VPN connections",
-  "Il provider si contatta solo attraverso una VPN. Due modi: una WireGuard dentro VodMax (si importa il file .conf del proprio servizio: Proton, Mullvad, NordVPN…; la chiave privata resta cifrata) oppure una VPN che hai già fuori da VodMax, sul dispositivo o sul router.": "The provider is only contacted through a VPN. Two ways: a WireGuard inside VodMax (import your service's .conf file: Proton, Mullvad, NordVPN…; the private key stays encrypted) or a VPN you already have outside VodMax, on the device or on the router.",
   "Aggiungi una VPN": "Add a VPN",
   "VPN esterna, non controllata da VodMax": "External VPN, not managed by VodMax",
   "in uso": "in use",
@@ -729,5 +728,13 @@
   "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.": "If it is none of these, the rule below records every matching programme.",
   "Registra ogni volta che va in onda": "Record every time it airs",
   "Nella guida non ho trovato un programma a quell'ora: scrivi il canale e l'ora d'inizio, oppure crea una regola.": "I found no programme at that time in the guide: write the channel and the start time, or create a rule.",
-  "Nella guida ho trovato questi programmi: tocca quello da registrare.": "I found these programmes in the guide: tap the one to record."
+  "Nella guida ho trovato questi programmi: tocca quello da registrare.": "I found these programmes in the guide: tap the one to record.",
+  "Nessuna VPN (rete normale)": "No VPN (normal network)",
+  "nessuna: in attesa di una VPN": "none: waiting for a VPN",
+  "Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla VPN scelta, oppure dalla rete normale se non ne ha una.": "Provider playlists (Xtream Codes, M3U or Stalker portals). Each subscription goes through the chosen VPN, or through the normal network if it has none.",
+  "I provider si contattano solo tramite VPN": "Providers are contacted only through a VPN",
+  "Gli abbonamenti senza VPN usano la rete normale": "Subscriptions without a VPN use the normal network",
+  "Contatta i provider solo tramite VPN": "Contact providers only through a VPN",
+  "Acceso: un abbonamento senza VPN resta in attesa e il provider non viene mai contattato, nemmeno se la VPN cade. Spento: puoi lasciare un abbonamento senza VPN, e VodMax usa la rete normale del server per quel provider.": "On: a subscription without a VPN waits and the provider is never contacted, not even if the VPN drops. Off: you can leave a subscription without a VPN, and VodMax uses the server's normal network for that provider.",
+  "Due modi di usare una VPN: una WireGuard dentro VodMax (si importa il file .conf del proprio servizio: Proton, Mullvad, NordVPN…; la chiave privata resta cifrata) oppure una VPN che hai già fuori da VodMax, sul dispositivo o sul router.": "Two ways to use a VPN: a WireGuard inside VodMax (import your service's .conf file: Proton, Mullvad, NordVPN…; the private key stays encrypted) or a VPN you already have outside VodMax, on the device or on the router."
 }

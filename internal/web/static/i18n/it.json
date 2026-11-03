@@ -391,7 +391,6 @@
   "Cartella superiore": "Cartella superiore",
   "Nessuna sottocartella.": "Nessuna sottocartella.",
   "Connessioni VPN": "Connessioni VPN",
-  "Il provider si contatta solo attraverso una VPN. Due modi: una WireGuard dentro VodMax (si importa il file .conf del proprio servizio: Proton, Mullvad, NordVPN…; la chiave privata resta cifrata) oppure una VPN che hai già fuori da VodMax, sul dispositivo o sul router.": "Il provider si contatta solo attraverso una VPN. Due modi: una WireGuard dentro VodMax (si importa il file .conf del proprio servizio: Proton, Mullvad, NordVPN…; la chiave privata resta cifrata) oppure una VPN che hai già fuori da VodMax, sul dispositivo o sul router.",
   "Aggiungi una VPN": "Aggiungi una VPN",
   "VPN esterna, non controllata da VodMax": "VPN esterna, non controllata da VodMax",
   "in uso": "in uso",
@@ -729,5 +728,13 @@
   "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.": "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.",
   "Registra ogni volta che va in onda": "Registra ogni volta che va in onda",
   "Nella guida non ho trovato un programma a quell'ora: scrivi il canale e l'ora d'inizio, oppure crea una regola.": "Nella guida non ho trovato un programma a quell'ora: scrivi il canale e l'ora d'inizio, oppure crea una regola.",
-  "Nella guida ho trovato questi programmi: tocca quello da registrare.": "Nella guida ho trovato questi programmi: tocca quello da registrare."
+  "Nella guida ho trovato questi programmi: tocca quello da registrare.": "Nella guida ho trovato questi programmi: tocca quello da registrare.",
+  "Nessuna VPN (rete normale)": "Nessuna VPN (rete normale)",
+  "nessuna: in attesa di una VPN": "nessuna: in attesa di una VPN",
+  "Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla VPN scelta, oppure dalla rete normale se non ne ha una.": "Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla VPN scelta, oppure dalla rete normale se non ne ha una.",
+  "I provider si contattano solo tramite VPN": "I provider si contattano solo tramite VPN",
+  "Gli abbonamenti senza VPN usano la rete normale": "Gli abbonamenti senza VPN usano la rete normale",
+  "Contatta i provider solo tramite VPN": "Contatta i provider solo tramite VPN",
+  "Acceso: un abbonamento senza VPN resta in attesa e il provider non viene mai contattato, nemmeno se la VPN cade. Spento: puoi lasciare un abbonamento senza VPN, e VodMax usa la rete normale del server per quel provider.": "Acceso: un abbonamento senza VPN resta in attesa e il provider non viene mai contattato, nemmeno se la VPN cade. Spento: puoi lasciare un abbonamento senza VPN, e VodMax usa la rete normale del server per quel provider.",
+  "Due modi di usare una VPN: una WireGuard dentro VodMax (si importa il file .conf del proprio servizio: Proton, Mullvad, NordVPN…; la chiave privata resta cifrata) oppure una VPN che hai già fuori da VodMax, sul dispositivo o sul router.": "Due modi di usare una VPN: una WireGuard dentro VodMax (si importa il file .conf del proprio servizio: Proton, Mullvad, NordVPN…; la chiave privata resta cifrata) oppure una VPN che hai già fuori da VodMax, sul dispositivo o sul router."
 }

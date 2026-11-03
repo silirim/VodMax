@@ -8,10 +8,12 @@ Code structure and the HTTP API: [docs/sviluppo.md](docs/sviluppo.md).
 
 ## Hard rules
 
-- **The provider only through the VPN.** Every request to a playlist
-  provider goes through `internal/provider` and the subscription's tunnel.
-  Never add another HTTP client towards providers, never fall back to the
-  system network for them (decision 0012).
+- **The provider through the subscription's connection.** Every request
+  to a playlist provider goes through `internal/provider` and
+  `Service.tunnel`. Never add another HTTP client towards providers, never
+  fall back from a VPN to the system network. A subscription without a VPN
+  uses the normal network only when "only through a VPN" is off
+  (decisions 0012 and 0039).
 - **No real data in the repository**: no provider URLs or names, no
   credentials, no private addresses, no home host names, no personal
   catalogues. Tests use fake providers (`httptest`) and synthetic data.

@@ -109,6 +109,8 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	route("POST /api/v1/live/{id}/ticket", levelViewer, a.liveTicket)
 	route("POST /api/v1/live/{id}/timeshift", levelViewer, a.startTimeshift)
 	route("POST /api/v1/catchup/{id}/session", levelViewer, a.catchupSession)
+	route("GET /api/v1/settings/network", levelAdmin, a.getProviderNetwork)
+	route("PUT /api/v1/settings/network", levelAdmin, a.putProviderNetwork)
 	route("GET /api/v1/settings/live", levelViewer, a.getLiveSettings)
 	route("PUT /api/v1/settings/live", levelAdmin, a.putLiveSettings)
 	route("GET /api/v1/series/{id}/episodes", levelViewer, a.episodes)
@@ -1915,6 +1917,28 @@ func (a *api) timeshiftKeepAlive(w http.ResponseWriter, r *http.Request) {
 func (a *api) timeshiftStop(w http.ResponseWriter, r *http.Request) {
 	a.svc.StopTimeshift(r.PathValue("session"))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *api) getProviderNetwork(w http.ResponseWriter, r *http.Request) {
+	n, err := a.svc.ProviderNetwork(r.Context())
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, n)
+}
+
+func (a *api) putProviderNetwork(w http.ResponseWriter, r *http.Request) {
+	var in service.ProviderNetwork
+	if err := decode(r, &in); err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	if err := a.svc.SetProviderNetwork(r.Context(), in); err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, in)
 }
 
 func (a *api) getLiveSettings(w http.ResponseWriter, r *http.Request) {

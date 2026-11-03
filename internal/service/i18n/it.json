@@ -183,7 +183,6 @@
   "non è un film": "non è un film",
   "non è una serie": "non è una serie",
   "numero di registrazioni da tenere non valido": "numero di registrazioni da tenere non valido",
-  "ogni abbonamento richiede una connessione VPN esistente": "ogni abbonamento richiede una connessione VPN esistente",
   "operazione riservata a un profilo amministratore": "operazione riservata a un profilo amministratore",
   "ora della sincronizzazione del catalogo non valida (0-23, oppure -1 per disattivarla)": "ora della sincronizzazione del catalogo non valida (0-23, oppure -1 per disattivarla)",
   "password del backup errata, oppure file danneggiato": "password del backup errata, oppure file danneggiato",
@@ -259,5 +258,8 @@
   "uscita verso altre app spenta o indirizzo non valido": "uscita verso altre app spenta o indirizzo non valido",
   "valori non validi": "valori non validi",
   "è già un file della raccolta": "è già un file della raccolta",
-  "“%s” su %s": "“%s” su %s"
+  "“%s” su %s": "“%s” su %s",
+  "l'abbonamento non ha una VPN e i provider si contattano solo tramite VPN: scegline una nell'abbonamento oppure cambia l'impostazione in Impostazioni → VPN": "l'abbonamento non ha una VPN e i provider si contattano solo tramite VPN: scegline una nell'abbonamento oppure cambia l'impostazione in Impostazioni → VPN",
+  "scegli una VPN: i provider si contattano solo tramite VPN (Impostazioni → VPN)": "scegli una VPN: i provider si contattano solo tramite VPN (Impostazioni → VPN)",
+  "la VPN scelta non esiste": "la VPN scelta non esiste"
 }

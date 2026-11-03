@@ -237,6 +237,18 @@ func (s *Service) tunnel(ctx context.Context, id int64) (Tunnel, error) {
 	if t != nil && t.Up() {
 		return t, nil
 	}
+	// A subscription without a VPN: the normal network, only when the
+	// person chose so; otherwise it waits for one.
+	if id == 0 {
+		n, err := s.ProviderNetwork(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if n.VPNOnly {
+			return nil, errVPNOnly
+		}
+		return systemNetwork{}, nil
+	}
 	if v, err := s.st.VPN(ctx, id); err != nil {
 		return nil, err
 	} else if v.Kind == "system" {
@@ -304,8 +316,8 @@ func (s *Service) AddSubscription(ctx context.Context, in SubscriptionInput) (in
 		return s.st.AddSubscription(ctx, store.Subscription{Name: in.Name, Kind: "local", Settings: rawSettings},
 			func(id int64) []byte { return s.box.Seal([]byte("{}"), subOwner(id)) })
 	}
-	if _, err := s.st.VPN(ctx, in.VPNID); err != nil {
-		return 0, invalid("ogni abbonamento richiede una connessione VPN esistente")
+	if err := s.checkSubscriptionVPN(ctx, in.VPNID); err != nil {
+		return 0, err
 	}
 	var settings any
 	var sec subscriptionSecret
@@ -391,8 +403,8 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 		return s.st.UpdateSubscription(ctx, id, p.Name, nil, settings, nil)
 	}
 	if p.VPNID != nil {
-		if _, err := s.st.VPN(ctx, *p.VPNID); err != nil {
-			return invalid("ogni abbonamento richiede una connessione VPN esistente")
+		if err := s.checkSubscriptionVPN(ctx, *p.VPNID); err != nil {
+			return err
 		}
 	}
 	raw, err := s.box.Open(sub.Secret, subOwner(id))

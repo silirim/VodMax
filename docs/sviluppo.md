@@ -43,6 +43,7 @@ di accesso di ognuna, è in `internal/api/api.go`.
 |---|---|
 | `POST /api/v1/vpn` `{name, config}` | Registra una VPN WireGuard (testo `.conf`) |
 | `POST /api/v1/vpn/{id}/connect` · `/disconnect` | Collega o scollega il tunnel |
+| `GET`/`PUT /api/v1/settings/network` `{vpn_only}` | "Solo tramite VPN" (predefinito `true`); con `false` un abbonamento può avere `vpn_id: 0` e usare la rete normale (0039) |
 | `POST /api/v1/subscriptions` `{name, kind, vpn_id, server, username, password}` o `{…, url}` | Aggiunge un abbonamento Xtream o M3U |
 | `POST /api/v1/subscriptions` `{name, kind: "local", path, content: movie\|series}` | Aggiunge una raccolta locale (cartella del server, senza VPN) |
 | `GET /api/v1/folders?path=` | Cartelle del server, per scegliere una raccolta |

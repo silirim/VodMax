@@ -226,9 +226,14 @@ func nullable(raw json.RawMessage) any {
 // UpdateSubscription changes name, VPN, settings and sealed secret; nil
 // arguments are left unchanged.
 func (s *Store) UpdateSubscription(ctx context.Context, id int64, name *string, vpnID *int64, settings json.RawMessage, secret []byte) error {
-	res, err := s.w.ExecContext(ctx, `UPDATE subscription SET name = coalesce(?, name), vpn_id = coalesce(?, vpn_id),
+	// 0: no VPN (the normal network, when the person allows it).
+	noVPN := vpnID != nil && *vpnID == 0
+	if noVPN {
+		vpnID = nil
+	}
+	res, err := s.w.ExecContext(ctx, `UPDATE subscription SET name = coalesce(?, name), vpn_id = CASE WHEN ? THEN NULL ELSE coalesce(?, vpn_id) END,
 		settings = coalesce(?, settings), secret = coalesce(?, secret) WHERE id = ?`,
-		name, vpnID, nullable(settings), secret, id)
+		name, noVPN, vpnID, nullable(settings), secret, id)
 	if isUnique(err) {
 		return ErrSubscriptionName
 	}

@@ -88,3 +88,10 @@ WireGuard interna. Ogni connessione VPN ha un tipo:
 
 Ogni abbonamento continua a indicare la sua connessione: il provider non
 si contatta mai senza averne scelta una.
+
+## Aggiornamento del 3 novembre 2026: VPN facoltativa (0039)
+
+Su richiesta dell'utente la VPN non è più obbligatoria: "solo tramite VPN"
+è un interruttore in Impostazioni → VPN, acceso in modo predefinito. Spento,
+un abbonamento può non avere una VPN e usare la rete normale. Dettagli in
+[0039](0039-vpn-facoltativa.md).

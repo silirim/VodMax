@@ -39,9 +39,9 @@ telecomando.
 - **Tutto in un posto**: playlist (M3U, Xtream Codes: le playlist TV che
   hai diritto di usare) e cartelle di film e serie nella stessa Home, ricerca
   e "Continua a guardare".
-- **Riservato**: il traffico verso le playlist passa solo da una VPN (quella
-  WireGuard interna o una sul router); credenziali cifrate; nessuna
-  telemetria.
+- **Riservato**: il traffico verso le playlist può passare solo da una VPN
+  (quella WireGuard interna o una sul router), scelta accesa in modo
+  predefinito; credenziali cifrate; nessuna telemetria.
 
 ## Funzioni
 
@@ -56,7 +56,7 @@ telecomando.
 | 📁 **Raccolte locali** | Cartelle di film o serie con i nomi di Jellyfin/Kodi/Plex, file `.nfo` e immagini accanto ai video |
 | 🧹 **Selezione del catalogo** | Solo i paesi, gli anni e le categorie che vuoi, con anteprima |
 | 👪 **Profili** | Avanzamenti e preferiti per persona, profili bambini, dispositivi abbinati con un codice |
-| 🔒 **VPN interna** | WireGuard dentro server e app: senza VPN le playlist non vengono mai contattate |
+| 🔒 **VPN interna** | WireGuard dentro server e app: con *solo tramite VPN* acceso (il predefinito), senza VPN le playlist non vengono mai contattate |
 | 💾 **Backup** | Backup cifrati e copie automatiche; avvisi su VPN, playlist, guida e disco |
 | 🖼️ **Schede** | Dalla playlist, dai file `.nfo` o da TMDB con una tua chiave |
 
@@ -130,7 +130,8 @@ Dai sorgenti: [docs/sviluppo.md](docs/sviluppo.md) e `scripts/release.sh`.
    trovi in `/var/lib/vodmax/admin.token`. La lingua (italiano o inglese)
    segue il dispositivo e si cambia in **Impostazioni → Lingua**.
 2. **Impostazioni → VPN**: importa il file `.conf` WireGuard, oppure indica
-   una VPN che usi già sul router.
+   una VPN che usi già sul router. Senza VPN, spegni *Contatta i provider
+   solo tramite VPN*.
 3. **Impostazioni → Abbonamenti**: aggiungi una playlist M3U o Xtream Codes,
    poi *Sincronizza ora*.
 4. **Impostazioni → Raccolte**: aggiungi una cartella di film o di serie.

@@ -39,9 +39,9 @@ decoder with the remote.
 - **One place** — playlists (M3U, Xtream Codes: the TV playlists you are
   entitled to use) and local folders of movies and series in the same home,
   search and "continue watching".
-- **Private by design** — playlist traffic goes only through a VPN (the
-  built-in WireGuard tunnel or one you run on the router); credentials are
-  encrypted; no telemetry.
+- **Private by design** — playlist traffic can be limited to a VPN (the
+  built-in WireGuard tunnel or one you run on the router), on by default;
+  credentials are encrypted; no telemetry.
 
 ## Features
 
@@ -59,7 +59,7 @@ decoder with the remote.
 | 👪 **Profiles** | Per-person progress and favourites, kids profiles, devices paired with a short code or signed in with your home account (OpenID Connect: Authelia, Authentik, Keycloak…) |
 | ✨ **Assistant** | Optional: built in (VodMax downloads and runs the model at home), Claude and other online services with an API key, or your own server. Write a recording rule as a sentence, ask what to watch tonight |
 | 🔌 **Other apps** | Plex, Jellyfin and Emby see VodMax as an HDHomeRun tuner; M3U playlist and XMLTV guide for TiviMate, Kodi, VLC |
-| 🔒 **Built-in VPN** | WireGuard in user space inside the server and the app: without the VPN, playlists are never contacted |
+| 🔒 **Built-in VPN** | WireGuard in user space inside the server and the app: with *only through a VPN* on (the default), playlists are never contacted without it |
 | 💾 **Backups** | Encrypted backups and automatic copies, health warnings for VPN, playlists, guide and disk |
 | 🖼️ **Metadata** | From the playlist, from `.nfo` files, or from TMDB with your own key |
 
@@ -137,7 +137,8 @@ Build from source: [docs/sviluppo.md](docs/sviluppo.md) and
    `/var/lib/vodmax/admin.token`. The language (Italian or English) follows
    the device and can be changed in **Settings → Language**.
 2. **Settings → VPN**: import your WireGuard `.conf`, or declare a VPN you
-   already run on the router.
+   already run on the router. Without a VPN, switch off *Contact providers
+   only through a VPN*.
 3. **Settings → Subscriptions**: add an M3U or Xtream Codes playlist, then
    *Sync now*.
 4. **Settings → Collections**: add a folder of movies or series.

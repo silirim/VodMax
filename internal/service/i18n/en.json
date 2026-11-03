@@ -183,7 +183,6 @@
   "non è un film": "not a movie",
   "non è una serie": "not a show",
   "numero di registrazioni da tenere non valido": "invalid number of recordings to keep",
-  "ogni abbonamento richiede una connessione VPN esistente": "every subscription needs an existing VPN connection",
   "operazione riservata a un profilo amministratore": "only an admin profile can do this",
   "ora della sincronizzazione del catalogo non valida (0-23, oppure -1 per disattivarla)": "invalid catalog sync hour (0-23, or -1 to turn it off)",
   "password del backup errata, oppure file danneggiato": "wrong backup password, or damaged file",
@@ -259,5 +258,8 @@
   "uscita verso altre app spenta o indirizzo non valido": "output to other apps off or invalid address",
   "valori non validi": "invalid values",
   "è già un file della raccolta": "it is already a file of the collection",
-  "“%s” su %s": "“%s” on %s"
+  "“%s” su %s": "“%s” on %s",
+  "l'abbonamento non ha una VPN e i provider si contattano solo tramite VPN: scegline una nell'abbonamento oppure cambia l'impostazione in Impostazioni → VPN": "the subscription has no VPN and providers are contacted only through a VPN: choose one in the subscription or change the setting in Settings → VPN",
+  "scegli una VPN: i provider si contattano solo tramite VPN (Impostazioni → VPN)": "choose a VPN: providers are contacted only through a VPN (Settings → VPN)",
+  "la VPN scelta non esiste": "the chosen VPN does not exist"
 }

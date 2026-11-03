@@ -216,11 +216,16 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
 
   // ---- Subscriptions ----
   async function renderSubscriptions(main) {
-    const [all, vpns] = await Promise.all([api("GET", "/api/v1/subscriptions"), api("GET", "/api/v1/vpn")]);
+    const [all, list, net] = await Promise.all([api("GET", "/api/v1/subscriptions"), api("GET", "/api/v1/vpn"), api("GET", "/api/v1/settings/network")]);
     const subs = all.filter((s) => s.kind !== "local");
+    // "No VPN" is a choice only when the providers may be reached without
+    // one (Settings → VPN); a subscription left without one says so.
+    const vpns = net.vpn_only ? list : [...list, { id: 0, name: t("Nessuna VPN (rete normale)") }];
     const vpnName = fromEntries(vpns.map((v) => [v.id, v.name]));
+    if (net.vpn_only) vpnName[0] = t("nessuna: in attesa di una VPN");
     const parts = [el("h2", {}, t("Abbonamenti")),
-      el("p", { className: "note" }, t("Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla sua VPN: senza VPN il provider non viene mai contattato."))];
+      el("p", { className: "note" }, net.vpn_only ? t("Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla sua VPN: senza VPN il provider non viene mai contattato.")
+        : t("Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla VPN scelta, oppure dalla rete normale se non ne ha una."))];
     for (const s of subs) parts.push(subscriptionBox(s, vpns, vpnName));
     parts.push(el("h2", {}, t("Aggiungi un abbonamento")));
     parts.push(vpns.length ? subscriptionForm(vpns) : el("p", { className: "note" }, t("Prima aggiungi una connessione VPN (scheda VPN).")));
@@ -428,9 +433,21 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
 
   // ---- VPN ----
   async function renderVPN(main) {
-    const vpns = await api("GET", "/api/v1/vpn");
+    const [vpns, net] = await Promise.all([api("GET", "/api/v1/vpn"), api("GET", "/api/v1/settings/network")]);
+    const only = input({ type: "checkbox", checked: net.vpn_only });
+    only.onchange = async () => {
+      only.disabled = true;
+      try {
+        await api("PUT", "/api/v1/settings/network", { vpn_only: only.checked });
+        flash(only.checked ? t("I provider si contattano solo tramite VPN") : t("Gli abbonamenti senza VPN usano la rete normale"));
+      } catch (e) { flash(e.message); only.checked = !only.checked; }
+      only.disabled = false;
+    };
     const parts = [el("h2", {}, t("Connessioni VPN")),
-      el("p", { className: "note" }, t("Il provider si contatta solo attraverso una VPN. Due modi: una WireGuard dentro VodMax (si importa il file .conf " +
+      el("section", { className: "box" }, el("label", { className: "check" }, only, el("b", {}, t("Contatta i provider solo tramite VPN"))),
+        el("p", { className: "note" }, t("Acceso: un abbonamento senza VPN resta in attesa e il provider non viene mai contattato, nemmeno se la VPN cade. " +
+          "Spento: puoi lasciare un abbonamento senza VPN, e VodMax usa la rete normale del server per quel provider."))),
+      el("p", { className: "note" }, t("Due modi di usare una VPN: una WireGuard dentro VodMax (si importa il file .conf " +
         "del proprio servizio: Proton, Mullvad, NordVPN…; la chiave privata resta cifrata) oppure una VPN che hai già fuori da VodMax, " +
         "sul dispositivo o sul router."))];
     for (const v of vpns) parts.push(vpnBox(v));

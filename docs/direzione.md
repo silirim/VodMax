@@ -21,9 +21,12 @@ uno, la proposta cambia.
 
 1. **Nessun contenuto.** VodMax organizza quello che l'utente ha. Non
    fornisce, non cerca e non suggerisce playlist, canali o provider.
-2. **Il provider solo tramite VPN** ([0012](decisioni/0012-connessioni-vpn.md)).
-   Ogni richiesta al provider passa da un solo client (`internal/provider`)
-   e dal tunnel dell'abbonamento; senza VPN il provider non viene contattato.
+2. **Il provider tramite VPN, se lo scegli** ([0012](decisioni/0012-connessioni-vpn.md),
+   [0039](decisioni/0039-vpn-facoltativa.md)). Ogni richiesta al provider
+   passa da un solo client (`internal/provider`) e dalla connessione
+   dell'abbonamento. Con "solo tramite VPN" acceso (il predefinito) senza
+   VPN il provider non viene contattato; spento, un abbonamento può usare
+   la rete normale. Mai ripiego dalla VPN alla rete normale.
 3. **Tutto in casa.** Dati, credenziali (cifrate) e storico restano sul
    server. Nessun servizio cloud obbligatorio, nessuna telemetria. Quello
    che va fuori casa (TMDB, un assistente online) è scelto e configurato

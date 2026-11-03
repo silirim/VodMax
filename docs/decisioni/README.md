@@ -44,6 +44,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0036](0036-indice-delle-persone.md) | Indice delle persone: "un film con…" senza fidarsi della memoria del modello | **Approvata** |
 | [0037](0037-picture-in-picture.md) | Finestra piccola sull'app Android (picture in picture) | **Proposta** |
 | [0038](0038-registra-solo-quella-volta.md) | Assistente: registrare solo quella volta | **Approvata** |
+| [0039](0039-vpn-facoltativa.md) | VPN facoltativa, "solo tramite VPN" come scelta | **Approvata** |
 
 ## Ordine consigliato per decidere
 
