@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -462,7 +463,8 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (RuleProposal,
 			channel = c
 		}
 	}
-	p.Once = s.onceCandidates(ctx, out.Date, out.Time, r, err == nil, channel, time.Now())
+	p.Once = s.onceCandidates(ctx, onceAsk{date: out.Date, clock: out.Time, evening: eveningRE.MatchString(fold(text)), film: filmRE.MatchString(fold(text))},
+		r, err == nil, channel, time.Now())
 	if err != nil {
 		// "The film at 21 on Rai 1": no title to make a rule of, but the
 		// guide knows the programme.
@@ -479,9 +481,22 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (RuleProposal,
 // the named channel then, whatever its title. Nothing without a day or a
 // time, or with one VodMax cannot read: the model's dates are not trusted
 // beyond the guide's days.
-func (s *Service) onceCandidates(ctx context.Context, date, clock string, r store.RecordingRule, ruleOK bool, channel store.TVChannel, now time.Time) []RuleMatch {
-	date, clock = strings.TrimSpace(date), strings.TrimSpace(clock)
-	if date == "" && clock == "" {
+// onceAsk is when the sentence asks for: the day and the time the model
+// read, and two words VodMax reads itself, whatever the model made of
+// them ("questa sera", even misspelt as "quyesta sera"; "film").
+type onceAsk struct {
+	date, clock   string
+	evening, film bool
+}
+
+var (
+	eveningRE = regexp.MustCompile(`\b(sera|stasera|serata|tonight|evening)\b`)
+	filmRE    = regexp.MustCompile(`\b(film|movie)\b`)
+)
+
+func (s *Service) onceCandidates(ctx context.Context, ask onceAsk, r store.RecordingRule, ruleOK bool, channel store.TVChannel, now time.Time) []RuleMatch {
+	date, clock := strings.TrimSpace(ask.date), strings.TrimSpace(ask.clock)
+	if date == "" && clock == "" && !ask.evening {
 		return nil
 	}
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
@@ -561,6 +576,32 @@ func (s *Service) onceCandidates(ctx context.Context, date, clock string, r stor
 				if pr != nil {
 					add(RuleMatch{ChannelID: channel.ID, Channel: channel.Name, Start: pr.Start, Stop: pr.Stop, Title: pr.Title, State: "new"})
 				}
+			}
+		}
+	}
+	// A channel and a day, no time ("the film tonight on Canale 5"): the
+	// evening's main programmes, the long ones starting in prime time;
+	// the guide's films first when the sentence says "film".
+	if channel.ID != 0 && channel.GuideID != "" && at.IsZero() {
+		pfrom := time.Date(day.Year(), day.Month(), day.Day(), 20, 30, 0, 0, now.Location())
+		pto := pfrom.Add(3 * time.Hour)
+		progs, err := s.st.GuideWindow(ctx, []string{channel.GuideID}, pfrom, pto)
+		if err == nil {
+			var main []store.Programme
+			for _, pr := range progs[channel.GuideID] {
+				if pr.Stop > now.Unix() && pr.Stop-pr.Start >= 3600 && pr.Start >= pfrom.Unix() && pr.Start < pto.Unix() {
+					main = append(main, pr)
+				}
+			}
+			isFilm := func(pr store.Programme) bool { return ask.film && filmRE.MatchString(fold(pr.Category)) }
+			sort.SliceStable(main, func(i, j int) bool {
+				if fi, fj := isFilm(main[i]), isFilm(main[j]); fi != fj {
+					return fi
+				}
+				return main[i].Start < main[j].Start
+			})
+			for _, pr := range main {
+				add(RuleMatch{ChannelID: channel.ID, Channel: channel.Name, Start: pr.Start, Stop: pr.Stop, Title: pr.Title, State: "new"})
 			}
 		}
 	}
