@@ -239,6 +239,11 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .matches .when { color: var(--soft); font-size: 0.9rem; }
 .matches strong { color: var(--text); font-weight: 600; }
 .matches .what { font-size: 0.95rem; }
+.rule-once { display: grid; gap: 0.5rem; margin-top: 0.5rem; padding: 0.8rem 0.9rem; background: var(--raised); border-radius: 12px; border-left: 3px solid var(--accent); }
+.rule-once p { margin: 0; }
+.once-item { display: grid; gap: 0.2rem; overflow-wrap: anywhere; word-break: break-word; }
+.once-item .when { color: var(--soft); font-size: 0.9rem; }
+.once-item .buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.3rem; }
 .matches li.new { border-left-color: var(--accent); }
 .matches li.scheduled { border-left-color: #8fd9b6; }
 .matches li.conflict, .matches li.too_long { border-left-color: #ff9a92; }

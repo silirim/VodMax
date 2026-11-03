@@ -641,7 +641,7 @@
   "In onda ora": "In onda ora",
   "Registrare “{title}” alle {time} su {channel}?": "Registrare “{title}” alle {time} su {channel}?",
   "Registrazione programmata": "Registrazione programmata",
-  "es. registra le gare di Formula 1 in diretta, non le qualifiche": "es. registra le gare di Formula 1 in diretta, non le qualifiche",
+  "es. registra le gare di Formula 1 in diretta, non le qualifiche; oppure: il film di stasera alle 21 su Rai 1": "es. registra le gare di Formula 1 in diretta, non le qualifiche; oppure: il film di stasera alle 21 su Rai 1",
   "Compila con l'assistente": "Compila con l'assistente",
   "L'assistente sta scrivendo la regola…": "L'assistente sta scrivendo la regola…",
   "Controlla l'anteprima e salva.": "Controlla l'anteprima e salva.",
@@ -720,5 +720,11 @@
   "Controllo…": "Controllo…",
   "È disponibile l'app per Android {version}": "È disponibile l'app per Android {version}",
   "È disponibile la versione {version}": "È disponibile la versione {version}",
-  "Nessun aggiornamento: hai già l'ultima versione": "Nessun aggiornamento: hai già l'ultima versione"
+  "Nessun aggiornamento: hai già l'ultima versione": "Nessun aggiornamento: hai già l'ultima versione",
+  "Nella guida a quell'ora c'è questo programma. È quello che vuoi registrare?": "Nella guida a quell'ora c'è questo programma. È quello che vuoi registrare?",
+  "Nella guida a quell'ora ci sono questi programmi. È uno di questi?": "Nella guida a quell'ora ci sono questi programmi. È uno di questi?",
+  "Solo questa volta": "Solo questa volta",
+  "Ogni volta che va in onda": "Ogni volta che va in onda",
+  "Regola per “{title}”: controlla l'anteprima e salva.": "Regola per “{title}”: controlla l'anteprima e salva.",
+  "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.": "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde."
 }

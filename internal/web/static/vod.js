@@ -630,12 +630,51 @@
     form.addEventListener("change", refresh);
     if (!existing) assistant().then((on) => {
       if (!on) return;
-      const text = el("input", { className: "focusable", type: "text", maxLength: 500, placeholder: t("es. registra le gare di Formula 1 in diretta, non le qualifiche") });
+      const text = el("input", { className: "focusable", type: "text", maxLength: 500, placeholder: t("es. registra le gare di Formula 1 in diretta, non le qualifiche; oppure: il film di stasera alle 21 su Rai 1") });
       const go = el("button", { className: "small focusable", type: "button" }, t("Compila con l'assistente"));
       const said = el("p", { className: "empty" });
+      const once = el("div", { className: "rule-once" });
+      once.hidden = true;
+      // A day or a time in the sentence: the programme then may be the one
+      // meant, to record once, rather than every airing of the title.
+      const showOnce = (list) => {
+        once.replaceChildren();
+        once.hidden = !list.length;
+        if (!list.length) return;
+        once.append(el("p", {}, list.length === 1 ? t("Nella guida a quell'ora c'è questo programma. È quello che vuoi registrare?")
+          : t("Nella guida a quell'ora ci sono questi programmi. È uno di questi?")));
+        for (const m of list) {
+          const just = el("button", { className: "small primary focusable", type: "button" }, t("Solo questa volta"));
+          just.onclick = async () => {
+            just.disabled = true;
+            try {
+              await api("POST", "/api/v1/recordings", { channel_id: m.channel_id, start: m.start, stop: m.stop, title: m.title, from_guide: true });
+              flash(t("Registrazione programmata"));
+              render();
+            } catch (e) { flash(e.message); just.disabled = false; }
+          };
+          const every = el("button", { className: "small focusable", type: "button" }, t("Ogni volta che va in onda"));
+          every.onclick = () => {
+            // The rule for this title: its name is what to look for.
+            name.value = m.title;
+            all.value = m.title.replace(/,/g, " ");
+            any.value = "";
+            none.value = "";
+            once.hidden = true;
+            said.textContent = t("Regola per “{title}”: controlla l'anteprima e salva.", { title: m.title });
+            refresh();
+            name.focus();
+          };
+          once.append(el("div", { className: "once-item" },
+            el("span", { className: "when" }, day(m.start) + " " + hhmm(m.start) + "–" + hhmm(m.stop) + " · " + m.channel),
+            el("strong", {}, m.title), el("div", { className: "buttons" }, just, every)));
+        }
+        once.append(el("p", { className: "empty" }, t("Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.")));
+      };
       go.onclick = async () => {
         if (!text.value.trim()) return;
         go.disabled = true;
+        showOnce([]);
         said.textContent = t("L'assistente sta scrivendo la regola…");
         try {
           const p = await api("POST", "/api/v1/assistant/rule", { text: text.value });
@@ -651,12 +690,15 @@
           keep.value = r.keep || "";
           said.textContent = (p.explanation ? p.explanation + " " : "") + t("Controlla l'anteprima e salva.");
           refresh();
+          showOnce(p.once || []);
+          const first = once.querySelector("button");
+          if (first) first.focus();
         } catch (e) { said.textContent = e.message; }
         go.disabled = false;
       };
       text.setAttribute("enterkeyhint", "go");
       text.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go.click(); } });
-      form.prepend(el("div", { className: "rule-ask" }, f(t("Descrivi la regola"), text), go, said));
+      form.prepend(el("div", { className: "rule-ask" }, f(t("Descrivi la regola"), text), go, said, once));
     });
     form.onsubmit = async (e) => {
       e.preventDefault();

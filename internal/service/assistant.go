@@ -359,6 +359,13 @@ type RuleProposal struct {
 	Rule        RuleInput `json:"rule"`
 	ChannelName string    `json:"channel_name,omitempty"`
 	Explanation string    `json:"explanation"`
+	// Once: when the sentence names a day or a time ("tonight at 21"),
+	// the guide's programmes then, so that the person can record just
+	// that one instead of every airing of the title.
+	Once []RuleMatch `json:"once,omitempty"`
+	// RuleError: the rule itself does not stand (no title named), while
+	// Once has the programme.
+	RuleError string `json:"rule_error,omitempty"`
 }
 
 const rulePrompt = `You turn a request into a recording rule for VodMax, a TV recorder. A rule records every programme of the TV guide whose title (or subtitle) matches. Fields:
@@ -370,6 +377,8 @@ const rulePrompt = `You turn a request into a recording rule for VodMax, a TV re
 - section: "sport", "tv" or "" (any).
 - live_only: true when the person wants only live events, not reruns or delayed broadcasts.
 - keep: how many recordings to keep (0 = all), only if the person says so.
+- date: "YYYY-MM-DD" only if the person names a day ("tonight" and "today" are today, "tomorrow", "on Saturday"); otherwise "". Now it is %s.
+- time: "HH:MM" (24 hours) only if the person names a time ("at 9 pm" is "21:00"); otherwise "".
 - explanation: one sentence, in %s, saying what the rule will record.
 Answer with only a JSON object with exactly these fields.
 
@@ -398,7 +407,7 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (RuleProposal,
 		}
 	}
 	answer, err := s.chat(ctx, a, []chatMessage{
-		{Role: "system", Content: fmt.Sprintf(rulePrompt, languageName(ctx), strings.Join(names, "; "))},
+		{Role: "system", Content: fmt.Sprintf(rulePrompt, time.Now().Format("Monday 2006-01-02 15:04"), languageName(ctx), strings.Join(names, "; "))},
 		{Role: "user", Content: text + "\n(Explanation in " + languageName(ctx) + ".)"},
 	}, true)
 	if err != nil {
@@ -413,6 +422,8 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (RuleProposal,
 		Section     string   `json:"section"`
 		LiveOnly    bool     `json:"live_only"`
 		Keep        int      `json:"keep"`
+		Date        string   `json:"date"`
+		Time        string   `json:"time"`
 		Explanation string   `json:"explanation"`
 	}
 	if err := jsonObject(answer, &out); err != nil {
@@ -422,7 +433,9 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (RuleProposal,
 	if name == "" { // small models sometimes leave it out: the words name the rule
 		name = strings.Join(out.All, " ")
 	}
-	if name == "" {
+	// No title at all but a day or a time ("the film at 21 on Rai 1"): the
+	// sentence is no name to look for, the guide answers instead.
+	if name == "" && strings.TrimSpace(out.Date+out.Time) == "" {
 		name = text
 	}
 	p.Rule = RuleInput{Name: truncate(name, 60), All: out.All, Any: out.Any, None: out.None, LiveOnly: out.LiveOnly, Keep: out.Keep}
@@ -440,11 +453,117 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (RuleProposal,
 	p.Explanation = truncate(strings.TrimSpace(out.Explanation), 300)
 	// The same checks as a rule typed by hand.
 	r, err := s.ruleFromInput(ctx, p.Rule)
-	if err != nil {
-		return p, err
+	if err == nil {
+		p.Rule.Name, p.Rule.All, p.Rule.Any, p.Rule.None, p.Rule.Keep = r.Name, r.Spec.All, r.Spec.Any, r.Spec.None, r.Keep
 	}
-	p.Rule.Name, p.Rule.All, p.Rule.Any, p.Rule.None, p.Rule.Keep = r.Name, r.Spec.All, r.Spec.Any, r.Spec.None, r.Keep
+	var channel store.TVChannel
+	for _, c := range channels {
+		if c.ID == p.Rule.ChannelID {
+			channel = c
+		}
+	}
+	p.Once = s.onceCandidates(ctx, out.Date, out.Time, r, err == nil, channel, time.Now())
+	if err != nil {
+		// "The film at 21 on Rai 1": no title to make a rule of, but the
+		// guide knows the programme.
+		if len(p.Once) == 0 {
+			return p, err
+		}
+		p.RuleError = err.Error()
+	}
 	return p, nil
+}
+
+// onceCandidates: the programmes at the day and time the person named,
+// at most three. Those the rule matches around that time, and the one on
+// the named channel then, whatever its title. Nothing without a day or a
+// time, or with one VodMax cannot read: the model's dates are not trusted
+// beyond the guide's days.
+func (s *Service) onceCandidates(ctx context.Context, date, clock string, r store.RecordingRule, ruleOK bool, channel store.TVChannel, now time.Time) []RuleMatch {
+	date, clock = strings.TrimSpace(date), strings.TrimSpace(clock)
+	if date == "" && clock == "" {
+		return nil
+	}
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	day := today
+	if date != "" {
+		d, err := time.ParseInLocation("2006-01-02", date, now.Location())
+		if err != nil || d.Before(today) || d.After(today.Add(8*24*time.Hour)) {
+			return nil
+		}
+		day = d
+	}
+	var at time.Time // the time named; zero: the whole day
+	if clock != "" {
+		c, err := time.Parse("15:04", clock)
+		if err != nil {
+			return nil
+		}
+		at = time.Date(day.Year(), day.Month(), day.Day(), c.Hour(), c.Minute(), 0, 0, now.Location())
+		// "At 21" without a day, said at 23: tomorrow's.
+		if date == "" && at.Before(now.Add(-time.Hour)) {
+			at = at.AddDate(0, 0, 1)
+		}
+	}
+	from, to := day, day.AddDate(0, 0, 1)
+	if !at.IsZero() {
+		from, to = at.Add(-time.Hour), at.Add(time.Hour)
+	}
+	near := func(start, stop int64) bool {
+		if stop <= now.Unix() {
+			return false
+		}
+		if at.IsZero() {
+			return start >= from.Unix() && start < to.Unix()
+		}
+		return (start <= at.Unix() && stop > at.Unix()) || (start >= from.Unix() && start < to.Unix())
+	}
+	var out []RuleMatch
+	seen := map[string]bool{}
+	add := func(m RuleMatch) {
+		k := fmt.Sprint(m.ChannelID, m.Start)
+		if !seen[k] && len(out) < 3 {
+			seen[k] = true
+			out = append(out, m)
+		}
+	}
+	if ruleOK {
+		if matches, err := s.PreviewRule(ctx, r); err == nil {
+			for _, m := range matches {
+				if near(m.Start, m.Stop) {
+					add(m)
+				}
+			}
+		}
+	}
+	if channel.ID != 0 && channel.GuideID != "" && !at.IsZero() {
+		progs, err := s.st.GuideWindow(ctx, []string{channel.GuideID}, at.Add(-time.Minute), at.Add(30*time.Minute))
+		if err == nil {
+			// What starts nearest the time named (the news ending at 21 is
+			// not "the film at 21"), else what is on air then.
+			var best *store.Programme
+			dist := func(p store.Programme) int64 { return abs64(p.Start - at.Unix()) }
+			for i, pr := range progs[channel.GuideID] {
+				if pr.Stop <= now.Unix() || pr.Start < at.Add(-15*time.Minute).Unix() || pr.Start >= at.Add(30*time.Minute).Unix() {
+					continue
+				}
+				if best == nil || dist(pr) < dist(*best) {
+					best = &progs[channel.GuideID][i]
+				}
+			}
+			if best == nil {
+				for i, pr := range progs[channel.GuideID] {
+					if pr.Start <= at.Unix() && pr.Stop > at.Unix() && pr.Stop > now.Unix() {
+						best = &progs[channel.GuideID][i]
+					}
+				}
+			}
+			if best != nil {
+				add(RuleMatch{ChannelID: channel.ID, Channel: channel.Name, Start: best.Start, Stop: best.Stop, Title: best.Title, State: "new"})
+			}
+		}
+	}
+	return out
 }
 
 func truncate(s string, n int) string {

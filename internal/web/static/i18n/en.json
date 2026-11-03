@@ -641,7 +641,7 @@
   "In onda ora": "On now",
   "Registrare “{title}” alle {time} su {channel}?": "Record “{title}” at {time} on {channel}?",
   "Registrazione programmata": "Recording scheduled",
-  "es. registra le gare di Formula 1 in diretta, non le qualifiche": "e.g. record the Formula 1 races live, not qualifying",
+  "es. registra le gare di Formula 1 in diretta, non le qualifiche; oppure: il film di stasera alle 21 su Rai 1": "e.g. record the Formula 1 races live, not qualifying; or: tonight's film at 9 pm on Rai 1",
   "Compila con l'assistente": "Fill in with the assistant",
   "L'assistente sta scrivendo la regola…": "The assistant is writing the rule…",
   "Controlla l'anteprima e salva.": "Check the preview and save.",
@@ -720,5 +720,11 @@
   "Controllo…": "Checking…",
   "È disponibile l'app per Android {version}": "Android app {version} is available",
   "È disponibile la versione {version}": "Version {version} is available",
-  "Nessun aggiornamento: hai già l'ultima versione": "No updates: you already have the latest version"
+  "Nessun aggiornamento: hai già l'ultima versione": "No updates: you already have the latest version",
+  "Nella guida a quell'ora c'è questo programma. È quello che vuoi registrare?": "The guide has this programme at that time. Is it the one you want to record?",
+  "Nella guida a quell'ora ci sono questi programmi. È uno di questi?": "The guide has these programmes at that time. Is it one of them?",
+  "Solo questa volta": "Just this once",
+  "Ogni volta che va in onda": "Every time it airs",
+  "Regola per “{title}”: controlla l'anteprima e salva.": "Rule for “{title}”: check the preview and save.",
+  "Se non è nessuno di questi, la regola qui sotto registra ogni programma che corrisponde.": "If it is none of these, the rule below records every matching programme."
 }

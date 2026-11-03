@@ -43,6 +43,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0035](0035-assistente-integrato.md) | Assistente integrato, servizi online e attivazione in evidenza | **Approvata** |
 | [0036](0036-indice-delle-persone.md) | Indice delle persone: "un film con…" senza fidarsi della memoria del modello | **Approvata** |
 | [0037](0037-picture-in-picture.md) | Finestra piccola sull'app Android (picture in picture) | **Proposta** |
+| [0038](0038-registra-solo-quella-volta.md) | Assistente: registrare solo quella volta | **Approvata** |
 
 ## Ordine consigliato per decidere
 

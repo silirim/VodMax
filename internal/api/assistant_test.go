@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // fakeModel is an OpenAI-compatible chat server with a scripted answer.
@@ -106,6 +107,46 @@ func TestAssistant(t *testing.T) {
 	if _, body := e.do(t, "GET", "/api/v1/recording-rules", nil, true); strings.Contains(string(body), "Juventus") {
 		t.Fatalf("saved: %s", body)
 	}
+	if len(p.Rule.All) == 0 || strings.Contains(string(body), `"once"`) {
+		t.Fatalf("no day or time named, nothing to record once: %s", body)
+	}
+
+	// A day and a time: the programme then on the channel named, whatever
+	// its title ("Film della sera" starts in 20 minutes on Rai 1), to
+	// record just once; without a title there is no rule to propose.
+	at := time.Now().Add(20 * time.Minute)
+	m.answer = func(system, user string) string {
+		if !strings.Contains(system, time.Now().Format("2006-01-02")) {
+			return "?"
+		}
+		return `{"name":"","all":[],"any":[],"none":[],"channel":"Rai 1","section":"","live_only":false,"keep":0,"date":"` + at.Format("2006-01-02") +
+			`","time":"` + at.Format("15:04") + `","explanation":"Registra il film."}`
+	}
+	code, body = e.do(t, "POST", "/api/v1/assistant/rule", map[string]string{"text": "registra il film di stasera su Rai 1"}, true)
+	var o struct {
+		Once []struct {
+			ChannelID   int64 `json:"channel_id"`
+			Title       string
+			Start, Stop int64
+		}
+		RuleError string `json:"rule_error"`
+	}
+	if code != 200 || json.Unmarshal(body, &o) != nil || len(o.Once) != 1 || o.Once[0].Title != "Film della sera" || o.Once[0].ChannelID == 0 {
+		t.Fatalf("once: %d %s", code, body)
+	}
+	// "Just this once" is the guide's own recording request.
+	rec := map[string]any{"channel_id": o.Once[0].ChannelID, "start": o.Once[0].Start, "stop": o.Once[0].Stop, "title": o.Once[0].Title, "from_guide": true}
+	if code, body := e.do(t, "POST", "/api/v1/recordings", rec, true); code != 201 {
+		t.Fatalf("record once: %d %s", code, body)
+	}
+	// A date the guide cannot have is not trusted.
+	m.answer = func(system, user string) string {
+		return `{"name":"Film","all":["film"],"channel":"Rai 1","date":"2031-01-01","time":"21:00","explanation":"."}`
+	}
+	if code, body := e.do(t, "POST", "/api/v1/assistant/rule", map[string]string{"text": "il film del 2031"}, true); code != 200 || strings.Contains(string(body), `"once"`) {
+		t.Fatalf("far date: %d %s", code, body)
+	}
+
 	m.answer = func(system, user string) string { return "non so" }
 	if code, _ := e.do(t, "POST", "/api/v1/assistant/rule", map[string]string{"text": "boh"}, true); code != 502 {
 		t.Fatalf("unusable answer: %d", code)
