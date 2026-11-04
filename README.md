@@ -133,7 +133,8 @@ docker run -d --name vodmax --restart unless-stopped -p 8095:8095 -v vodmax-data
 ```
 
 (the data stays in the `vodmax-data` volume; a
-[compose file](packaging/docker-compose.yml) is ready).
+[compose file](packaging/docker-compose.yml) is ready). The admin token to
+sign in the first time: `docker exec vodmax cat /var/lib/vodmax/admin.token`.
 
 **Android / Android TV / Fire TV** — install `VodMax-<version>.apk`, then enter
 the server address or choose *Use this device on its own* (standalone).
@@ -149,7 +150,8 @@ Build from source: [docs/sviluppo.md](docs/sviluppo.md) and
 ## Quick start
 
 1. Open `http://<server>:8095` and paste the admin token from
-   `/var/lib/vodmax/admin.token`. The language (Italian or English) follows
+   `/var/lib/vodmax/admin.token` (with Docker:
+   `docker exec vodmax cat /var/lib/vodmax/admin.token`). The language (Italian or English) follows
    the device and can be changed in **Settings → Language**.
 2. **Settings → VPN**: import your WireGuard `.conf`, or declare a VPN you
    already run on the router. Without a VPN, switch off *Contact providers
