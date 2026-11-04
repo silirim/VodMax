@@ -56,7 +56,35 @@
       el("span", { className: "label" }, title), el("span", { className: "sub" }, sub));
     card.onclick = () => play(c.media, c.id, title + (c.media === "episode" ? " · " + ep : ""), c.next ? 0 : c.progress.position);
     card.hero = heroFromContinue(c);
-    return card;
+    // Off the row: the × on the card, the red key (Canc), or a long press.
+    const itemID = c.media === "episode" ? c.series_id : c.id;
+    card.dataset.continue = itemID;
+    const off = el("button", { className: "card-x focusable" });
+    window.VodMax.label(off, "x", t("Togli da Continua a guardare"));
+    off.title = t("Togli da Continua a guardare");
+    off.onclick = () => hideContinue(card);
+    card.addEventListener("contextmenu", async (e) => {
+      e.preventDefault();
+      if (await choose(title, [["off", t("Togli da Continua a guardare"), "x"]]) === "off") hideContinue(card);
+    });
+    return el("div", { className: "card-wrap wide" }, card, off);
+  }
+
+  // Takes a title off "continue watching" (its position stays: the detail
+  // page still resumes it); the focus moves to the next card.
+  async function hideContinue(card) {
+    const wrap = card.closest(".card-wrap");
+    try { await api("DELETE", "/api/v1/continue/" + card.dataset.continue); }
+    catch (e) { flash(e.message); return; }
+    const next = wrap.nextElementSibling || wrap.previousElementSibling;
+    const row = wrap.parentElement;
+    wrap.remove();
+    flash(t("Tolto da Continua a guardare"));
+    if (next) next.querySelector(".card").focus();
+    else if (row) {
+      row.replaceWith(el("p", { className: "empty" }, t("Qui compaiono i film e gli episodi iniziati e la prossima puntata delle serie che stai seguendo.")));
+      focusFirst($("content"));
+    }
   }
 
   // ---- Views ----
@@ -1748,6 +1776,11 @@
     if (key === "Green" || key === "g") { location.href = "/tv.html"; return; }
     if ((key === "Yellow" || key === "p") && document.activeElement && document.activeElement.dataset.recording) {
       toggleProtected(document.activeElement.dataset.recording, document.activeElement.dataset.protected === "1");
+      e.preventDefault();
+      return;
+    }
+    if ((key === "Red" || key === "Delete") && document.activeElement && document.activeElement.dataset.continue) {
+      hideContinue(document.activeElement);
       e.preventDefault();
       return;
     }

@@ -743,5 +743,7 @@
   "Annullare la registrazione in programma?": "Cancel the scheduled recording?",
   "Fermare la registrazione? Quanto registrato finora resta da guardare.": "Stop the recording? What has been recorded so far stays to watch.",
   "Fermo la registrazione…": "Stopping the recording…",
-  "Registrazione fermata": "Recording stopped"
+  "Registrazione fermata": "Recording stopped",
+  "Togli da Continua a guardare": "Remove from Continue watching",
+  "Tolto da Continua a guardare": "Removed from Continue watching"
 }

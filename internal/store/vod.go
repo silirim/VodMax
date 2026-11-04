@@ -178,6 +178,22 @@ type ContinueEntry struct {
 	Next         bool     `json:"next,omitempty"` // the episode after the one finished last
 }
 
+// HideContinue takes a film or a series (its item id) off a profile's
+// "continue watching", with all its versions, until it is watched again.
+func (s *Store) HideContinue(ctx context.Context, profileID, itemID int64) error {
+	res, err := s.w.ExecContext(ctx, `INSERT INTO continue_hidden (profile_id, title_key, hidden_at)
+		SELECT ?, i.kind || ':' || CASE WHEN i.group_key <> '' THEN i.group_key ELSE '#' || i.id END, ?
+		FROM item i WHERE i.id = ? AND i.kind IN ('movie', 'series')
+		ON CONFLICT (profile_id, title_key) DO UPDATE SET hidden_at = excluded.hidden_at`, profileID, time.Now().Unix(), itemID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // Continue lists unfinished films and episodes, most recent first. For a
 // series only the latest episode appears. Titles the catalog selection
 // hides (an excluded category) are left out, unless another visible
@@ -190,6 +206,8 @@ func (s *Store) Continue(ctx context.Context, profileID int64, noAdult bool, lim
 			AND (i.visible = 1 OR (i.group_key <> '' AND EXISTS (SELECT 1 FROM item v WHERE v.kind = i.kind AND v.group_key = i.group_key AND v.visible = 1 AND v.available = 1)))
 			AND (i.group_key = '' OR p.updated_at = (SELECT max(p2.updated_at) FROM progress p2 JOIN item i2 ON i2.id = p2.media_id
 				WHERE p2.profile_id = p.profile_id AND p2.media = 'movie' AND i2.group_key = i.group_key))
+			AND NOT EXISTS (SELECT 1 FROM continue_hidden h WHERE h.profile_id = p.profile_id AND h.title_key = i.kind || ':' ||
+				CASE WHEN i.group_key <> '' THEN i.group_key ELSE '#' || i.id END AND h.hidden_at >= p.updated_at)
 		UNION ALL
 		SELECT 'episode', e.id, e.title, i.id, i.display_title, e.season, e.number, i.year, p.position, p.duration, p.updated_at,
 			i.id, i.image <> ''
@@ -200,6 +218,8 @@ func (s *Store) Continue(ctx context.Context, profileID int64, noAdult bool, lim
 				JOIN item i2 ON i2.id = e2.series_item_id
 				WHERE p2.profile_id = p.profile_id AND p2.media = 'episode'
 					AND (e2.series_item_id = e.series_item_id OR (i.group_key <> '' AND i2.group_key = i.group_key)))
+			AND NOT EXISTS (SELECT 1 FROM continue_hidden h WHERE h.profile_id = p.profile_id AND h.title_key = i.kind || ':' ||
+				CASE WHEN i.group_key <> '' THEN i.group_key ELSE '#' || i.id END AND h.hidden_at >= p.updated_at)
 		ORDER BY 11 DESC LIMIT ?`, profileID, noAdult, profileID, noAdult, limit)
 	if err != nil {
 		return nil, err
@@ -259,6 +279,8 @@ func (s *Store) nextEpisodes(ctx context.Context, profileID int64, noAdult bool)
 			AND p.updated_at = (SELECT max(p2.updated_at) FROM progress p2 JOIN episode e2 ON e2.id = p2.media_id
 				WHERE p2.profile_id = p.profile_id AND p2.media = 'episode' AND e2.series_item_id = e.series_item_id)
 			AND NOT EXISTS (SELECT 1 FROM progress q WHERE q.profile_id = p.profile_id AND q.media = 'episode' AND q.media_id = n.id AND q.completed = 1)
+			AND NOT EXISTS (SELECT 1 FROM continue_hidden h WHERE h.profile_id = p.profile_id AND h.title_key = i.kind || ':' ||
+				CASE WHEN i.group_key <> '' THEN i.group_key ELSE '#' || i.id END AND h.hidden_at >= p.updated_at)
 		ORDER BY p.updated_at DESC LIMIT 20`, profileID, noAdult)
 	if err != nil {
 		return nil, err

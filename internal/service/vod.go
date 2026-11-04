@@ -160,6 +160,12 @@ func (s *Service) Continue(ctx context.Context) ([]store.ContinueEntry, error) {
 	return list, err
 }
 
+// HideContinue takes a film or a series off the viewer's "continue
+// watching" until they watch it again.
+func (s *Service) HideContinue(ctx context.Context, itemID int64) error {
+	return s.st.HideContinue(ctx, viewerOf(ctx).ProfileID, itemID)
+}
+
 // ---- Playback sessions ----
 
 // A playback session covers one film or episode being watched by one

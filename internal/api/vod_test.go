@@ -547,3 +547,42 @@ func TestStopAndDeleteRecordingInProgress(t *testing.T) {
 		t.Fatalf("files after delete: %v", files)
 	}
 }
+
+// A film or a series can be taken off "continue watching" (the position
+// stays); watching it again brings it back.
+func TestHideFromContinue(t *testing.T) {
+	e, _ := tvSetup(t)
+	film := strconv.FormatInt(findItem(t, e, "movie", "1408"), 10)
+	series := findItem(t, e, "series", "twin")
+	_, body := e.do(t, "GET", "/api/v1/series/"+strconv.FormatInt(series, 10)+"/episodes", nil, true)
+	var eps []struct{ ID int64 }
+	json.Unmarshal(body, &eps)
+	ep := strconv.FormatInt(eps[1].ID, 10)
+	e.do(t, "PUT", "/api/v1/progress/movie/"+film, map[string]int{"position": 600, "duration": 6000}, true)
+	e.do(t, "PUT", "/api/v1/progress/episode/"+ep, map[string]int{"position": 2790, "duration": 2800}, true) // finished: next episode
+	_, body = e.do(t, "GET", "/api/v1/continue", nil, true)
+	if !strings.Contains(string(body), `"title":"1408"`) || !strings.Contains(string(body), "Twin Peaks") {
+		t.Fatalf("continue: %s", body)
+	}
+	time.Sleep(1100 * time.Millisecond) // positions are kept by the second
+	for _, id := range []string{film, strconv.FormatInt(series, 10)} {
+		if code, body := e.do(t, "DELETE", "/api/v1/continue/"+id, nil, true); code != 204 {
+			t.Fatalf("hide %s: %d %s", id, code, body)
+		}
+	}
+	if _, body := e.do(t, "GET", "/api/v1/continue", nil, true); strings.TrimSpace(string(body)) != "[]" {
+		t.Fatalf("after hiding: %s", body)
+	}
+	// The position is still there for "resume".
+	if _, body := e.do(t, "GET", "/api/v1/progress/movie/"+film, nil, true); !strings.Contains(string(body), `"position":600`) {
+		t.Fatalf("progress kept: %s", body)
+	}
+	if code, _ := e.do(t, "DELETE", "/api/v1/continue/999999", nil, true); code != 404 {
+		t.Fatalf("unknown title: %d", code)
+	}
+	time.Sleep(1100 * time.Millisecond)
+	e.do(t, "PUT", "/api/v1/progress/movie/"+film, map[string]int{"position": 700, "duration": 6000}, true)
+	if _, body := e.do(t, "GET", "/api/v1/continue", nil, true); !strings.Contains(string(body), `"title":"1408"`) || strings.Contains(string(body), "Twin Peaks") {
+		t.Fatalf("watched again: %s", body)
+	}
+}

@@ -294,7 +294,7 @@ func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub fu
 	}
 	defer tx.Rollback()
 	for _, q := range []string{
-		`DELETE FROM progress`, `DELETE FROM favorite`, `DELETE FROM recording`, `DELETE FROM setting`,
+		`DELETE FROM progress`, `DELETE FROM continue_hidden`, `DELETE FROM favorite`, `DELETE FROM recording`, `DELETE FROM setting`,
 		`DELETE FROM epg_programme`, `DELETE FROM epg_channel`, `DELETE FROM guide_source`, `DELETE FROM recording_rule`,
 		`DELETE FROM subscription`, `DELETE FROM vpn`, // cascades to the catalog
 	} {

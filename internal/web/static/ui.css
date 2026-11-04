@@ -239,6 +239,23 @@ a.chip { text-decoration: none; }
 /* The title on a card without a picture: a few lines, never out of it. */
 .poster-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden; }
 .card.wide { flex-basis: clamp(15rem, 20vw, 24rem); }
+/* A card with a small × on it ("continue watching"): the × shows on
+   hover and focus, always on touch screens. */
+.card-wrap { position: relative; display: flex; flex: 0 0 clamp(8.5rem, 11vw, 13rem); }
+.card-wrap.wide { flex-basis: clamp(15rem, 20vw, 24rem); }
+.card-wrap > .card { flex: 1 1 auto; min-width: 0; }
+.card-x {
+  position: absolute; top: 0.45rem; right: 0.45rem; z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  width: 2.1rem; height: 2.1rem; padding: 0;
+  color: #fff; background: rgba(0, 0, 0, 0.65); border: 0; border-radius: 50%;
+  cursor: pointer; opacity: 0; transition: opacity 0.15s;
+}
+.card-x .lbl { display: none; }
+.card-x svg { width: 1.15rem; height: 1.15rem; }
+.card-wrap:hover .card-x, .card-wrap:focus-within .card-x { opacity: 1; }
+.card-x:focus { opacity: 1; outline: none; color: #0b0c10; background: var(--focus); box-shadow: 0 0 0 3px var(--accent); }
+@media (hover: none) { .card-x { opacity: 1; } }
 /* webOS 22 (Chromium 87) has no aspect-ratio: posters without a picture
    would collapse to a strip. At least the height of a row's card. */
 @supports not (aspect-ratio: 2 / 3) {

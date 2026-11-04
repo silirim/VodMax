@@ -102,7 +102,7 @@ func (s *Store) DeleteProfile(ctx context.Context, id int64) error {
 		return err
 	}
 	defer tx.Rollback()
-	for _, q := range []string{`DELETE FROM favorite WHERE profile_id = ?`, `DELETE FROM progress WHERE profile_id = ?`} {
+	for _, q := range []string{`DELETE FROM favorite WHERE profile_id = ?`, `DELETE FROM progress WHERE profile_id = ?`, `DELETE FROM continue_hidden WHERE profile_id = ?`} {
 		if _, err := tx.ExecContext(ctx, q, id); err != nil {
 			return err
 		}

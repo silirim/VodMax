@@ -394,6 +394,14 @@ var migrations = []string{
 		people     TEXT NOT NULL,      -- folded names between " , "; '' when the page had none
 		checked_at INTEGER NOT NULL
 	)`,
+	// 20: titles a profile took off "continue watching"; watching them
+	// again (a newer progress) brings them back.
+	`CREATE TABLE continue_hidden (
+		profile_id INTEGER NOT NULL,
+		title_key  TEXT NOT NULL,      -- kind:group_key, or kind:#id for a title without one
+		hidden_at  INTEGER NOT NULL,
+		PRIMARY KEY (profile_id, title_key)
+	)`,
 }
 
 // noForeignKeys lists migrations (1-based) that rebuild a parent table:

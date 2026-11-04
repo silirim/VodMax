@@ -140,6 +140,7 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	route("PUT /api/v1/progress/{media}/{id}", levelViewer, a.putProgress)
 	route("GET /api/v1/progress/{media}/{id}", levelViewer, a.getProgress)
 	route("GET /api/v1/continue", levelViewer, a.continueWatching)
+	route("DELETE /api/v1/continue/{id}", levelViewer, a.hideContinue)
 	route("POST /api/v1/vod/{media}/{id}/session", levelViewer, a.vodSession)
 	route("GET /api/v1/recordings", levelViewer, a.recordings)
 	route("POST /api/v1/recordings", levelMember, a.addRecording)
@@ -1013,6 +1014,18 @@ func (a *api) putProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, p)
+}
+
+func (a *api) hideContinue(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err == nil {
+		err = a.svc.HideContinue(r.Context(), id)
+	}
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *api) continueWatching(w http.ResponseWriter, r *http.Request) {
