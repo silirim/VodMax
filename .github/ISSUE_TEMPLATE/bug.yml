@@ -1,0 +1,50 @@
+name: Bug / Problema
+description: Something does not work as it should. / Qualcosa non funziona come dovrebbe.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        VodMax does not provide content: issues asking for playlists, channels or providers are closed without an answer. Never paste playlist addresses, user names, passwords or tokens.
+        VodMax non fornisce contenuti: le issue che chiedono playlist, canali o provider vengono chiuse senza risposta. Non incollare mai indirizzi di playlist, nomi utente, password o token.
+  - type: input
+    id: version
+    attributes:
+      label: Version / Versione
+      description: Settings → System → Version and updates; Android app version in the same page. / Impostazioni → Sistema → Versione e aggiornamenti.
+      placeholder: 0.6.4
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where / Dove
+      multiple: true
+      options:
+        - Server (Linux)
+        - Server (Docker)
+        - Browser
+        - Android phone or tablet / telefono o tablet Android
+        - Android TV / Fire TV
+        - LG webOS
+        - Other / Altro
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and system / Dispositivo e sistema
+      placeholder: e.g. Raspberry Pi 5 with Debian 13, Docker 27; Chromecast with Google TV; LG C2 (webOS 22)
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens / Cosa succede
+      description: What you did, what you expected, what happened instead. / Cosa hai fatto, cosa ti aspettavi, cosa è successo.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log
+      description: "Server: `journalctl -u vodmax -n 100` or `docker logs vodmax --tail 100`. Remove addresses and names of your provider. / Togli indirizzi e nomi del provider."
+      render: text
