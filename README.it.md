@@ -157,6 +157,25 @@ Dai sorgenti: [docs/sviluppo.md](docs/sviluppo.md) e `scripts/release.sh`.
 5. **Impostazioni → Dispositivi**: abbina TV e telefoni con il codice che
    mostrano.
 
+## Come è fatto VodMax
+
+VodMax è scritto con un assistente di programmazione basato su AI, Claude
+Code di Anthropic. Ogni commit lo dice (`Co-Authored-By: Claude`) e
+[AGENTS.md](AGENTS.md) contiene le regole con cui lavora. Una persona decide
+cosa fa VodMax e come si comporta (ogni scelta è una
+[scheda di decisione](docs/decisioni/README.md) scritta e approvata
+dall'autore), lo prova a casa e decide cosa pubblicare.
+
+Cosa tiene il codice sotto controllo:
+
+- circa 7.500 righe di test Go, eseguiti con il controllo delle race a ogni
+  modifica, con `gofmt`, `go vet` e una ricerca di segreti (gitleaks) nella CI;
+- le modifiche all'interfaccia provate in un browser vero a misura di TV e di
+  telefono, con i tasti del telecomando;
+- il traffico verso i provider passa da un solo client (e dalla VPN quando
+  richiesta), credenziali cifrate, nessun dato reale nel repository;
+- vulnerabilità segnalate in privato ([SECURITY.md](SECURITY.md)).
+
 ## Documentazione
 
 - [Decisioni di progetto](docs/decisioni/README.md): una scheda per ogni

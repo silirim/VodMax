@@ -159,6 +159,24 @@ Build from source: [docs/sviluppo.md](docs/sviluppo.md) and
 4. **Settings → Collections**: add a folder of movies or series.
 5. **Settings → Devices**: pair TVs and phones with the code they show.
 
+## How VodMax is built
+
+VodMax is written with an AI coding assistant, Claude Code by Anthropic.
+Every commit says so (`Co-Authored-By: Claude`), and [AGENTS.md](AGENTS.md)
+holds the rules it works by. A person decides what VodMax does and how it
+behaves — each choice is a written [decision record](docs/decisioni/README.md)
+approved by the author — tries it at home and decides what gets released.
+
+What keeps the code in check:
+
+- about 7,500 lines of Go tests, run with the race detector on every change,
+  with `gofmt`, `go vet` and a secret scan (gitleaks) in CI;
+- interface changes checked in a real browser at TV and phone sizes, with
+  the remote's keys;
+- provider traffic only through one client (and the VPN when required),
+  credentials encrypted at rest, no real data in the repository;
+- vulnerabilities reported privately ([SECURITY.md](SECURITY.md)).
+
 ## Documentation
 
 - [Design decisions](docs/decisioni/README.md) (Italian): one page per choice,
