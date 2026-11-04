@@ -72,6 +72,17 @@ decoder with the remote.
 | **LG webOS** | TV app (webOS 22+ recommended) |
 | **Linux server** | x86-64, ARM64 (Raspberry Pi 4/5), ARMv7; one binary, SQLite |
 
+## Status
+
+VodMax is young: the first commit is from 29 October 2026, and one person
+works on it. It runs every day at the author's home — a Linux server with an
+Xtream Codes playlist behind a VPN, watched from the browser, an Android
+phone and an LG webOS TV — and every release passes the automated tests.
+
+Not tried on real devices yet: Android TV and Fire TV boxes, Raspberry Pi
+and other ARM servers, the Unraid template. They are built and should work;
+reports are very welcome (open an issue with the device and the version).
+
 ## Screenshots
 
 | | |

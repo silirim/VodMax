@@ -72,6 +72,18 @@ telecomando.
 | **LG webOS** | App per TV (consigliato webOS 22 o successivo) |
 | **Server Linux** | x86-64, ARM64 (Raspberry Pi 4/5), ARMv7; un solo programma, SQLite |
 
+## Stato
+
+VodMax è giovane: il primo commit è del 29 ottobre 2026 e ci lavora una
+persona. Gira ogni giorno a casa dell'autore (un server Linux con una
+playlist Xtream Codes dietro una VPN, guardato dal browser, da un telefono
+Android e da una TV LG webOS) e ogni versione passa i test automatici.
+
+Non ancora provati su dispositivi veri: box Android TV e Fire TV, Raspberry
+Pi e altri server ARM, il template Unraid. Sono compilati e dovrebbero
+funzionare; le segnalazioni sono benvenute (apri una issue con dispositivo e
+versione).
+
 ## Schermate
 
 | | |
