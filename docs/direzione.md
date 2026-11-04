@@ -5,7 +5,7 @@ pensato e dove sta andando. Le scelte puntuali, con alternative e motivi,
 sono nelle [decisioni](decisioni/README.md); le istruzioni per chi ci
 lavora in [AGENTS.md](../AGENTS.md).
 
-*Aggiornato al 3 novembre 2026 (0.6.0 stabile).*
+*Aggiornato al 4 novembre 2026 (0.6.3).*
 
 ## In una frase
 
@@ -76,8 +76,10 @@ uno, la proposta cambia.
 - **Altre app** ([0028](decisioni/0028-uscita-verso-altre-app.md)): Plex,
   Jellyfin ed Emby vedono VodMax come un sintonizzatore HDHomeRun; TiviMate,
   Kodi e VLC usano la playlist M3U e la guida XMLTV del server.
-- **Fuori casa**: tramite la VPN di casa (WireGuard, Tailscale…). VodMax non
-  apre porte su internet.
+- **Fuori casa**: tramite la VPN di casa (WireGuard, Tailscale…), oppure
+  dietro un tunnel o un reverse proxy con login, anche dall'app Android
+  ([0040](decisioni/0040-fuori-casa-dietro-un-login.md)). VodMax non apre
+  porte su internet.
 
 ### In famiglia
 

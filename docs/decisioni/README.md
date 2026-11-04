@@ -45,6 +45,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0037](0037-picture-in-picture.md) | Finestra piccola sull'app Android (picture in picture) | **Proposta** |
 | [0038](0038-registra-solo-quella-volta.md) | Assistente: registrare solo quella volta | **Approvata** |
 | [0039](0039-vpn-facoltativa.md) | VPN facoltativa, "solo tramite VPN" come scelta | **Approvata** |
+| [0040](0040-fuori-casa-dietro-un-login.md) | Fuori casa dietro un login (tunnel o reverse proxy) | **Approvata** |
 
 ## Ordine consigliato per decidere
 

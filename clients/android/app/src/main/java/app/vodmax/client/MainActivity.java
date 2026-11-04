@@ -15,6 +15,7 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
+import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -58,6 +59,9 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> picking;
     private byte[] saving;
     private boolean signingIn;
+    // The sign-in is the one of a proxy in front of the server: Back there
+    // cannot go back to the server (it would send us to the login again).
+    private boolean proxyLogin;
     // Live TV plays in the page: the page says when (Bridge.pip) and the
     // whole activity becomes the small window.
     private boolean pipAvailable, pipPlaying;
@@ -230,6 +234,14 @@ public class MainActivity extends Activity {
                 if (u.toString().startsWith(server + "/") || u.toString().equals(server)) {
                     if (!u.getPath().startsWith("/auth/sso/")) endSignIn();
                     return false;
+                }
+                // A login in front of the server (Cloudflare Access, Authelia…)
+                // redirects to its own site: it stays in the app, so its cookie
+                // ends up where the interface runs, until it sends us back.
+                if (request.isForMainFrame() && request.isRedirect() && !signingIn) {
+                    signingIn = true;
+                    proxyLogin = true;
+                    web.removeJavascriptInterface("VodMaxNative");
                 }
                 if (signingIn) return false;
                 // Trailers and other sites open outside the app.
@@ -426,6 +438,7 @@ public class MainActivity extends Activity {
     private void endSignIn() {
         if (!signingIn) return;
         signingIn = false;
+        proxyLogin = false;
         web.addJavascriptInterface(new Bridge(), "VodMaxNative");
     }
 
@@ -477,9 +490,13 @@ public class MainActivity extends Activity {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK && web != null && signingIn) {
-            // Back on the account's site: the sign-in is given up.
+            // Back on the account's site: the sign-in is given up. On the
+            // login of a proxy, the server is out of reach without it: back
+            // to the first screen, where another address can be given.
+            boolean proxy = proxyLogin;
             endSignIn();
-            web.loadUrl(server + "/");
+            if (proxy) showSetup(null);
+            else web.loadUrl(server + "/");
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_BACK && web != null) {
@@ -500,6 +517,13 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             if (!LocalServer.ours()) runOnUiThread(this::openLocal);
         }).start();
+    }
+
+    // The login cookie of a proxy in front of the server must survive the app being closed.
+    @Override
+    protected void onPause() {
+        super.onPause();
+        CookieManager.getInstance().flush();
     }
 
     @Override

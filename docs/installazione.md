@@ -45,6 +45,12 @@ vodmax-server -version
 - **Porta**: l'interfaccia è su `http://<server>:8095`; si cambia in
   `vodmax.service` (`-listen`). Tienila dentro la rete di casa; da fuori usa
   una tua VPN (WireGuard, Tailscale…) invece di aprire la porta.
+  Se lo pubblichi con un tunnel o un reverse proxy con login davanti
+  (Cloudflare Access, Authelia, Authentik…), lascia senza login solo
+  `/stream`, `/out`, `/api/v1/progress` e `/api/v1/health`: li chiamano il
+  player dell'app Android e le altre app, e VodMax li protegge già con
+  biglietti, chiave o token del dispositivo. Il login si fa dentro l'app,
+  una volta.
 - **Dati**: tutto in `/var/lib/vodmax` (database, chiave di cifratura,
   token di amministrazione, registrazioni, download, backup). I download
   possono andare su un altro disco con `-downloads /percorso` in
