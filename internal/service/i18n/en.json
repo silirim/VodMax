@@ -261,5 +261,7 @@
   "“%s” su %s": "“%s” on %s",
   "l'abbonamento non ha una VPN e i provider si contattano solo tramite VPN: scegline una nell'abbonamento oppure cambia l'impostazione in Impostazioni → VPN": "the subscription has no VPN and providers are contacted only through a VPN: choose one in the subscription or change the setting in Settings → VPN",
   "scegli una VPN: i provider si contattano solo tramite VPN (Impostazioni → VPN)": "choose a VPN: providers are contacted only through a VPN (Settings → VPN)",
-  "la VPN scelta non esiste": "the chosen VPN does not exist"
+  "la VPN scelta non esiste": "the chosen VPN does not exist",
+  "fermata prima della fine": "stopped before the end",
+  "la registrazione non è in corso": "the recording is not in progress"
 }

@@ -144,6 +144,7 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	route("GET /api/v1/recordings", levelViewer, a.recordings)
 	route("POST /api/v1/recordings", levelMember, a.addRecording)
 	route("DELETE /api/v1/recordings/{id}", levelMember, a.deleteRecording)
+	route("POST /api/v1/recordings/{id}/stop", levelMember, a.stopRecording)
 	route("POST /api/v1/recordings/{id}/ticket", levelViewer, a.recordingTicket)
 	route("PUT /api/v1/recordings/{id}/protected", levelMember, a.protectRecording)
 	route("GET /api/v1/recordings/space", levelViewer, a.recordingSpace)
@@ -1118,6 +1119,18 @@ func (a *api) deleteRecording(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err == nil {
 		err = a.svc.DeleteRecording(r.Context(), id)
+	}
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *api) stopRecording(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err == nil {
+		err = a.svc.StopRecording(r.Context(), id)
 	}
 	if err != nil {
 		a.fail(w, r, err)

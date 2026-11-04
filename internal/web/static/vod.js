@@ -473,7 +473,7 @@
     else {
       parts.push(el("p", { className: "empty" }, t("OK guarda · Giallo (P) protegge dalla cancellazione automatica · Rosso (Canc) elimina")));
       parts.push(el("ol", { className: "recs" }, ...list.map((r) => {
-        const b = el("button", { className: "focusable" },
+        const b = el("button", { className: "rec focusable" },
           el("span", {}, day(r.start) + " " + hhmm(r.start)),
           el("span", {}, el("strong", {}, r.title), " · " + r.channel, r.rule_id ? el("small", { className: "tag" }, " " + t("regola")) : null),
           el("span", { className: "state " + r.status }, (r.protected ? "🔒 " : "") + (recState[r.status] || r.status)),
@@ -481,8 +481,23 @@
         b.onclick = () => r.status === "scheduled" ? flash(t("Non ancora iniziata")) : playRecording(r);
         b.dataset.recording = r.id;
         b.dataset.protected = r.protected ? "1" : "";
+        b.dataset.status = r.status;
         b.title = r.error || "";
-        return el("li", {}, b);
+        // Visible actions, for touch and mouse too (the keys stay).
+        const actions = [];
+        if (!kids && r.status === "recording") {
+          const stop = el("button", { className: "focusable small" });
+          window.VodMax.label(stop, null, t("Ferma"));
+          stop.onclick = () => stopRecording(r.id);
+          actions.push(stop);
+        }
+        if (!kids) {
+          const del = el("button", { className: "focusable small danger" });
+          window.VodMax.label(del, r.status === "scheduled" ? "x" : "trash", r.status === "scheduled" ? t("Annulla") : t("Elimina"));
+          del.onclick = () => deleteRecording(r.id, r.status);
+          actions.push(del);
+        }
+        return el("li", {}, b, actions.length ? el("div", { className: "rec-actions" }, ...actions) : null);
       })));
     }
     if (!kids) parts.push(...await rulesSection());
@@ -760,9 +775,19 @@
     return form;
   }
 
-  async function deleteRecording(id) {
-    if (!confirm(t("Eliminare la registrazione?"))) return;
-    try { await api("DELETE", "/api/v1/recordings/" + id); flash(t("Registrazione eliminata")); render(); }
+  async function deleteRecording(id, status) {
+    const ask = status === "recording" ? t("Interrompere la registrazione ed eliminare quanto registrato finora?")
+      : status === "scheduled" ? t("Annullare la registrazione in programma?") : t("Eliminare la registrazione?");
+    if (!confirm(ask)) return;
+    try { await api("DELETE", "/api/v1/recordings/" + id); flash(status === "scheduled" ? t("Registrazione annullata") : t("Registrazione eliminata")); render(); }
+    catch (e) { flash(e.message); }
+  }
+
+  // Ends a recording in progress now; what has been recorded stays.
+  async function stopRecording(id) {
+    if (!confirm(t("Fermare la registrazione? Quanto registrato finora resta da guardare."))) return;
+    flash(t("Fermo la registrazione…"));
+    try { await api("POST", "/api/v1/recordings/" + id + "/stop"); flash(t("Registrazione fermata")); render(); }
     catch (e) { flash(e.message); }
   }
 
@@ -1727,7 +1752,7 @@
       return;
     }
     if ((key === "Red" || key === "Delete") && document.activeElement && document.activeElement.dataset.recording) {
-      deleteRecording(document.activeElement.dataset.recording);
+      deleteRecording(document.activeElement.dataset.recording, document.activeElement.dataset.status);
       e.preventDefault();
     }
   });

@@ -38,6 +38,7 @@ type activeRec struct {
 	mu     sync.Mutex
 	bytes  int64
 	began  time.Time // when the file started: with the size, how many bytes a second
+	early  bool      // stopped by a person before the end: what is there is kept
 }
 
 type recorderState struct {
@@ -223,7 +224,12 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 			}
 		default:
 			final.Status = "completed"
-			if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			a.mu.Lock()
+			early := a.early
+			a.mu.Unlock()
+			if early {
+				final.Error = "fermata prima della fine"
+			} else if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 				final.Error = "registrazione parziale: " + err.Error()
 			} else if resumed {
 				final.Error = "registrazione parziale: interrotta da un riavvio del server"
@@ -518,6 +524,26 @@ func (s *Service) Recordings(ctx context.Context) ([]store.Recording, error) {
 	}
 	s.rec.mu.Unlock()
 	return list, err
+}
+
+// StopRecording ends a running recording now and keeps what it has
+// recorded, as a finished recording.
+func (s *Service) StopRecording(ctx context.Context, id int64) error {
+	s.rec.mu.Lock()
+	a := s.rec.running[id]
+	s.rec.mu.Unlock()
+	if a == nil {
+		return invalid("la registrazione non è in corso")
+	}
+	a.mu.Lock()
+	a.early = true
+	a.mu.Unlock()
+	a.cancel()
+	select {
+	case <-a.done: // closed, converted and saved
+	case <-ctx.Done():
+	}
+	return nil
 }
 
 // DeleteRecording cancels a scheduled or running recording, or deletes a

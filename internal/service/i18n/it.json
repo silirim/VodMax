@@ -261,5 +261,7 @@
   "“%s” su %s": "“%s” su %s",
   "l'abbonamento non ha una VPN e i provider si contattano solo tramite VPN: scegline una nell'abbonamento oppure cambia l'impostazione in Impostazioni → VPN": "l'abbonamento non ha una VPN e i provider si contattano solo tramite VPN: scegline una nell'abbonamento oppure cambia l'impostazione in Impostazioni → VPN",
   "scegli una VPN: i provider si contattano solo tramite VPN (Impostazioni → VPN)": "scegli una VPN: i provider si contattano solo tramite VPN (Impostazioni → VPN)",
-  "la VPN scelta non esiste": "la VPN scelta non esiste"
+  "la VPN scelta non esiste": "la VPN scelta non esiste",
+  "fermata prima della fine": "fermata prima della fine",
+  "la registrazione non è in corso": "la registrazione non è in corso"
 }

@@ -494,3 +494,56 @@ func TestRecordingKeepsTheNoteOfAGap(t *testing.T) {
 		t.Fatalf("recording with a gap: %s", body)
 	}
 }
+
+// Stopping a recording in progress keeps what it has recorded; deleting
+// one in progress removes it and its file.
+func TestStopAndDeleteRecordingInProgress(t *testing.T) {
+	e, _ := tvSetup(t)
+	tv := channels(t, e, "?section=tv")
+	now := time.Now().Unix()
+	code, body := e.do(t, "POST", "/api/v1/recordings",
+		map[string]any{"channel_id": tv[0].ID, "start": now, "stop": now + 600, "title": "Lunga"}, true)
+	if code != 201 {
+		t.Fatalf("schedule: %d %s", code, body)
+	}
+	var rec struct{ ID int64 }
+	json.Unmarshal(body, &rec)
+	id := strconv.FormatInt(rec.ID, 10)
+	time.Sleep(1500 * time.Millisecond)
+	if code, body := e.do(t, "POST", "/api/v1/recordings/"+id+"/stop", nil, true); code != 204 {
+		t.Fatalf("stop: %d %s", code, body)
+	}
+	_, body = e.do(t, "GET", "/api/v1/recordings", nil, true)
+	var list []struct {
+		ID     int64
+		Status string
+		Bytes  int64
+		Error  string
+	}
+	json.Unmarshal(body, &list)
+	if len(list) != 1 || list[0].Status != "completed" || list[0].Bytes == 0 || !strings.Contains(list[0].Error, "prima della fine") {
+		t.Fatalf("stopped: %s", body)
+	}
+	if code, _ := e.do(t, "POST", "/api/v1/recordings/"+id+"/stop", nil, true); code != 400 {
+		t.Fatalf("stop of a finished recording: %d", code)
+	}
+	if files, _ := os.ReadDir(e.recordings); len(files) != 1 {
+		t.Fatalf("files after stop: %v", files)
+	}
+
+	// Another one, deleted while it records.
+	_, body = e.do(t, "POST", "/api/v1/recordings",
+		map[string]any{"channel_id": tv[0].ID, "start": now + 2, "stop": now + 600, "title": "Da togliere"}, true)
+	json.Unmarshal(body, &rec)
+	time.Sleep(2500 * time.Millisecond)
+	if code, body := e.do(t, "DELETE", "/api/v1/recordings/"+strconv.FormatInt(rec.ID, 10), nil, true); code != 204 {
+		t.Fatalf("delete in progress: %d %s", code, body)
+	}
+	_, body = e.do(t, "GET", "/api/v1/recordings", nil, true)
+	if strings.Contains(string(body), "Da togliere") {
+		t.Fatalf("deleted recording still listed: %s", body)
+	}
+	if files, _ := os.ReadDir(e.recordings); len(files) != 1 {
+		t.Fatalf("files after delete: %v", files)
+	}
+}

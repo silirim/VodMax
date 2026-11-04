@@ -68,7 +68,8 @@ di accesso di ognuna, è in `internal/api/api.go`.
 | `GET /api/v1/continue` | Continua a guardare |
 | `POST /api/v1/vod/{movie\|episode}/{id}/session` `{viewer, mode?}` | Sessione di riproduzione: `direct` (MP4, intervalli) o `remux` (ffmpeg, `?t=` secondi) |
 | `GET` · `POST /api/v1/recordings` | Registrazioni; `{channel_id}` registra il programma in onda, oppure `start`/`stop` esatti |
-| `DELETE /api/v1/recordings/{id}` · `POST …/{id}/ticket` | Annulla o elimina; permesso di visione |
+| `DELETE /api/v1/recordings/{id}` · `POST …/{id}/ticket` | Annulla o elimina; permesso di visione (`recorded`: secondi già registrati, se in corso) |
+| `POST /api/v1/recordings/{id}/stop` | Ferma una registrazione in corso tenendo quanto registrato |
 | `GET /img/logo/{id}?s=firma` | Logo del canale scaricato tramite VPN e in cache (indirizzo firmato, fornito dall'elenco dei canali) |
 | `GET` · `PUT /api/v1/settings/assistant` | Assistente: modo (`local`, `online`, `server`), modello, chiave; stato dell'integrato e dell'indice delle persone |
 | `POST /api/v1/settings/assistant/local` `{model}` · `…/local/cancel` · `DELETE …/local` | Installa, annulla o rimuove l'assistente integrato |
