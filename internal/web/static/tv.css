@@ -244,6 +244,31 @@ video {
 .dialog-buttons button { padding: 0.6rem 1.3rem; font: inherit; color: var(--text); background: var(--raised); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
 .dialog-buttons button:first-child { color: var(--bg); background: var(--text); }
 
+body.controls-on .banner { display: none; }
+
+/* The programme on air under the controls: what has aired, what can be
+   rewound, where the picture is. */
+.timeline {
+  position: absolute; left: 50%; bottom: 4vh; transform: translateX(-50%);
+  width: min(92vw, 72rem); padding: 0.9rem 1.4rem 0.7rem;
+  font-size: clamp(0.9rem, 1.2vw, 1.2rem);
+  background: rgba(19, 21, 27, 0.92); border: 1px solid var(--line); border-radius: 16px;
+}
+.tl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.tl-title { min-width: 0; overflow: hidden; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.tl-state { flex: none; color: var(--soft); font-variant-numeric: tabular-nums; }
+.tl-state.behind { color: var(--accent); }
+.tl-bar { position: relative; padding: 0.7rem 0; cursor: pointer; touch-action: none; }
+.tl-track { position: relative; height: 6px; background: var(--raised); border-radius: 3px; }
+.tl-bar:hover .tl-track { height: 9px; margin-top: -1.5px; }
+.tl-track > div { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 3px; }
+#tl-aired { background: rgba(255, 255, 255, 0.18); }
+#tl-buffer { background: rgba(255, 255, 255, 0.32); }
+#tl-fill { background: var(--accent-grad); }
+#tl-pos { top: 50%; bottom: auto; width: 14px; height: 14px; margin: -7px 0 0 -7px; background: #fff; border-radius: 50%; box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35); }
+.tl-hover { position: absolute; bottom: 1.6rem; transform: translateX(-50%); padding: 0.15rem 0.5rem; font-size: 0.85em; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; pointer-events: none; }
+.tl-times { display: flex; justify-content: space-between; color: var(--soft); font-size: 0.85em; font-variant-numeric: tabular-nums; }
+
 /* Touch screens: controls over the whole picture, like the streaming
    apps: Menu and Channels at the top, rewind / pause / forward large in
    the middle, the other actions along the bottom. */
@@ -280,6 +305,7 @@ video {
   .controls #ctl-live .lbl { max-width: 100%; white-space: normal; text-align: center; }
   /* The channel banner would sit under the bottom row. */
   body.controls-on .banner { display: none; }
+  .timeline:not([hidden]) { bottom: calc(5.6rem + env(safe-area-inset-bottom)); width: calc(100% - 24px); padding: 0.4rem 0.6rem; background: none; border: 0; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
 }
 
 /* Channel list on touch screens: full width, scrolls, tap to watch. */

@@ -745,5 +745,8 @@
   "Fermo la registrazione…": "Fermo la registrazione…",
   "Registrazione fermata": "Registrazione fermata",
   "Togli da Continua a guardare": "Togli da Continua a guardare",
-  "Tolto da Continua a guardare": "Tolto da Continua a guardare"
+  "Tolto da Continua a guardare": "Tolto da Continua a guardare",
+  "Posizione nel programma": "Posizione nel programma",
+  "−{time} dalla diretta": "−{time} dalla diretta",
+  "Questo punto non è più nel buffer e il canale non ha l'archivio del provider": "Questo punto non è più nel buffer e il canale non ha l'archivio del provider"
 }

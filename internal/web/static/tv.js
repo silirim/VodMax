@@ -410,6 +410,7 @@
     VodMax.label(fav, "star", c && c.favorite ? t("Preferito") + " ✓" : t("Preferito"));
     ctl.hidden = false;
     document.body.classList.add("controls-on");
+    updateTimeline();
     clearTimeout(state.timers.controls);
     // They stay on screen only while the viewer has paused (the way back
     // to playing); a video still loading counts as playing.
@@ -426,6 +427,7 @@
   function hideControls() {
     clearTimeout(state.timers.controls);
     $("controls").hidden = true;
+    $("timeline").hidden = true;
     document.body.classList.remove("controls-on");
   }
 
@@ -457,8 +459,81 @@
     else if ($("controls").hidden) showControls();
     else hideControls();
   });
+  // ---- Timeline: the programme on air, from its start to its end ----
+  // Where the picture is (wall clock), how far back the buffer goes, how
+  // much has aired. A click moves there: in the buffer, or from the
+  // provider's archive before it, or back to live after it.
+  function timelineState() {
+    const c = state.current, p = c && c.now, player = state.player;
+    const now = Date.now() / 1000;
+    if (!p || p.stop <= now || p.stop <= p.start) return null;
+    const behind = player ? player.behind() : 0;
+    const clock = player && player.clockTime && player.clockTime();
+    const at = clock ? Math.min(now, clock.getTime() / 1000) : now - behind;
+    let back = 0;
+    if (player && player.back) back = player.back();
+    else {
+      const v = $("video"), b = v.buffered;
+      if (b.length) back = Math.max(0, v.currentTime - b.start(0));
+    }
+    return { c, p, now, at, behind: Math.max(0, now - at), from: at - back };
+  }
+  function updateTimeline() {
+    const tl = $("timeline"), st = timelineState();
+    if (!st || $("controls").hidden) { tl.hidden = true; return; }
+    const { p, now, at, behind, from } = st;
+    const span = p.stop - p.start;
+    const f = (t) => Math.min(100, Math.max(0, (t - p.start) / span * 100));
+    $("tl-title").textContent = p.title;
+    $("tl-start").textContent = hhmm(p.start);
+    $("tl-end").textContent = hhmm(p.stop);
+    $("tl-aired").style.width = f(now) + "%";
+    $("tl-buffer").style.left = f(from) + "%";
+    $("tl-buffer").style.width = Math.max(0, f(now) - f(from)) + "%";
+    $("tl-fill").style.width = f(at) + "%";
+    $("tl-pos").style.left = f(at) + "%";
+    const late = behind > 12;
+    $("tl-state").classList.toggle("behind", late);
+    $("tl-state").textContent = late ? t("−{time} dalla diretta", { time: VodMax.clock(behind) }) : t("In diretta");
+    tl.hidden = false;
+  }
+  {
+    const bar = $("tl-bar");
+    const timeAt = (e) => {
+      const st = timelineState();
+      if (!st) return null;
+      const r = bar.getBoundingClientRect();
+      const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      return { st, x, time: st.p.start + x * (st.p.stop - st.p.start) };
+    };
+    bar.addEventListener("pointermove", (e) => {
+      const h = timeAt(e), tip = $("tl-hover");
+      if (!h) return;
+      tip.textContent = h.time > h.st.now ? t("In diretta") : hhmm(h.time);
+      tip.style.left = h.x * 100 + "%";
+      tip.hidden = false;
+      showControls();
+    });
+    bar.addEventListener("pointerleave", () => { $("tl-hover").hidden = true; });
+    bar.addEventListener("click", (e) => {
+      const h = timeAt(e), player = state.player;
+      if (!h || !player) return;
+      const { st, time } = h;
+      if (time >= st.now - 8) player.goLive();
+      else if (player.seekToTime && player.seekToTime(time)) { /* in the buffer */ }
+      else if (time >= st.from) player.seek(time - st.at);
+      else if (st.c.catchup_days) {
+        stopPlayer();
+        location.href = "/?" + new URLSearchParams({ catchup: st.c.id, start: Math.floor(time), stop: st.p.stop, title: st.p.title, back: "/tv.html?channel=" + st.c.id });
+        return;
+      } else flash(t("Questo punto non è più nel buffer e il canale non ha l'archivio del provider"));
+      showControls();
+    });
+  }
+
   // Keep the "behind live" label current while visible.
   setInterval(() => { if (!$("controls").hidden) {
+    updateTimeline();
     const p = state.player, behind = p ? p.behind() : 0;
     $("ctl-live").classList.toggle("behind", behind > 12);
     VodMax.label($("ctl-live"), behind > 12 ? "skip-forward" : "radio", behind > 12 ? t("Torna in diretta (−{time})", { time: VodMax.clock(behind) }) : t("In diretta"));

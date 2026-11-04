@@ -47,6 +47,15 @@
     <button data-action="multiview" data-i18n data-i18n-attr="title" data-icon="layout-grid" title="Più canali insieme" class="icon-only"><span class="txt">Multiview</span></button>
   </section>
 
+  <section id="timeline" class="timeline" hidden>
+    <div class="tl-head"><span id="tl-title" class="tl-title"></span><span id="tl-state" class="tl-state"></span></div>
+    <div id="tl-bar" class="tl-bar" role="slider" aria-label="Posizione nel programma" data-i18n-attr="aria-label">
+      <div class="tl-track"><div id="tl-aired"></div><div id="tl-buffer"></div><div id="tl-fill"></div><div id="tl-pos"></div></div>
+      <span id="tl-hover" class="tl-hover" hidden></span>
+    </div>
+    <div class="tl-times"><span id="tl-start"></span><span id="tl-end"></span></div>
+  </section>
+
   <section id="list" class="list" hidden>
     <nav id="list-tabs" class="tabs"></nav>
     <ol id="list-items"></ol>
