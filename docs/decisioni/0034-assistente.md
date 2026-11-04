@@ -38,3 +38,17 @@ Stato: **Approvata** (31 ottobre 2026: "Parti dalle prime due")
   pulizia del catalogo, diagnosi dei problemi, avvisi intelligenti.
 - Un container Ollama nella rete di casa (sulla P4000): solo con un via
   libera esplicito.
+
+## Aggiornamento del 4 novembre 2026: generi nel catalogo
+
+Su richiesta dell'utente ("la AI cerca solo nei canali live o anche nei
+vod? se cerco ad esempio 'voglio vedere un film thriller' cosa mi da?",
+poi "si" alla proposta): per un genere o un'atmosfera ("un thriller",
+"qualcosa che faccia paura") **Cosa guardo stasera** cerca anche in tutto il
+catalogo, non solo fra i titoli iniziati, la propria lista e le tendenze.
+Il modello indica le parole del genere e alcuni titoli noti; VodMax cerca
+quei titoli nel catalogo e prende i titoli meglio votati delle categorie
+del provider che portano quel nome (una parola intera: "Thriller",
+"Horror"), alcuni da ognuna, diversi ogni sera. Se il provider non ha
+categorie per genere restano i titoli che il modello nomina e che il
+catalogo ha. I generi delle schede TMDB non sono ancora usati.

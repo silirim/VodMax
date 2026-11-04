@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -642,10 +643,11 @@ Answer in %s with only a JSON object: {"intro": "one short sentence", "picks": [
 // titlesPrompt turns a request ("a Brad Pitt film from 2004") into titles
 // to look for in the catalog: the catalog knows titles and years, the
 // model knows who played in what (not always right: requestFor checks).
-const titlesPrompt = `You help find films and series in a home catalog. Read the request below, correcting misspelled names (for example "catrin z jones" is Catherine Zeta-Jones), and answer with only a JSON object: {"about": "person", "person": "Catherine Zeta-Jones", "titles": [{"title": "Chicago", "year": 2002}]}.
+const titlesPrompt = `You help find films and series in a home catalog. Read the request below, correcting misspelled names (for example "catrin z jones" is Catherine Zeta-Jones), and answer with only a JSON object: {"about": "person", "person": "Catherine Zeta-Jones", "genres": [], "titles": [{"title": "Chicago", "year": 2002}]}.
 - about: "person" if it asks for an actor or a director, "title" if it names films, series or a saga, "mood" if it is only a mood, a genre or a topic.
 - person: that actor or director, with the name spelled correctly; "" otherwise.
-- titles: as many as you can, up to 10 films or series that match, only ones you are sure about (for a person: what they really acted in or directed); the original title, and the Italian title as another entry when different; the year when you are sure. For a mood, [].`
+- genres: for a mood, a genre or a topic, the film genres it means, as single words in Italian and in English (for example "un thriller" → ["thriller", "giallo", "suspense"]; "qualcosa che fa ridere" → ["commedia", "comedy"]); [] otherwise.
+- titles: as many as you can, up to 10 films or series that match, only ones you are sure about (for a person: what they really acted in or directed; for a mood or a genre: well-known ones that fit it); the original title, and the Italian title as another entry when different; the year when you are sure.`
 
 // request is what a precise request asks for, and the titles of the
 // catalog that answer it; a mood is not precise.
@@ -668,8 +670,9 @@ func (s *Service) requestFor(ctx context.Context, a AssistantSettings, wish stri
 		return req
 	}
 	var raw struct {
-		About  string `json:"about"`
-		Person string `json:"person"`
+		About  string   `json:"about"`
+		Person string   `json:"person"`
+		Genres []string `json:"genres"`
 		Titles []struct {
 			Title string `json:"title"`
 			Year  int    `json:"year"`
@@ -726,6 +729,19 @@ func (s *Service) requestFor(ctx context.Context, a AssistantSettings, wish stri
 			}
 		}
 	}
+	// A genre: the best rated titles of the provider's categories with
+	// that name ("Thriller", "Horror"), the whole catalog and not only
+	// what the model remembers.
+	if req.person == "" && raw.About == "mood" && len(raw.Genres) > 0 {
+		for _, it := range s.genreTitles(ctx, raw.Genres, wish) {
+			if seen[it.ID] || (year > 0 && it.Year != nil && (*it.Year < year-1 || *it.Year > year+1)) {
+				continue
+			}
+			add(it)
+			req.found[len(req.found)-1].extra = strings.TrimSuffix(req.found[len(req.found)-1].extra, " (matches the request)") +
+				" (genre: " + it.CategoryID + ")"
+		}
+	}
 	if req.person == "" && year == 0 || len(req.found) == 0 {
 		return req
 	}
@@ -772,6 +788,64 @@ func (s *Service) requestFor(ctx context.Context, a AssistantSettings, wish stri
 	}
 	req.found = checked
 	return req
+}
+
+// seriesRE: a request that names series (films are filmRE).
+var seriesRE = regexp.MustCompile(`\b(serie|series|telefilm)\b`)
+
+// genreTitles: titles of the provider's categories named after one of the
+// genres (a whole word: "giallo" is not "Gialloblu"), the best rated first,
+// a few from each so that more than one category is heard; films and
+// series, or only what the request names. CategoryID carries the name of
+// the category, for the model.
+func (s *Service) genreTitles(ctx context.Context, genres []string, wish string) []store.CatalogItem {
+	kinds := []string{"movie", "series"}
+	w := fold(wish)
+	if filmRE.MatchString(w) && !seriesRE.MatchString(w) {
+		kinds = kinds[:1]
+	} else if seriesRE.MatchString(w) && !filmRE.MatchString(w) {
+		kinds = kinds[1:]
+	}
+	var words []string
+	for _, g := range genres {
+		if g = fold(g); len(g) >= 3 && len(words) < 8 {
+			words = append(words, g)
+		}
+	}
+	var out []store.CatalogItem
+	seen := map[int64]bool{}
+	for _, kind := range kinds {
+		cats, err := s.BrowseCategories(ctx, kind)
+		if err != nil {
+			continue
+		}
+		matched := 0
+		for _, c := range cats {
+			name := fold(c.Name)
+			if matched >= 3 || !slices.ContainsFunc(words, func(g string) bool { return hasWord(name, g) }) {
+				continue
+			}
+			matched++
+			page, err := s.Catalog(ctx, store.Query{Kind: kind, CategoryID: c.ID, Sort: "rating", Limit: 30})
+			if err != nil {
+				continue
+			}
+			// Among the best rated, a different few each evening.
+			items := page.Items
+			rand.Shuffle(len(items), func(i, j int) { items[i], items[j] = items[j], items[i] })
+			taken := 0
+			for _, it := range items {
+				if taken >= 6 || len(out) >= 12 || seen[it.ID] {
+					continue
+				}
+				seen[it.ID] = true
+				it.CategoryID = c.Name
+				out = append(out, it)
+				taken++
+			}
+		}
+	}
+	return out
 }
 
 // hasPerson: the surname of person (every word after the first) is among

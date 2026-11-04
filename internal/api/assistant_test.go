@@ -290,6 +290,31 @@ func TestAssistant(t *testing.T) {
 		t.Fatalf("unchecked title: %d %s", code, body)
 	}
 
+	// A genre: the model gives its words; the provider's category with that
+	// name ("Horror") brings its titles, marked for the model, also ones it
+	// did not name.
+	var promptGenre string
+	m.answer = func(system, user string) string {
+		if strings.Contains(system, "home catalog") {
+			return `{"about":"mood","person":"","genres":["horror","paura"],"titles":[]}`
+		}
+		promptGenre = user
+		for _, line := range strings.Split(user, "\n") {
+			if strings.Contains(line, "Psycho") {
+				return `{"intro":"Un horror.","picks":[{"code":"` + strings.TrimSpace(strings.SplitN(line, "|", 2)[0]) + `","why":"Fa paura."}]}`
+			}
+		}
+		return `{"intro":"Niente.","picks":[]}`
+	}
+	code, body = e.do(t, "POST", "/api/v1/assistant/tonight", map[string]string{"wish": "voglio vedere un film horror"}, true)
+	tn.Picks, tn.Intro = nil, ""
+	if code != 200 || json.Unmarshal(body, &tn) != nil || len(tn.Picks) != 1 || tn.Picks[0].Title != "Psycho" {
+		t.Fatalf("a genre: %d %s\n%s", code, body, promptGenre)
+	}
+	if !strings.Contains(promptGenre, "(genre: Horror)") || !strings.Contains(promptGenre, "1408") {
+		t.Fatalf("genre titles not offered: %s", promptGenre)
+	}
+
 	// Nothing fits: a sentence, not an error.
 	m.answer = func(system, user string) string {
 		if strings.Contains(system, "home catalog") {
