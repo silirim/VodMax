@@ -200,6 +200,8 @@ body.view-system #server-problems { display: none; }
 }
 .way span { font-size: 0.84rem; color: var(--soft); }
 .way.chosen { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* One under the other: Up and Down on the remote, as a list. */
+.ways.stack { grid-template-columns: 1fr; }
 .way:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
 .box.model h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; }
 .box.model.dim { opacity: 0.6; }

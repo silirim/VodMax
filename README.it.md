@@ -40,8 +40,8 @@ telecomando.
   hai diritto di usare) e cartelle di film e serie nella stessa Home, ricerca
   e "Continua a guardare".
 - **Riservato**: il traffico verso le playlist può passare solo da una VPN
-  (quella WireGuard interna o una sul router), scelta accesa in modo
-  predefinito; credenziali cifrate; nessuna telemetria.
+  (quella WireGuard interna o una sul router), da scegliere alla prima
+  playlist; credenziali cifrate; nessuna telemetria.
 
 ## Funzioni
 
@@ -59,7 +59,7 @@ telecomando.
 | 👪 **Profili** | Avanzamenti e preferiti per persona, profili bambini, dispositivi abbinati con un codice o con l'account di casa (OpenID Connect: Authelia, Authentik, Keycloak…) |
 | ✨ **Assistente** | Facoltativo: integrato (VodMax scarica e fa girare il modello in casa), Claude e altri servizi online con una chiave API, oppure un tuo server. Scrivi una regola di registrazione con una frase, registra "solo questa volta" ("il film di stasera su Rai 1", "Feyenoord Inter"), chiedi cosa guardare stasera |
 | 🔌 **Altre app** | Plex, Jellyfin ed Emby vedono VodMax come sintonizzatore HDHomeRun; playlist M3U e guida XMLTV per TiviMate, Kodi, VLC |
-| 🔒 **VPN interna** | WireGuard dentro server e app: con *solo tramite VPN* acceso (il predefinito), senza VPN le playlist non vengono mai contattate |
+| 🔒 **VPN interna** | WireGuard dentro server e app: con *solo tramite VPN* acceso (il predefinito, scelto alla prima playlist), senza VPN le playlist non vengono mai contattate |
 | 💾 **Backup** | Backup cifrati e copie automatiche; avvisi su VPN, playlist, guida e disco |
 | 🖼️ **Schede** | Dalla playlist, dai file `.nfo` o da TMDB con una tua chiave |
 
@@ -151,13 +151,12 @@ Dai sorgenti: [docs/sviluppo.md](docs/sviluppo.md) e `scripts/release.sh`.
    trovi in `/var/lib/vodmax/admin.token` (con Docker:
    `docker exec vodmax cat /var/lib/vodmax/admin.token`). La lingua (italiano o inglese)
    segue il dispositivo e si cambia in **Impostazioni → Lingua**.
-2. **Impostazioni → VPN**: importa il file `.conf` WireGuard, oppure indica
-   una VPN che usi già sul router. Senza VPN, spegni *Contatta i provider
-   solo tramite VPN*.
-3. **Impostazioni → Abbonamenti**: aggiungi una playlist M3U o Xtream Codes,
-   poi *Sincronizza ora*.
-4. **Impostazioni → Raccolte**: aggiungi una cartella di film o di serie.
-5. **Impostazioni → Dispositivi**: abbina TV e telefoni con il codice che
+2. **Impostazioni → Abbonamenti**: la prima volta chiede come VodMax
+   raggiunge il provider: con una VPN WireGuard (incolli il `.conf`), con
+   una VPN che usi già sul router o sul dispositivo, oppure senza VPN. Poi
+   aggiungi una playlist M3U o Xtream Codes e *Sincronizza ora*.
+3. **Impostazioni → Raccolte**: aggiungi una cartella di film o di serie.
+4. **Impostazioni → Dispositivi**: abbina TV e telefoni con il codice che
    mostrano.
 
 ## Come è fatto VodMax

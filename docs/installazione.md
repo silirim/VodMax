@@ -129,13 +129,13 @@ una versione nuova.
    `sudo cat /var/lib/vodmax/admin.token`.
 2. **Impostazioni → Lingua**: italiano o inglese (per dispositivo; la stessa
    scelta è nella schermata dei profili).
-3. **Impostazioni → VPN**: in modo predefinito VodMax contatta le playlist
-   **solo tramite una VPN**. Importa il file WireGuard `.conf` del tuo
-   servizio VPN (Proton VPN, Mullvad, NordVPN…; meglio un file per ogni
-   dispositivo), oppure indica una *VPN esterna* se il server esce già da
-   una VPN sul router (in quel caso sta a te che il traffico passi davvero
-   da lì). Senza VPN, spegni *Contatta i provider solo tramite VPN*: un
-   abbonamento può allora usare la rete normale.
+3. **Impostazioni → Abbonamenti**, la prima volta: VodMax chiede come
+   raggiunge il provider. *Con una VPN WireGuard*: incolli il file `.conf`
+   del tuo servizio VPN (Proton VPN, Mullvad, NordVPN…; meglio un file per
+   ogni dispositivo). *Con la VPN che ho già*: il server esce già da una VPN
+   sul router o sul dispositivo (in quel caso sta a te che il traffico passi
+   davvero da lì). *Senza VPN*: il provider vede l'indirizzo di casa. Si
+   cambia quando vuoi in **Impostazioni → VPN**.
 4. **Impostazioni → Abbonamenti**: aggiungi una playlist M3U (il suo
    indirizzo) o un account Xtream Codes (server, utente, password), scegli
    la VPN (o *Nessuna VPN*), poi *Sincronizza ora*. Catalogo e guida si aggiornano ogni notte,
@@ -229,10 +229,11 @@ Su/Giù e OK (elenco dei canali).
 
 Nella prima schermata scegli **Usa questo dispositivo da solo**: l'app
 avvia un server VodMax tutto suo dentro il dispositivo e apre Impostazioni
-→ Abbonamenti. Aggiungi il `.conf` della VPN e la playlist come sopra.
-Limiti: niente registrazioni né pausa della diretta (sul dispositivo non c'è
-ffmpeg); film, serie e diretta funzionano. Il dispositivo contatta la
-playlist da sé, tramite la sua VPN.
+→ Abbonamenti: scegli come raggiungere il provider e aggiungi la playlist
+come sopra. Limiti: niente registrazioni né pausa della diretta (sul
+dispositivo non c'è ffmpeg); film, serie e diretta funzionano. Il
+dispositivo contatta la playlist da sé (tramite la sua VPN, se l'hai
+scelta).
 
 ### TV LG (webOS)
 

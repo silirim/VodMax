@@ -228,8 +228,34 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
         : t("Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla VPN scelta, oppure dalla rete normale se non ne ha una."))];
     for (const s of subs) parts.push(subscriptionBox(s, vpns, vpnName));
     parts.push(el("h2", {}, t("Aggiungi un abbonamento")));
-    parts.push(vpns.length ? subscriptionForm(vpns) : el("p", { className: "note" }, t("Prima aggiungi una connessione VPN (scheda VPN).")));
+    parts.push(vpns.length ? subscriptionForm(vpns) : reachChoice());
     main.replaceChildren(...parts);
+  }
+
+  // First playlist with "only through a VPN" on and no VPN yet: instead of
+  // a dead end pointing to another tab, ask once how the provider is
+  // reached (decision 0041). Each answer only uses what the VPN tab does.
+  function reachChoice() {
+    const box = el("section", { className: "box" }, el("h3", {}, t("Come raggiunge il provider, VodMax?")),
+      el("p", { className: "note" }, t("Una scelta sola, prima della prima playlist. Potrai cambiarla nella scheda VPN.")));
+    const way = (title, text, onclick) => el("button", { type: "button", className: "way focusable", onclick }, el("b", {}, title), el("span", {}, text));
+    const busy = async (job) => {
+      for (const b of box.querySelectorAll("button")) b.disabled = true;
+      try { await job(); render(); } catch (e) { flash(e.message); for (const b of box.querySelectorAll("button")) b.disabled = false; }
+    };
+    const ways = el("div", { className: "ways stack" },
+      way(t("Con una VPN WireGuard"), t("Consigliato se hai un servizio VPN (Proton, Mullvad, NordVPN…): incolli il suo file .conf e la VPN vive dentro VodMax. Se cade, il provider non viene contattato."), () => {
+        ways.replaceChildren(el("p", { className: "note" }, t("Incolla o scegli il file .conf della tua VPN, poi “Aggiungi”: subito dopo compare il modulo della playlist.")), vpnForm(null, "wireguard"),
+          el("div", { className: "buttons" }, button(t("Altre scelte"), () => render())));
+        const first = ways.querySelector("input, textarea");
+        if (first) first.focus();
+      }),
+      way(t("Con la VPN che ho già"), t("Sul router o sul dispositivo. VodMax usa la rete normale: deve essere quella rete a passare dalla VPN, e se la VPN cade VodMax non se ne accorge."),
+        () => busy(() => api("POST", "/api/v1/vpn", { name: t("VPN del router o del dispositivo"), kind: "system", config: "" }))),
+      way(t("Senza VPN"), t("Il provider vede l'indirizzo internet di casa tua, come una qualsiasi app sulla TV. Puoi aggiungere una VPN quando vuoi."),
+        () => busy(() => api("PUT", "/api/v1/settings/network", { vpn_only: false }))));
+    box.append(ways);
+    return box;
   }
 
   function subscriptionBox(s, vpns, vpnName) {
@@ -484,13 +510,13 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     return box;
   }
 
-  function vpnForm(existing) {
+  function vpnForm(existing, onlyKind) {
     const name = input({ value: existing ? existing.name : "", placeholder: t("es. Proton Italia") });
     const kind = el("select", { className: "focusable" },
       el("option", { value: "wireguard" }, t("WireGuard dentro VodMax (consigliato)")),
       el("option", { value: "system" }, t("VPN già attiva fuori da VodMax (sul dispositivo o sul router)")));
-    kind.value = existing ? existing.kind || "wireguard" : "wireguard";
-    kind.disabled = Boolean(existing);
+    kind.value = existing ? existing.kind || "wireguard" : onlyKind || "wireguard";
+    kind.disabled = Boolean(existing || onlyKind);
     const conf = el("textarea", { className: "focusable", spellcheck: false,
       placeholder: existing ? t("Incolla un nuovo .conf per sostituirlo, oppure lascia vuoto") : "[Interface]\nPrivateKey = …\nAddress = …\nDNS = …\n\n[Peer]\nPublicKey = …\nEndpoint = …" });
     const file = input({ type: "file", accept: ".conf,text/plain" });

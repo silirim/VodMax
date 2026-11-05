@@ -349,7 +349,6 @@
   "no": "no",
   "Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla sua VPN: senza VPN il provider non viene mai contattato.": "Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla sua VPN: senza VPN il provider non viene mai contattato.",
   "Aggiungi un abbonamento": "Aggiungi un abbonamento",
-  "Prima aggiungi una connessione VPN (scheda VPN).": "Prima aggiungi una connessione VPN (scheda VPN).",
   "Playlist M3U": "Playlist M3U",
   "Utente": "Utente",
   "attivo": "attivo",
@@ -748,5 +747,16 @@
   "Tolto da Continua a guardare": "Tolto da Continua a guardare",
   "Posizione nel programma": "Posizione nel programma",
   "−{time} dalla diretta": "−{time} dalla diretta",
-  "Questo punto non è più nel buffer e il canale non ha l'archivio del provider": "Questo punto non è più nel buffer e il canale non ha l'archivio del provider"
+  "Questo punto non è più nel buffer e il canale non ha l'archivio del provider": "Questo punto non è più nel buffer e il canale non ha l'archivio del provider",
+  "Come raggiunge il provider, VodMax?": "Come raggiunge il provider, VodMax?",
+  "Una scelta sola, prima della prima playlist. Potrai cambiarla nella scheda VPN.": "Una scelta sola, prima della prima playlist. Potrai cambiarla nella scheda VPN.",
+  "Con una VPN WireGuard": "Con una VPN WireGuard",
+  "Consigliato se hai un servizio VPN (Proton, Mullvad, NordVPN…): incolli il suo file .conf e la VPN vive dentro VodMax. Se cade, il provider non viene contattato.": "Consigliato se hai un servizio VPN (Proton, Mullvad, NordVPN…): incolli il suo file .conf e la VPN vive dentro VodMax. Se cade, il provider non viene contattato.",
+  "Incolla o scegli il file .conf della tua VPN, poi “Aggiungi”: subito dopo compare il modulo della playlist.": "Incolla o scegli il file .conf della tua VPN, poi “Aggiungi”: subito dopo compare il modulo della playlist.",
+  "Altre scelte": "Altre scelte",
+  "Con la VPN che ho già": "Con la VPN che ho già",
+  "Sul router o sul dispositivo. VodMax usa la rete normale: deve essere quella rete a passare dalla VPN, e se la VPN cade VodMax non se ne accorge.": "Sul router o sul dispositivo. VodMax usa la rete normale: deve essere quella rete a passare dalla VPN, e se la VPN cade VodMax non se ne accorge.",
+  "VPN del router o del dispositivo": "VPN del router o del dispositivo",
+  "Senza VPN": "Senza VPN",
+  "Il provider vede l'indirizzo internet di casa tua, come una qualsiasi app sulla TV. Puoi aggiungere una VPN quando vuoi.": "Il provider vede l'indirizzo internet di casa tua, come una qualsiasi app sulla TV. Puoi aggiungere una VPN quando vuoi."
 }
