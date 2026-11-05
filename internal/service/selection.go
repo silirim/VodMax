@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/silirim/vodmax/internal/catalog"
 	"github.com/silirim/vodmax/internal/store"
@@ -23,6 +24,9 @@ func (s *Service) loadSelection(ctx context.Context, subID int64, extra *catalog
 	}
 	if extra != nil {
 		rules[subID] = *extra
+	}
+	if err := s.withHome(ctx, rules); err != nil {
+		return nil, nil, nil, err
 	}
 	subs, err := s.st.Subscriptions(ctx)
 	if err != nil {
@@ -93,13 +97,60 @@ func (s *Service) SubscriptionStats(ctx context.Context, subID int64, rules *cat
 	return stats, nil
 }
 
-// Rules returns the selection rules of a subscription.
+// Rules returns the selection rules of a subscription, with the home
+// country chosen at the first start when the subscription has none.
 func (s *Service) Rules(ctx context.Context, subID int64) (catalog.Rules, error) {
 	raw, err := s.st.Rules(ctx, subID)
 	if err != nil {
 		return catalog.Rules{}, err
 	}
-	return catalog.ParseRules(raw)
+	r, err := catalog.ParseRules(raw)
+	if err != nil {
+		return r, err
+	}
+	if r.Home == "" {
+		r.Home, err = s.HomeCountry(ctx)
+	}
+	return r, err
+}
+
+const homeCountryKey = "home_country"
+
+// HomeCountry is the country chosen at the first start (decision 0043),
+// "" until then. A subscription's own choice in Selection wins over it.
+func (s *Service) HomeCountry(ctx context.Context) (string, error) {
+	var code string
+	err := s.st.Setting(ctx, homeCountryKey, &code)
+	return code, err
+}
+
+// SetHomeCountry stores the country chosen at the first start and applies
+// it to the subscriptions that have not chosen one of their own.
+func (s *Service) SetHomeCountry(ctx context.Context, code string) error {
+	code = strings.ToUpper(strings.TrimSpace(code))
+	if !catalog.IsHomeCountry(code) {
+		return invalid("paese non valido")
+	}
+	if err := s.st.SetSetting(ctx, homeCountryKey, code); err != nil {
+		return err
+	}
+	_, err := s.ApplySelection(ctx)
+	return err
+}
+
+// withHome gives the server's home country to rules that have none.
+func (s *Service) withHome(ctx context.Context, rules map[int64]catalog.Rules) error {
+	home, err := s.HomeCountry(ctx)
+	if err != nil || home == "" {
+		return err
+	}
+	for id, r := range rules {
+		if r.Home == "" {
+			r.Home = home
+			rules[id] = r
+		}
+	}
+	return nil
 }
 
 // SetRules validates, stores and applies new rules.

@@ -209,6 +209,57 @@ window.VodMax = (() => {
     }
   }
 
+  // ---- Countries (decisions 0042 and 0043) ----
+  // Codes from the server: ISO codes get their name in the interface
+  // language; groups of languages and regions have their own; a label
+  // VodMax does not know is shown as it is.
+  const COUNTRY_GROUPS = { INT: "Internazionale", EN: "In inglese", ARABIC: "Arabo", EXYU: "Ex Jugoslavia", LATAM: "America Latina",
+    AFRICA: "Africa", ASIA: "Asia", BENELUX: "Benelux", KU: "Curdo" };
+  let regionNames = null;
+  try { regionNames = new Intl.DisplayNames([window.VodMaxI18n.locale], { type: "region" }); } catch { /* older WebViews: codes */ }
+  function countryName(code) {
+    if (COUNTRY_GROUPS[code]) return t(COUNTRY_GROUPS[code]);
+    if (/^[A-Z]{2}$/.test(code) && regionNames) { try { return regionNames.of(code) || code; } catch { return code; } }
+    return code;
+  }
+  // The country of the device's language: "it-IT" → IT, "en-GB" → GB, "de" → DE.
+  function proposeCountry(found) {
+    const [lang, region] = (navigator.language || "it").split("-");
+    if (region && /^[A-Za-z]{2}$/.test(region)) return region.toUpperCase();
+    const byLang = { it: "IT", de: "DE", fr: "FR", es: "ES", pt: "PT", nl: "NL", pl: "PL", ro: "RO", tr: "TR", el: "GR", sq: "AL", sv: "SE", da: "DK", nb: "NO", fi: "FI" };
+    if (byLang[lang]) return byLang[lang];
+    if (lang === "en") return (found || []).find((c) => c === "GB" || c === "US") || "GB";
+    return "";
+  }
+
+  // First start: the admin chooses the country they watch from, with the
+  // flags (decision 0043). "Later" asks again on this device in a week.
+  async function countryFirst() {
+    if (document.querySelector(".setup-panel") || store.get("countryLater", 0) > Date.now()) return;
+    let s;
+    try { s = await api("GET", "/api/v1/settings/country"); } catch { return; }
+    if (s.home || !s.countries || !s.countries.length || document.querySelector(".setup-panel")) return;
+    const proposed = proposeCountry(s.countries);
+    const codes = s.countries.slice().sort((a, b) => countryName(a).localeCompare(countryName(b), window.VodMaxI18n.locale));
+    if (codes.includes(proposed)) codes.splice(codes.indexOf(proposed), 1), codes.unshift(proposed);
+    const choices = codes.map((code) => el("button", { type: "button", className: "country-choice focusable" + (code === proposed ? " proposed" : ""), onclick: () => choose(code) },
+      el("img", { src: "/flags/" + code.toLowerCase() + ".png", alt: "", width: 48, height: 36 }), el("span", {}, countryName(code))));
+    const msg = el("p", { className: "hint" });
+    const later = el("button", { type: "button", className: "link focusable", onclick: () => { store.set("countryLater", Date.now() + 7 * 86400000); close(); } }, t("Più tardi"));
+    const box = overlay("country-pick", el("h1", {}, t("Da dove guardi?")),
+      el("p", {}, t("VodMax tiene i canali, i film e le serie del tuo paese e lascia fuori quelli degli altri. Potrai aggiungere altri paesi in Impostazioni → Selezione.")),
+      el("div", { className: "country-grid" }, ...choices), msg, later);
+    box.back = later.onclick;
+    function close() { box.remove(); }
+    async function choose(code) {
+      for (const b of choices) b.disabled = true;
+      msg.textContent = t("Un momento…");
+      try { await api("PUT", "/api/v1/settings/country", { home: code }); close(); location.reload(); }
+      catch (e) { msg.textContent = e.message; for (const b of choices) b.disabled = false; }
+    }
+    (choices[0] || later).focus();
+  }
+
   // Shows the profile in the page header and hides what it cannot use.
   let meCache;
   async function me() {
@@ -231,6 +282,7 @@ window.VodMax = (() => {
       else if (search) { chip.style.marginLeft = "auto"; search.before(chip); } else nav.append(chip);
     }
     if (who.pin_required) setAdminPIN(who.profile);
+    else if (who.admin) countryFirst();
   }
 
   // ---- Avatars and "my profile" ----
@@ -814,5 +866,5 @@ window.VodMax = (() => {
   // The Android app's native player (window.VodMaxNative), if present.
   const native = window.VodMaxNative || null;
 
-  return { native, newerVersion, appUpdate, updateApp, bottomNav, closeSheet, sheetOpen, label, store, viewer, token, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
+  return { countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, bottomNav, closeSheet, sheetOpen, label, store, viewer, token, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
 })();

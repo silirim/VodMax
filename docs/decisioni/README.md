@@ -48,6 +48,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0040](0040-fuori-casa-dietro-un-login.md) | Fuori casa dietro un login (tunnel o reverse proxy) | **Approvata** |
 | [0041](0041-vpn-scelta-alla-prima-playlist.md) | La VPN si sceglie alla prima playlist | **Approvata** |
 | [0042](0042-il-tuo-paese.md) | Il tuo paese, scelto da te | **Approvata** |
+| [0043](0043-paese-al-primo-avvio.md) | Il paese al primo avvio, con le bandiere | **Approvata** |
 
 ## Ordine consigliato per decidere
 

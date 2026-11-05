@@ -110,6 +110,8 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	route("POST /api/v1/live/{id}/ticket", levelViewer, a.liveTicket)
 	route("POST /api/v1/live/{id}/timeshift", levelViewer, a.startTimeshift)
 	route("POST /api/v1/catchup/{id}/session", levelViewer, a.catchupSession)
+	route("GET /api/v1/settings/country", levelAdmin, a.getHomeCountry)
+	route("PUT /api/v1/settings/country", levelAdmin, a.putHomeCountry)
 	route("GET /api/v1/settings/network", levelAdmin, a.getProviderNetwork)
 	route("PUT /api/v1/settings/network", levelAdmin, a.putProviderNetwork)
 	route("GET /api/v1/settings/live", levelViewer, a.getLiveSettings)
@@ -522,6 +524,32 @@ func (a *api) getRules(w http.ResponseWriter, r *http.Request) {
 	}
 	rules.Countries = countries
 	writeJSON(w, http.StatusOK, rules)
+}
+
+// The country chosen at the first start (decision 0043), with the
+// countries the picker offers.
+func (a *api) getHomeCountry(w http.ResponseWriter, r *http.Request) {
+	home, err := a.svc.HomeCountry(r.Context())
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"home": home, "countries": catalog.HomeCountries()})
+}
+
+func (a *api) putHomeCountry(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Home string `json:"home"`
+	}
+	if err := decode(r, &body); err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	if err := a.svc.SetHomeCountry(r.Context(), body.Home); err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *api) putRules(w http.ResponseWriter, r *http.Request) {

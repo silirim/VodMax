@@ -488,6 +488,28 @@ body.with-panel #server-problems { display: none; }
 #admin-pin .link { margin-top: 1rem; padding: 0; color: var(--soft); background: none; border: 0; text-decoration: underline; cursor: pointer; font: inherit; }
 #admin-pin .link:focus { outline: 2px solid var(--focus); }
 .profile-kind .icon { width: 0.9em; height: 0.9em; vertical-align: -0.1em; margin-left: 0.3em; }
+/* First start: the country, with flags (decision 0043). */
+#country-pick {
+  position: fixed; top: 4vh; right: 50%; bottom: auto; left: auto; z-index: 1000; transform: translateX(50%);
+  width: min(94vw, 62rem); max-height: 92vh; overflow-y: auto; padding: 1.6rem 1.8rem; color: var(--text); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.85);
+}
+#country-pick h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+#country-pick p { color: var(--soft); line-height: 1.5; margin: 0 0 1rem; }
+.country-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.5rem; }
+#country-pick .country-choice {
+  display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0.8rem; min-width: 0;
+  font: inherit; color: var(--text); text-align: left; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; cursor: pointer;
+}
+#country-pick .country-choice img { flex: none; width: 48px; height: 36px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12); }
+#country-pick .country-choice span { overflow-wrap: break-word; word-break: break-word; }
+#country-pick .country-choice.proposed { border-color: var(--accent); }
+#country-pick .country-choice:hover { border-color: var(--text); }
+#country-pick .country-choice:focus { outline: none; color: #0b0c10; background: var(--focus); border-color: var(--focus); }
+#country-pick .link { margin-top: 1rem; padding: 0; color: var(--soft); background: none; border: 0; text-decoration: underline; cursor: pointer; font: inherit; }
+#country-pick .link:focus { outline: 2px solid var(--focus); outline-offset: 3px; }
+@media (max-width: 600px) { #country-pick { top: 2vh; padding: 1.1rem; } .country-grid { grid-template-columns: 1fr 1fr; } #country-pick .country-choice img { width: 36px; height: 27px; } }
+
 /* The profile choice covers the page behind it. */
 .setup-panel .hint.bad { color: var(--bad); }
 .setup-panel button.sso { display: block; width: 100%; margin-top: 0.5rem; }

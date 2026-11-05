@@ -95,9 +95,11 @@ uno, la proposta cambia.
 
 ### TV e registrazioni
 
-- **Il tuo paese** ([0042](decisioni/0042-il-tuo-paese.md)): liste del
-  mercato italiano ("Live Francia") o internazionali ("UK | Sport",
-  "|DE| Filme"); ognuno sceglie il proprio paese e quali altri tenere.
+- **Il tuo paese** ([0042](decisioni/0042-il-tuo-paese.md),
+  [0043](decisioni/0043-paese-al-primo-avvio.md)): liste del mercato
+  italiano ("Live Francia") o internazionali ("UK | Sport", "|DE| Filme");
+  al primo avvio si sceglie il paese tra le bandiere, poi in Selezione
+  quali altri tenere.
 - Zapping da decoder: numeri ufficiali dei canali, P+/P−, preferiti, guida,
   pausa della diretta, catch-up dove il provider lo offre, multiview.
 - Registrazioni dal programma in onda, dalla guida o da **regole** ("tutte

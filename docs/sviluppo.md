@@ -43,6 +43,7 @@ di accesso di ognuna, è in `internal/api/api.go`.
 |---|---|
 | `POST /api/v1/vpn` `{name, config}` | Registra una VPN WireGuard (testo `.conf`) |
 | `POST /api/v1/vpn/{id}/connect` · `/disconnect` | Collega o scollega il tunnel |
+| `GET`/`PUT /api/v1/settings/country` `{home}` | Il paese scelto al primo avvio (codice ISO, "" finché non scelto); `GET` dà anche i paesi tra cui scegliere. Vale per gli abbonamenti senza un paese proprio nelle regole (0043) |
 | `GET`/`PUT /api/v1/settings/network` `{vpn_only}` | "Solo tramite VPN" (predefinito `true`); con `false` un abbonamento può avere `vpn_id: 0` e usare la rete normale (0039) |
 | `POST /api/v1/subscriptions` `{name, kind, vpn_id, server, username, password}` o `{…, url}` | Aggiunge un abbonamento Xtream o M3U |
 | `POST /api/v1/subscriptions` `{name, kind: "local", path, content: movie\|series}` | Aggiunge una raccolta locale (cartella del server, senza VPN) |
@@ -50,7 +51,7 @@ di accesso di ognuna, è in `internal/api/api.go`.
 | `POST /api/v1/subscriptions/{id}/sync` | Sincronizza il catalogo (`?allow_drop=true` per accettare un calo anomalo) |
 | `GET /api/v1/catalog/{live\|movie\|series}` | Catalogo selezionato, una scheda per titolo: `q`, `section` (tv, sport, radio), `category`, `subscription`, `sort=recent`, `cursor`, `limit`, `all=true` per vedere anche l'escluso |
 | `GET /api/v1/categories/{kind}` | Categorie |
-| `GET` · `PUT /api/v1/subscriptions/{id}/rules` | Regole di selezione (paesi, adulti, SD, anno minimo) |
+| `GET` · `PUT /api/v1/subscriptions/{id}/rules` | Regole di selezione (il proprio paese `home`, altri paesi, adulti, SD, anno minimo; 0042) |
 | `POST /api/v1/subscriptions/{id}/rules/preview` | Effetto di nuove regole senza salvarle |
 | `GET /api/v1/subscriptions/{id}/selection` | Conteggi: offerti, visibili, schede, per sezione |
 | `GET /api/v1/subscriptions/{id}/categories?kind=` | Categorie con classificazione, correzioni e motivo dell'esclusione |

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -135,5 +136,63 @@ func TestSelectionFlow(t *testing.T) {
 	json.Unmarshal(body, &res.Selection)
 	if res.Selection["live"].Sections["tv"] != 3 || res.Selection["movie"].Visible != 0 {
 		t.Fatalf("selection lost after re-sync: %s", body)
+	}
+}
+
+// An international list (every category names its country): everything
+// shows until the country is chosen at the first start; then only that
+// country and the categories naming none (decisions 0042 and 0043).
+func TestHomeCountryFirstStart(t *testing.T) {
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Query().Get("action") {
+		case "":
+			w.Write([]byte(`{"user_info":{"auth":1,"status":"Active","max_connections":"1"}}`))
+		case "get_live_categories":
+			w.Write([]byte(`[{"category_id":"1","category_name":"UK | Entertainment"},{"category_id":"2","category_name":"|DE| Sport"},{"category_id":"3","category_name":"Radio"}]`))
+		case "get_live_streams":
+			w.Write([]byte(`[{"name":"BBC One","stream_id":101,"category_id":"1"},{"name":"Sport DE","stream_id":102,"category_id":"2"},{"name":"Radio One","stream_id":103,"category_id":"3"}]`))
+		default:
+			w.Write([]byte(`[]`))
+		}
+	}))
+	defer provider.Close()
+	e := setup(t, true)
+	e.do(t, "POST", "/api/v1/vpn", map[string]string{"name": "VPN", "config": wgConf(t)}, true)
+	e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "B", "kind": "xtream", "vpn_id": 1,
+		"server": provider.URL, "username": "u", "password": "p"}, true)
+	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code != 200 {
+		t.Fatalf("sync %d %s", code, body)
+	}
+	visible := func() int {
+		_, body := e.do(t, "GET", "/api/v1/subscriptions/1/selection", nil, true)
+		var s map[string]struct{ Visible int }
+		json.Unmarshal(body, &s)
+		return s["live"].Visible
+	}
+	var c struct {
+		Home      string   `json:"home"`
+		Countries []string `json:"countries"`
+	}
+	_, body := e.do(t, "GET", "/api/v1/settings/country", nil, true)
+	if json.Unmarshal(body, &c); c.Home != "" || len(c.Countries) < 40 || visible() != 3 {
+		t.Fatalf("before the choice: %s, %d visible", body, visible())
+	}
+	if code, _ := e.do(t, "PUT", "/api/v1/settings/country", map[string]string{"home": "EN"}, true); code != 400 {
+		t.Fatal("a language group is not a country to live in")
+	}
+	if code, body := e.do(t, "PUT", "/api/v1/settings/country", map[string]string{"home": "gb"}, true); code != 204 {
+		t.Fatalf("choice: %d %s", code, body)
+	}
+	if v := visible(); v != 2 { // BBC One and the radio
+		t.Fatalf("after choosing GB: %d visible", v)
+	}
+	_, body = e.do(t, "GET", "/api/v1/subscriptions/1/rules", nil, true)
+	if !strings.Contains(string(body), `"home":"GB"`) {
+		t.Fatalf("rules show the chosen country: %s", body)
+	}
+	// A subscription's own choice wins.
+	e.do(t, "PUT", "/api/v1/subscriptions/1/rules", map[string]any{"home": "DE"}, true)
+	if v := visible(); v != 2 { // Sport DE and the radio
+		t.Fatalf("own choice DE: %d visible", v)
 	}
 }

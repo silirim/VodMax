@@ -150,7 +150,9 @@ Dai sorgenti: [docs/sviluppo.md](docs/sviluppo.md) e `scripts/release.sh`.
 1. Apri `http://<server>:8095` e incolla il token di amministrazione che
    trovi in `/var/lib/vodmax/admin.token` (con Docker:
    `docker exec vodmax cat /var/lib/vodmax/admin.token`). La lingua (italiano o inglese)
-   segue il dispositivo e si cambia in **Impostazioni → Lingua**.
+   segue il dispositivo e si cambia in **Impostazioni → Lingua**. VodMax
+   chiede poi da dove guardi, con le bandiere: tiene canali, film e serie
+   del tuo paese e lascia fuori gli altri.
 2. **Impostazioni → Abbonamenti**: la prima volta chiede come VodMax
    raggiunge il provider: con una VPN WireGuard (incolli il `.conf`), con
    una VPN che usi già sul router o sul dispositivo, oppure senza VPN. Poi

@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -97,6 +98,29 @@ func init() {
 			countryAliases[n] = code
 		}
 	}
+}
+
+// HomeCountries are the countries a person can live in, for the first
+// choice: ISO codes only, without the groups of languages and regions.
+func HomeCountries() []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, code := range countryAliases {
+		if len(code) == 2 && code != "EN" && code != "KU" && !seen[code] {
+			seen[code] = true
+			out = append(out, code)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// IsHomeCountry reports whether code is one of HomeCountries.
+func IsHomeCountry(code string) bool {
+	if len(code) != 2 || code == "EN" || code == "KU" {
+		return false
+	}
+	return countryAliases[strings.ToLower(code)] == code
 }
 
 // splitAliases splits an alias list on spaces, keeping the two-word names

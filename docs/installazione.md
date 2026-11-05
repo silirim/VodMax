@@ -126,7 +126,8 @@ una versione nuova.
 
 1. Apri `http://<server>:8095` nel browser. Chiede il **token di
    amministrazione**: lo trovi sul server con
-   `sudo cat /var/lib/vodmax/admin.token`.
+   `sudo cat /var/lib/vodmax/admin.token`. Poi chiede da dove guardi:
+   scegli il tuo paese tra le bandiere.
 2. **Impostazioni → Lingua**: italiano o inglese (per dispositivo; la stessa
    scelta è nella schermata dei profili).
 3. **Impostazioni → Abbonamenti**, la prima volta: VodMax chiede come
@@ -140,8 +141,9 @@ una versione nuova.
    indirizzo) o un account Xtream Codes (server, utente, password), scegli
    la VPN (o *Nessuna VPN*), poi *Sincronizza ora*. Catalogo e guida si aggiornano ogni notte,
    la guida anche ogni poche ore (Impostazioni → Sistema).
-5. **Impostazioni → Selezione** e **Categorie**: scegli il tuo paese (VodMax
-   propone quello della lingua del dispositivo), poi tieni solo gli altri
+5. **Impostazioni → Selezione** e **Categorie**: il tuo paese è quello
+   scelto tra le bandiere al primo avvio (se ne può scegliere un altro per
+   abbonamento), poi tieni solo gli altri
    paesi, gli anni e le categorie che vuoi; l'anteprima mostra l'effetto
    prima di salvare.
 6. **Impostazioni → Raccolte** (facoltativo): aggiungi cartelle di film o di

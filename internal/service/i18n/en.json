@@ -263,5 +263,6 @@
   "scegli una VPN: i provider si contattano solo tramite VPN (Impostazioni → VPN)": "choose a VPN: providers are contacted only through a VPN (Settings → VPN)",
   "la VPN scelta non esiste": "the chosen VPN does not exist",
   "fermata prima della fine": "stopped before the end",
-  "la registrazione non è in corso": "the recording is not in progress"
+  "la registrazione non è in corso": "the recording is not in progress",
+  "paese non valido": "invalid country"
 }

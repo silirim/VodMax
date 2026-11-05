@@ -125,7 +125,8 @@ is out.
 
 1. Open `http://<server>:8095` in a browser. It asks for the **admin
    token**: copy it from the server with
-   `sudo cat /var/lib/vodmax/admin.token`.
+   `sudo cat /var/lib/vodmax/admin.token`. Then it asks where you watch
+   from: choose your country among the flags.
 2. **Settings → Language**: Italian or English (per device; the profile
    screen has the same choice).
 3. **Settings → Subscriptions**, the first time: VodMax asks how it reaches
@@ -140,8 +141,9 @@ is out.
    then *Sync now*.
    The catalog and the guide are refreshed every night and the guide every
    few hours (Settings → System).
-5. **Settings → Selection** and **Categories**: choose your country (VodMax
-   proposes the one of the device's language), then keep only the other
+5. **Settings → Selection** and **Categories**: your country is the one you
+   chose among the flags at the first start (you can choose another per
+   subscription), then keep only the other
    countries, years and categories you want; the preview shows the effect
    before saving.
 6. **Settings → Collections** (optional): add folders of movies or of

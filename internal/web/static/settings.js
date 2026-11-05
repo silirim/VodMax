@@ -5,7 +5,7 @@
 const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o; }, {});
 
 (() => {
-  const { store, api, hhmm } = window.VodMax;
+  const { store, api, hhmm, countryName, proposeCountry } = window.VodMax;
   const t = window.VodMaxI18n.t;
   const locale = window.VodMaxI18n.locale;
   const $ = (id) => document.getElementById(id);
@@ -561,33 +561,12 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
   }
 
   // ---- Rules ----
-  // Country codes from the server (decision 0042): ISO codes get their
-  // name in the interface language; groups of languages and regions
-  // have their own; a label VodMax does not know is shown as it is.
-  const COUNTRY_GROUPS = { INT: "Internazionale", EN: "In inglese", ARABIC: "Arabo", EXYU: "Ex Jugoslavia", LATAM: "America Latina",
-    AFRICA: "Africa", ASIA: "Asia", BENELUX: "Benelux", KU: "Curdo" };
-  let regionNames = null;
-  try { regionNames = new Intl.DisplayNames([locale], { type: "region" }); } catch (e) { /* older WebViews: codes */ }
-  function countryName(code) {
-    if (COUNTRY_GROUPS[code]) return t(COUNTRY_GROUPS[code]);
-    if (/^[A-Z]{2}$/.test(code) && regionNames) { try { return regionNames.of(code) || code; } catch (e) { return code; } }
-    return code;
-  }
   // The server gives the reason in Italian ("paese escluso: GB").
   function whyExcluded(e) {
     const r = e.reason || "";
     if (r.startsWith("paese escluso: ")) return t("paese escluso: {country}", { country: countryName(r.slice(15)) });
     return r ? t(r) : t("Esclusa");
   }
-  function proposeHome(found) {
-    const [lang, region] = (navigator.language || "it").split("-");
-    if (region && /^[A-Za-z]{2}$/.test(region)) return region.toUpperCase();
-    const byLang = { it: "IT", de: "DE", fr: "FR", es: "ES", pt: "PT", nl: "NL", pl: "PL", ro: "RO", tr: "TR", el: "GR", sq: "AL", sv: "SE", da: "DK", nb: "NO", fi: "FI" };
-    if (byLang[lang]) return byLang[lang];
-    if (lang === "en") return found.find((c) => c === "GB" || c === "US") || "GB";
-    return "";
-  }
-
   async function renderRules(main) {
     const sub = await pickSubscription(main, t("Selezione del catalogo"),
       t("Cosa tenere della lista del provider. Le regole valgono a ogni sincronizzazione; le correzioni su singole categorie (scheda Categorie) prevalgono."));
@@ -605,8 +584,9 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     }
     // Before a choice, VodMax proposes the country of the device's
     // language ("it-IT" → IT, "en-GB" → GB, "de" → DE).
-    const proposed = rules.home || proposeHome(Object.keys(countries));
-    const home = el("select", { className: "focusable" }, el("option", { value: "" }, t("Non scelto")),
+    const proposed = rules.home || proposeCountry(Object.keys(countries));
+    // "Not chosen" only while no country was chosen, here or at the first start.
+    const home = el("select", { className: "focusable" }, rules.home ? null : el("option", { value: "" }, t("Non scelto")),
       ...[...new Set([proposed, ...Object.keys(countries).sort((a, b) => countries[b] - countries[a])])].filter(Boolean)
         .map((code) => el("option", { value: code }, countryName(code) + (countries[code] ? " (" + countries[code].toLocaleString(locale) + ")" : ""))));
     home.value = proposed;
