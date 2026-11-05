@@ -140,9 +140,10 @@ is out.
    then *Sync now*.
    The catalog and the guide are refreshed every night and the guide every
    few hours (Settings → System).
-5. **Settings → Selection** and **Categories**: keep only the countries,
-   years and categories you want; the preview shows the effect before
-   saving.
+5. **Settings → Selection** and **Categories**: choose your country (VodMax
+   proposes the one of the device's language), then keep only the other
+   countries, years and categories you want; the preview shows the effect
+   before saving.
 6. **Settings → Collections** (optional): add folders of movies or of
    series (one subfolder per series). Names like `Movie (2010).mkv` and
    `Series/Season 1/S01E03.mkv` are recognised; `.nfo` files and pictures

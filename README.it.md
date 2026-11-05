@@ -55,7 +55,7 @@ telecomando.
 | ⬇️ **Download** | Film, episodi, stagioni o serie intere copiati sul disco del server, da guardare senza la playlist; uno alla volta e solo con una connessione libera (chi guarda ha la precedenza), anche solo di notte |
 | 📁 **Raccolte locali** | Cartelle di film o serie con i nomi di Jellyfin/Kodi/Plex, file `.nfo` e immagini accanto ai video |
 | 📡 **Sorgenti** | Xtream Codes, playlist M3U e portali Stalker (MAC) |
-| 🧹 **Selezione del catalogo** | Solo i paesi, gli anni e le categorie che vuoi, con anteprima |
+| 🧹 **Selezione del catalogo** | Scegli il tuo paese e tieni solo i paesi, gli anni e le categorie che vuoi, riconosciuti in ogni grafia («UK \| Sport», «\|DE\| Filme», «Live Francia»), con anteprima |
 | 👪 **Profili** | Avanzamenti e preferiti per persona, profili bambini, dispositivi abbinati con un codice o con l'account di casa (OpenID Connect: Authelia, Authentik, Keycloak…) |
 | ✨ **Assistente** | Facoltativo: integrato (VodMax scarica e fa girare il modello in casa), Claude e altri servizi online con una chiave API, oppure un tuo server. Scrivi una regola di registrazione con una frase, registra "solo questa volta" ("il film di stasera su Rai 1", "Feyenoord Inter"), chiedi cosa guardare stasera |
 | 🔌 **Altre app** | Plex, Jellyfin ed Emby vedono VodMax come sintonizzatore HDHomeRun; playlist M3U e guida XMLTV per TiviMate, Kodi, VLC |

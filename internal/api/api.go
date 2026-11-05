@@ -515,9 +515,12 @@ func (a *api) getRules(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	if rules.Countries == nil {
-		rules.Countries = []string{}
+	// As codes: "UK" saved by an older version is "GB" on the page.
+	countries := []string{}
+	for _, c := range rules.Countries {
+		countries = append(countries, catalog.CanonicalCountry(c))
 	}
+	rules.Countries = countries
 	writeJSON(w, http.StatusOK, rules)
 }
 

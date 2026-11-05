@@ -47,6 +47,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0039](0039-vpn-facoltativa.md) | VPN facoltativa, "solo tramite VPN" come scelta | **Approvata** |
 | [0040](0040-fuori-casa-dietro-un-login.md) | Fuori casa dietro un login (tunnel o reverse proxy) | **Approvata** |
 | [0041](0041-vpn-scelta-alla-prima-playlist.md) | La VPN si sceglie alla prima playlist | **Approvata** |
+| [0042](0042-il-tuo-paese.md) | Il tuo paese, scelto da te | **Approvata** |
 
 ## Ordine consigliato per decidere
 

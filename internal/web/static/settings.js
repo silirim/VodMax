@@ -561,31 +561,76 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
   }
 
   // ---- Rules ----
+  // Country codes from the server (decision 0042): ISO codes get their
+  // name in the interface language; groups of languages and regions
+  // have their own; a label VodMax does not know is shown as it is.
+  const COUNTRY_GROUPS = { INT: "Internazionale", EN: "In inglese", ARABIC: "Arabo", EXYU: "Ex Jugoslavia", LATAM: "America Latina",
+    AFRICA: "Africa", ASIA: "Asia", BENELUX: "Benelux", KU: "Curdo" };
+  let regionNames = null;
+  try { regionNames = new Intl.DisplayNames([locale], { type: "region" }); } catch (e) { /* older WebViews: codes */ }
+  function countryName(code) {
+    if (COUNTRY_GROUPS[code]) return t(COUNTRY_GROUPS[code]);
+    if (/^[A-Z]{2}$/.test(code) && regionNames) { try { return regionNames.of(code) || code; } catch (e) { return code; } }
+    return code;
+  }
+  // The server gives the reason in Italian ("paese escluso: GB").
+  function whyExcluded(e) {
+    const r = e.reason || "";
+    if (r.startsWith("paese escluso: ")) return t("paese escluso: {country}", { country: countryName(r.slice(15)) });
+    return r ? t(r) : t("Esclusa");
+  }
+  function proposeHome(found) {
+    const [lang, region] = (navigator.language || "it").split("-");
+    if (region && /^[A-Za-z]{2}$/.test(region)) return region.toUpperCase();
+    const byLang = { it: "IT", de: "DE", fr: "FR", es: "ES", pt: "PT", nl: "NL", pl: "PL", ro: "RO", tr: "TR", el: "GR", sq: "AL", sv: "SE", da: "DK", nb: "NO", fi: "FI" };
+    if (byLang[lang]) return byLang[lang];
+    if (lang === "en") return found.find((c) => c === "GB" || c === "US") || "GB";
+    return "";
+  }
+
   async function renderRules(main) {
     const sub = await pickSubscription(main, t("Selezione del catalogo"),
       t("Cosa tenere della lista del provider. Le regole valgono a ogni sincronizzazione; le correzioni su singole categorie (scheda Categorie) prevalgono."));
     if (!sub) return;
     const [rules, cats, current] = await Promise.all([
       api("GET", "/api/v1/subscriptions/" + sub.id + "/rules"),
-      api("GET", "/api/v1/subscriptions/" + sub.id + "/categories?kind=live"),
+      api("GET", "/api/v1/subscriptions/" + sub.id + "/categories"),
       api("GET", "/api/v1/subscriptions/" + sub.id + "/selection")]);
+    // Countries named by the categories, in any spelling, with how many
+    // channels, films and series each brings (decision 0042).
     const countries = {};
     for (const c of cats) {
-      const country = c.country_override != null ? c.country_override : c.country;
-      if (country) countries[country] = (countries[country] || 0) + c.items;
+      const code = c.effective.detected;
+      if (code) countries[code] = (countries[code] || 0) + c.items;
     }
+    // Before a choice, VodMax proposes the country of the device's
+    // language ("it-IT" → IT, "en-GB" → GB, "de" → DE).
+    const proposed = rules.home || proposeHome(Object.keys(countries));
+    const home = el("select", { className: "focusable" }, el("option", { value: "" }, t("Non scelto")),
+      ...[...new Set([proposed, ...Object.keys(countries).sort((a, b) => countries[b] - countries[a])])].filter(Boolean)
+        .map((code) => el("option", { value: code }, countryName(code) + (countries[code] ? " (" + countries[code].toLocaleString(locale) + ")" : ""))));
+    home.value = proposed;
     const adult = input({ type: "checkbox", checked: rules.adult });
     const lowres = input({ type: "checkbox", checked: rules.low_res });
     const movieYear = input({ type: "number", min: 1900, max: 2100, placeholder: t("nessun limite"), value: rules.movie_min_year || "" });
     const seriesYear = input({ type: "number", min: 1900, max: 2100, placeholder: t("nessun limite"), value: rules.series_min_year || "" });
     const unknownYear = input({ type: "checkbox", checked: rules.hide_unknown_year });
-    const countryBoxes = Object.entries(countries).sort((a, b) => b[1] - a[1]).map(([name, n]) => {
-      const cb = input({ type: "checkbox", checked: (rules.countries || []).includes(name), value: name });
-      return el("label", { className: "check" }, cb, name + " (" + n + ")");
+    const countryBoxes = Object.entries(countries).sort((a, b) => b[1] - a[1]).map(([code, n]) => {
+      // A first choice in an English-speaking country keeps "In English" too.
+      const english = !rules.home && code === "EN" && ["GB", "US", "IE", "AU", "CA"].includes(proposed);
+      const cb = input({ type: "checkbox", checked: english || (rules.countries || []).includes(code), value: code });
+      const row = el("label", { className: "check" }, cb, countryName(code) + " (" + n.toLocaleString(locale) + ")");
+      row.dataset.code = code;
+      return row;
     });
+    // The home country is kept anyway: it leaves the list of the others.
+    const showOthers = () => { for (const r of countryBoxes) r.hidden = r.dataset.code === home.value; };
+    showOthers();
+    home.addEventListener("change", showOthers);
     const table = el("table", { className: "counts" });
     const readRules = () => ({
-      countries: countryBoxes.map((l) => l.firstChild).filter((c) => c.checked).map((c) => c.value),
+      home: home.value,
+      countries: countryBoxes.filter((l) => !l.hidden).map((l) => l.firstChild).filter((c) => c.checked).map((c) => c.value),
       adult: adult.checked, low_res: lowres.checked,
       movie_min_year: Number(movieYear.value) || 0, series_min_year: Number(seriesYear.value) || 0,
       hide_unknown_year: unknownYear.checked,
@@ -609,8 +654,12 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
         catch (e) { flash(e.message); }
       }, 300);
     };
+    if (home.value !== (rules.home || "")) preview(); // show what the proposal would change
     const form = el("form", { className: "form" },
-      el("label", {}, t("Paesi esteri da tenere")), el("div", { className: "countries" }, ...(countryBoxes.length ? countryBoxes : [el("span", { className: "note" }, t("Nessun canale estero riconosciuto"))])),
+      ...field(t("Il tuo paese"), home),
+      el("p", { className: "note full" }, rules.home ? t("Restano le categorie del tuo paese e quelle che non nominano un paese; gli altri paesi si escludono, tranne quelli che spunti qui sotto.")
+        : t("Proposto dalla lingua di questo dispositivo: controllalo e salva. Finché non lo scegli, si escludono solo i gruppi esteri scritti come “Live Francia”.")),
+      el("label", {}, t("Altri paesi da tenere")), el("div", { className: "countries" }, ...(countryBoxes.length ? countryBoxes : [el("span", { className: "note" }, t("Nessun paese riconosciuto nei nomi delle categorie"))])),
       el("label", {}, t("Contenuti per adulti")), el("label", { className: "check" }, adult, t("Mostra")),
       el("label", {}, t("Doppioni a bassa qualità")), el("label", { className: "check" }, lowres, t("Mostra (es. “SD Connessioni lente”)")),
       ...field(t("Film dall'anno"), movieYear), ...field(t("Serie dall'anno"), seriesYear),
@@ -650,7 +699,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
           el("option", { value: "tv" }, "TV"), el("option", { value: "sport" }, "Sport"), el("option", { value: "radio" }, "Radio"));
         section.value = c.section_override || "";
       }
-      const status = el("td", {}, c.effective.enabled ? el("span", { className: "ok" }, t("Inclusa")) : el("span", { className: "why" }, c.effective.reason || t("Esclusa")));
+      const status = el("td", {}, c.effective.enabled ? el("span", { className: "ok" }, t("Inclusa")) : el("span", { className: "why" }, whyExcluded(c.effective)));
       const row = el("tr", { className: c.effective.enabled ? "" : "off" }, el("td", { className: "name" }, c.name),
         el("td", { className: "n" }, c.items.toLocaleString(locale)), el("td", {}, include), section ? el("td", {}, section) : null, status);
       row.dataset.name = c.name.toLowerCase();
@@ -662,7 +711,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
           const fresh = (await api("GET", "/api/v1/subscriptions/" + sub.id + "/categories?kind=" + state.kind)).find((x) => x.id === c.id);
           if (fresh) {
             row.className = fresh.effective.enabled ? "" : "off";
-            status.replaceChildren(fresh.effective.enabled ? el("span", { className: "ok" }, t("Inclusa")) : el("span", { className: "why" }, fresh.effective.reason || t("Esclusa")));
+            status.replaceChildren(fresh.effective.enabled ? el("span", { className: "ok" }, t("Inclusa")) : el("span", { className: "why" }, whyExcluded(fresh.effective)));
           }
           flash(t("Salvato: {name}", { name: c.name }));
         } catch (e) { flash(e.message); }

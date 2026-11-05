@@ -56,7 +56,7 @@ decoder with the remote.
 | ⬇️ **Downloads** | Copy movies, episodes, seasons or whole series to the server's disk, to watch them without the playlist; one at a time, only on a free connection (whoever watches comes first), optionally at night |
 | 📁 **Local collections** | Folders of movies or series named like Jellyfin/Kodi/Plex libraries, `.nfo` files and artwork next to the videos |
 | 📡 **Sources** | Xtream Codes, M3U playlists and Stalker portals (MAC) |
-| 🧹 **Catalog selection** | Keep only the countries, years and categories you want, with a live preview |
+| 🧹 **Catalog selection** | Choose your country and keep only the countries, years and categories you want — recognised in any spelling (“UK \| Sport”, “\|DE\| Filme”, “Live France”) — with a live preview |
 | 👪 **Profiles** | Per-person progress and favourites, kids profiles, devices paired with a short code or signed in with your home account (OpenID Connect: Authelia, Authentik, Keycloak…) |
 | ✨ **Assistant** | Optional: built in (VodMax downloads and runs the model at home), Claude and other online services with an API key, or your own server. Write a recording rule as a sentence, record "just once" ("tonight's film on Rai 1", "Feyenoord Inter"), ask what to watch tonight |
 | 🔌 **Other apps** | Plex, Jellyfin and Emby see VodMax as an HDHomeRun tuner; M3U playlist and XMLTV guide for TiviMate, Kodi, VLC |

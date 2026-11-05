@@ -5,7 +5,7 @@ pensato e dove sta andando. Le scelte puntuali, con alternative e motivi,
 sono nelle [decisioni](decisioni/README.md); le istruzioni per chi ci
 lavora in [AGENTS.md](../AGENTS.md).
 
-*Aggiornato al 4 novembre 2026 (0.6.3).*
+*Aggiornato al 5 novembre 2026.*
 
 ## In una frase
 
@@ -95,6 +95,9 @@ uno, la proposta cambia.
 
 ### TV e registrazioni
 
+- **Il tuo paese** ([0042](decisioni/0042-il-tuo-paese.md)): liste del
+  mercato italiano ("Live Francia") o internazionali ("UK | Sport",
+  "|DE| Filme"); ognuno sceglie il proprio paese e quali altri tenere.
 - Zapping da decoder: numeri ufficiali dei canali, P+/P−, preferiti, guida,
   pausa della diretta, catch-up dove il provider lo offre, multiview.
 - Registrazioni dal programma in onda, dalla guida o da **regole** ("tutte

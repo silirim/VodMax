@@ -12,8 +12,14 @@ import (
 // provider's list. The zero value keeps only home-country, non-adult,
 // non-low-res content of any year.
 type Rules struct {
-	// Countries lists foreign channel groups to keep, by the label shown
-	// in the category list (e.g. "UK"). Home-country content is always kept.
+	// Home is the person's country (decision 0042), a code such as "IT"
+	// or "GB": its categories and those naming no country are kept. Empty
+	// for rules saved before it existed: then only the "Live <Country>"
+	// and "International" groups count as foreign, as they always did,
+	// and categories naming no country are the home ones.
+	Home string `json:"home"`
+	// Countries lists other countries to keep, as codes ("GB"); labels
+	// saved by older versions ("UK") are understood too.
 	Countries []string `json:"countries"`
 	Adult     bool     `json:"adult"`   // keep adult categories
 	LowRes    bool     `json:"low_res"` // keep low-quality duplicate categories
@@ -40,6 +46,9 @@ func ParseRules(raw json.RawMessage) (Rules, error) {
 }
 
 func (r Rules) Validate() error {
+	if len(r.Home) > 40 || len(r.Countries) > 300 {
+		return fmt.Errorf("paesi non validi")
+	}
 	for _, y := range []int{r.MovieMinYear, r.SeriesMinYear} {
 		if y != 0 && (y < 1900 || y > 2100) {
 			return fmt.Errorf("anno minimo %d non valido", y)
@@ -51,9 +60,12 @@ func (r Rules) Validate() error {
 // Effective is a category after applying user overrides and rules.
 type Effective struct {
 	Country string `json:"country"`
-	Adult   bool   `json:"adult"`
-	Section string `json:"section,omitempty"`
-	Enabled bool   `json:"enabled"`
+	// Detected is the country the name points to in any spelling (or the
+	// manual correction): what the selection page counts and offers.
+	Detected string `json:"detected,omitempty"`
+	Adult    bool   `json:"adult"`
+	Section  string `json:"section,omitempty"`
+	Enabled  bool   `json:"enabled"`
 	// Reason explains why a category is excluded, for the user interface.
 	Reason string `json:"reason,omitempty"`
 }
@@ -61,9 +73,15 @@ type Effective struct {
 // EffectiveCategory resolves a category against overrides and rules.
 func EffectiveCategory(c store.SelectionCategory, r Rules) Effective {
 	e := Effective{Country: c.Country, Adult: c.Adult, Section: c.Section, Enabled: true}
-	if c.CountryOverride != nil {
-		e.Country = *c.CountryOverride
+	e.Detected = DetectCountry(c.Kind, c.Name)
+	if r.Home != "" {
+		e.Country = e.Detected
 	}
+	if c.CountryOverride != nil {
+		e.Country = CanonicalCountry(*c.CountryOverride)
+		e.Detected = e.Country
+	}
+	e.Country = CanonicalCountry(e.Country)
 	if c.AdultOverride != nil {
 		e.Adult = *c.AdultOverride
 	}
@@ -73,7 +91,7 @@ func EffectiveCategory(c store.SelectionCategory, r Rules) Effective {
 	switch {
 	case e.Adult && !r.Adult:
 		e.Enabled, e.Reason = false, "contenuti per adulti"
-	case e.Country != "" && !contains(r.Countries, e.Country):
+	case e.Country != "" && e.Country != CanonicalCountry(r.Home) && !keeps(r.Countries, e.Country):
 		e.Enabled, e.Reason = false, "paese escluso: "+e.Country
 	case c.LowRes && !r.LowRes:
 		e.Enabled, e.Reason = false, "bassa qualità (doppioni)"
@@ -89,9 +107,11 @@ func EffectiveCategory(c store.SelectionCategory, r Rules) Effective {
 	return e
 }
 
-func contains(list []string, s string) bool {
+// keeps reports whether the kept countries include code, comparing codes
+// so that "UK" saved by an older version matches "GB".
+func keeps(list []string, code string) bool {
 	for _, v := range list {
-		if v == s {
+		if CanonicalCountry(v) == code {
 			return true
 		}
 	}

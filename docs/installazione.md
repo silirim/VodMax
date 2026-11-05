@@ -140,9 +140,10 @@ una versione nuova.
    indirizzo) o un account Xtream Codes (server, utente, password), scegli
    la VPN (o *Nessuna VPN*), poi *Sincronizza ora*. Catalogo e guida si aggiornano ogni notte,
    la guida anche ogni poche ore (Impostazioni → Sistema).
-5. **Impostazioni → Selezione** e **Categorie**: tieni solo i paesi, gli
-   anni e le categorie che vuoi; l'anteprima mostra l'effetto prima di
-   salvare.
+5. **Impostazioni → Selezione** e **Categorie**: scegli il tuo paese (VodMax
+   propone quello della lingua del dispositivo), poi tieni solo gli altri
+   paesi, gli anni e le categorie che vuoi; l'anteprima mostra l'effetto
+   prima di salvare.
 6. **Impostazioni → Raccolte** (facoltativo): aggiungi cartelle di film o di
    serie (una sottocartella per serie). Nomi come `Film (2010).mkv` e
    `Serie/Stagione 1/S01E03.mkv` vengono riconosciuti; i file `.nfo` e le
