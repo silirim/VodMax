@@ -442,7 +442,26 @@
     fav: () => toggleFavorite(state.current).then(showControls),
     rec: () => record(state.current),
     multiview: () => { stopPlayer(); location.href = "/multiview.html" + (state.current ? "?channel=" + state.current.id : ""); },
+    fullscreen: () => {
+      if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+      document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
+        if (screen.orientation && screen.orientation.lock && matchMedia("(pointer: coarse)").matches) screen.orientation.lock("landscape").catch(() => {});
+      }).catch(() => {});
+    },
   };
+  // Full screen where the browser allows it (phones, PCs); the TV app
+  // already fills the screen.
+  $("ctl-full").hidden = !(document.fullscreenEnabled && document.documentElement.requestFullscreen) || /Web0S|webOS/.test(navigator.userAgent);
+  document.addEventListener("fullscreenchange", () => {
+    const full = Boolean(document.fullscreenElement);
+    const text = full ? t("Esci dallo schermo intero") : t("Schermo intero");
+    const span = document.createElement("span");
+    span.className = "txt";
+    span.textContent = text;
+    $("ctl-full").replaceChildren(VodMaxIcons.icon(full ? "minimize" : "maximize"), span);
+    $("ctl-full").title = text;
+    $("ctl-full").setAttribute("aria-label", text);
+  });
   $("controls").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-action]");
     if (b) actions[b.dataset.action]();

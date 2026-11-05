@@ -1544,6 +1544,7 @@
     clearInterval(subTimer);
     if (subTrack) subTrack.mode = "disabled";
     closeMenu();
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     if (state.play && state.play.ts) state.play.ts.destroy();
     video.pause();
     video.removeAttribute("src");
@@ -1562,6 +1563,13 @@
         else focusFirst($("content"));
       });
     }
+  }
+
+  function hideBar() {
+    clearTimeout(idleTimer);
+    closeMenu();
+    $("player-bar").classList.add("idle");
+    $("player").classList.add("cursor-hidden");
   }
 
   function showBar() {
@@ -1814,10 +1822,34 @@
         else if (p && p.ts) { p.ts.goLive(); showBar(); }
       },
       next: () => playNext(true),
+      fullscreen: toggleFullscreen,
     })[b.dataset.action]();
   });
-  video.addEventListener("click", toggle);
-  $("player").addEventListener("mousemove", showBar);
+  // Mouse: moving shows the bar, a click pauses. Touch: a tap shows or
+  // hides the bar (pausing is its button), as on the TV page.
+  let lastPointer = "mouse";
+  $("player").addEventListener("pointerdown", (e) => { lastPointer = e.pointerType; }, true);
+  video.addEventListener("click", () => {
+    if (lastPointer === "mouse") toggle();
+    else if ($("player-bar").classList.contains("idle")) showBar();
+    else hideBar();
+  });
+  $("player").addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") showBar(); });
+
+  // Full screen, where the browser allows it (phones, PCs). On the TV the
+  // page already fills the screen. A phone turns to landscape.
+  const canFullscreen = Boolean(document.fullscreenEnabled && $("player").requestFullscreen) && !/Web0S|webOS/.test(navigator.userAgent);
+  $("player-full").hidden = !canFullscreen;
+  function toggleFullscreen() {
+    if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+    $("player").requestFullscreen({ navigationUI: "hide" }).then(() => {
+      if (screen.orientation && screen.orientation.lock && matchMedia("(pointer: coarse)").matches) screen.orientation.lock("landscape").catch(() => {});
+    }).catch(() => {});
+  }
+  document.addEventListener("fullscreenchange", () => {
+    const full = Boolean(document.fullscreenElement);
+    window.VodMax.label($("player-full"), full ? "minimize" : "maximize", full ? t("Esci dallo schermo intero") : t("Schermo intero"));
+  });
 
   addEventListener("pagehide", () => saveProgress());
   // From the TV ("from the start") or the guide ("watch again"):

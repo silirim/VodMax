@@ -104,7 +104,7 @@
   border-radius: 16px;
   transition: opacity 0.3s;
 }
-.player-bar.idle { opacity: 0; }
+.player-bar.idle { opacity: 0; pointer-events: none; } /* hidden controls are not tapped by mistake */
 .player-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.4rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .player-progress { height: 6px; background: var(--raised); border-radius: 3px; overflow: hidden; }
 .player-progress div { height: 100%; width: 0; background: var(--accent-grad); }
