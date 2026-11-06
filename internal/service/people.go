@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/silirim/vodmax/internal/playlist/xtream"
 	"github.com/silirim/vodmax/internal/store"
 )
 
@@ -75,6 +77,14 @@ func (s *Service) FillPeople(ctx context.Context, log *slog.Logger, night func()
 	if s.asst.peoplePause != nil {
 		pause = *s.asst.peoplePause
 	}
+	// After the provider did not answer, the rest of this night is left
+	// alone (the loop calls again every 10 minutes).
+	s.asst.mu.Lock()
+	halted := time.Since(s.asst.peopleHalt) < (peopleNightTo-peopleNightFrom)*time.Hour
+	s.asst.mu.Unlock()
+	if halted {
+		return 0
+	}
 	done := 0
 	for ctx.Err() == nil && night() && s.AssistantOn(ctx) {
 		batch, err := s.st.ItemsWithoutPeople(ctx, time.Now().Add(-peopleRetry), 50)
@@ -89,11 +99,22 @@ func (s *Service) FillPeople(ctx context.Context, log *slog.Logger, night func()
 			if err != nil {
 				continue
 			}
-			d, known := s.itemDetails(ctx, m)
-			if !known && d.Cast == "" && d.Director == "" {
+			d, err := s.itemDetails(ctx, m)
+			switch {
+			case err == nil || d.Cast != "" || d.Director != "":
+			case errors.Is(err, xtream.ErrUnreadable):
+				// A page VodMax cannot read: noted without people, so the
+				// night goes on with the next titles; tried again after
+				// peopleRetry.
+				log.Info("indice delle persone: scheda illeggibile, passo alla prossima", "titolo", m.ID, "err", err)
+			default:
 				// The provider (or its VPN) did not answer: not "no cast",
 				// and no point asking for more pages tonight.
-				log.Info("indice delle persone: il provider non risponde, riprovo la prossima notte", "abbonamento", m.SubscriptionID)
+				log.Info("indice delle persone: il provider non risponde, riprovo la prossima notte",
+					"abbonamento", m.SubscriptionID, "titolo", m.ID, "err", err)
+				s.asst.mu.Lock()
+				s.asst.peopleHalt = time.Now()
+				s.asst.mu.Unlock()
 				return done
 			}
 			if err := s.st.PutItemPeople(ctx, m.ID, peopleText(d.Cast, d.Director)); err != nil {

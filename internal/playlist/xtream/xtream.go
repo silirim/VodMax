@@ -17,6 +17,11 @@ import (
 	"github.com/silirim/vodmax/internal/provider"
 )
 
+// ErrUnreadable is in the chain of an error for an answer that came but
+// could not be read (a busy page, JSON of an unexpected shape), as opposed
+// to no answer at all.
+var ErrUnreadable = errors.New("risposta non valida")
+
 // MaxResponse bounds a single API response. Large providers return 60+ MB
 // for get_vod_streams; the bound must stay well above that.
 const MaxResponse = 512 << 20
@@ -384,7 +389,7 @@ func (c *Client) get(ctx context.Context, action string, extra url.Values, out a
 		if body.N <= 0 {
 			return fmt.Errorf("xtream %s: risposta oltre %d MiB", label(action), MaxResponse>>20)
 		}
-		return fmt.Errorf("xtream %s: risposta non valida: %w", label(action), err)
+		return fmt.Errorf("xtream %s: %w: %w", label(action), ErrUnreadable, err)
 	}
 	return nil
 }

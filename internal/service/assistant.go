@@ -63,6 +63,7 @@ type assistantState struct {
 	local   localState
 
 	peoplePause *time.Duration // tests
+	peopleHalt  time.Time      // the provider did not answer the people index
 }
 
 type tonightEntry struct {

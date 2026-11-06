@@ -24,7 +24,11 @@ Twelve*, *La maschera di Zorro*, *Entrapment*).
     ogni 3 secondi per i titoli Xtream (circa 7.000 a notte, per non
     pesare sul provider), subito per le raccolte locali. Le richieste
     passano dalla VPN dell'abbonamento, come quando si apre una scheda.
-    Una scheda senza cast viene richiesta di nuovo dopo 30 giorni.
+    Una scheda senza cast viene richiesta di nuovo dopo 30 giorni, e
+    così una scheda che VodMax non riesce a leggere (6 novembre 2026: prima
+    fermava l'indice ogni notte sullo stesso titolo). Se il provider non
+    risponde, l'indice si ferma fino alla notte dopo; l'errore vero è nel
+    registro.
 - **Nell'assistente**: il modello fa solo quello in cui è bravo, capire la
   persona chiesta anche scritta male. VodMax cerca nell'indice tutti i suoi
   titoli che hai, li mette per primi, poi aggiunge quelli che il modello

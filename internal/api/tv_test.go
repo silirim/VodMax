@@ -31,6 +31,10 @@ type tvProvider struct {
 	kicks    map[string]bool // live streams closed after a few packets, as when another client takes the connection
 	hits     map[string]int  // live requests per stream, served or not
 	extra    string          // more live streams, JSON objects
+	// Detail pages: detailsDown answers 503, badSeries a page that is not
+	// JSON; detailHits counts the requests.
+	detailsDown, badSeries bool
+	detailHits             int
 }
 
 // fakeFilm is the content served for films and episodes.
@@ -128,6 +132,20 @@ func newTVProvider() *tvProvider {
 				}
 			}
 		default:
+			if a := r.URL.Query().Get("action"); a == "get_vod_info" || a == "get_series_info" {
+				p.mu.Lock()
+				p.detailHits++
+				down, bad := p.detailsDown, p.badSeries && a == "get_series_info"
+				p.mu.Unlock()
+				if down {
+					http.Error(w, "busy", http.StatusServiceUnavailable)
+					return
+				}
+				if bad {
+					w.Write([]byte(`<html><body>Server busy</body></html>`))
+					return
+				}
+			}
 			switch r.URL.Query().Get("action") {
 			case "":
 				w.Write([]byte(`{"user_info":{"auth":1,"status":"Active","max_connections":"1"}}`))

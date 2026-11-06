@@ -331,6 +331,48 @@ func TestAssistant(t *testing.T) {
 
 // The people index (decision 0036): opened pages and the night fill it;
 // the assistant finds every title of a person in it.
+// A detail page that cannot be read is noted without people and the
+// night goes on; a provider that does not answer stops the index until
+// the next night, without asking again every 10 minutes.
+func TestPeopleIndexSkipsUnreadablePages(t *testing.T) {
+	assistantOn := func(e *env) {
+		m := newFakeModel(t)
+		e.svc.SetPeoplePause(0)
+		cfg := map[string]any{"enabled": true, "url": m.URL + "/v1", "model": "llama3", "key": "sk-test"}
+		if code, body := e.do(t, "PUT", "/api/v1/settings/assistant", cfg, true); code != 200 {
+			t.Fatalf("settings: %d %s", code, body)
+		}
+	}
+	night := func() bool { return true }
+
+	e, p := tvSetup(t)
+	assistantOn(e)
+	p.mu.Lock()
+	p.badSeries = true // Twin Peaks
+	p.mu.Unlock()
+	if n := e.svc.FillPeople(context.Background(), slog.Default(), night); n != 3 {
+		t.Fatalf("pages after an unreadable one: %d", n)
+	}
+	if again := e.svc.FillPeople(context.Background(), slog.Default(), night); again != 0 {
+		t.Fatalf("unreadable page asked again tonight: %d", again)
+	}
+
+	e, p = tvSetup(t)
+	assistantOn(e)
+	p.mu.Lock()
+	p.detailsDown = true
+	p.mu.Unlock()
+	if n := e.svc.FillPeople(context.Background(), slog.Default(), night); n != 0 {
+		t.Fatalf("pages with the provider down: %d", n)
+	}
+	p.mu.Lock()
+	p.detailsDown, p.detailHits = false, 0
+	p.mu.Unlock()
+	if n := e.svc.FillPeople(context.Background(), slog.Default(), night); n != 0 || p.detailHits != 0 {
+		t.Fatalf("asked again the same night: %d pages, %d requests", n, p.detailHits)
+	}
+}
+
 func TestPeopleIndex(t *testing.T) {
 	e, _ := tvSetup(t)
 	m := newFakeModel(t)

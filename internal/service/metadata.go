@@ -152,7 +152,7 @@ func (s *Service) Details(ctx context.Context, itemID int64) (ItemDetails, error
 	if m.Kind != "movie" && m.Kind != "series" {
 		return ItemDetails{}, invalid("schede solo per film e serie")
 	}
-	d, _ := s.itemDetails(ctx, m)
+	d, _ := s.itemDetails(ctx, m) // a page with what is known
 	if d.Cast != "" || d.Director != "" {
 		s.st.PutItemPeople(context.WithoutCancel(ctx), m.ID, peopleText(d.Cast, d.Director))
 	}
@@ -160,12 +160,12 @@ func (s *Service) Details(ctx context.Context, itemID int64) (ItemDetails, error
 }
 
 // itemDetails builds the detail page of a film or series, from the
-// provider (or the collection's files) and TMDB; known is false when the
-// provider did not answer.
-func (s *Service) itemDetails(ctx context.Context, m store.MetaItem) (d ItemDetails, known bool) {
-	p, known := s.providerDetailsChecked(ctx, m)
+// provider (or the collection's files) and TMDB; the error says why the
+// provider's page is missing, the details hold what is known anyway.
+func (s *Service) itemDetails(ctx context.Context, m store.MetaItem) (ItemDetails, error) {
+	p, err := s.providerDetailsChecked(ctx, m)
 	t := s.tmdbTitle(ctx, m, p.TMDB)
-	d = ItemDetails{Sources: []string{}, Title: t.Title, OriginalTitle: first(p.OriginalTitle, t.OriginalTitle),
+	d := ItemDetails{Sources: []string{}, Title: t.Title, OriginalTitle: first(p.OriginalTitle, t.OriginalTitle),
 		Plot: first(p.Plot, t.Overview), Cast: first(p.Cast, strings.Join(t.Cast, ", ")), Director: first(p.Director, t.Director),
 		Genre: first(p.Genre, strings.Join(t.Genres, ", ")), Released: first(p.Released, t.Released), Country: p.Country,
 		Rating: p.Rating, Duration: p.DurationSecs, Trailer: first(p.Trailer, t.Trailer)}
@@ -185,7 +185,7 @@ func (s *Service) itemDetails(ctx context.Context, m store.MetaItem) (d ItemDeta
 		d.Sources = append(d.Sources, "tmdb")
 	}
 	_, d.Local, _ = s.local(ctx, m.SubscriptionID)
-	return d, known
+	return d, err
 }
 
 func first(v ...string) string {
@@ -204,29 +204,30 @@ func (s *Service) providerDetails(ctx context.Context, m store.MetaItem) xtream.
 	return d
 }
 
-// providerDetailsChecked also says whether the page is known: false when
-// the provider was asked and did not answer.
-func (s *Service) providerDetailsChecked(ctx context.Context, m store.MetaItem) (xtream.Details, bool) {
+// providerDetailsChecked also says why the page is not known: the
+// provider was asked and did not answer, or answered something unreadable
+// (xtream.ErrUnreadable).
+func (s *Service) providerDetailsChecked(ctx context.Context, m store.MetaItem) (xtream.Details, error) {
 	key := "p:" + strconv.FormatInt(m.ID, 10)
 	var d xtream.Details
 	if data, at, ok, _ := s.st.Meta(ctx, key); ok {
 		json.Unmarshal([]byte(data), &d)
 		if age := time.Since(at); age < metaFresh && (data != "{}" || age < metaRetry) {
-			return d, true
+			return d, nil
 		}
 	}
 	sub, err := s.st.Subscription(ctx, m.SubscriptionID)
 	if err == nil && sub.Kind == "local" {
-		return s.localDetails(ctx, m), true // read from the folder each time: cheap, always current
+		return s.localDetails(ctx, m), nil // read from the folder each time: cheap, always current
 	}
 	if err != nil || sub.Kind != "xtream" {
-		return d, err == nil
+		return d, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 	client, err := s.xtreamClient(ctx, m.SubscriptionID, 12*time.Second)
 	if err != nil {
-		return d, false
+		return d, err
 	}
 	var fresh xtream.Details
 	if m.Kind == "movie" {
@@ -237,11 +238,11 @@ func (s *Service) providerDetailsChecked(ctx context.Context, m store.MetaItem) 
 		fresh = info.Details
 	}
 	if err != nil {
-		return d, false // the provider did not answer: try again next time
+		return d, err // try again next time
 	}
 	raw, _ := json.Marshal(fresh)
 	s.st.PutMeta(context.WithoutCancel(ctx), key, string(raw))
-	return fresh, true
+	return fresh, nil
 }
 
 func (s *Service) tmdbTitle(ctx context.Context, m store.MetaItem, fallbackID string) tmdb.Title {
