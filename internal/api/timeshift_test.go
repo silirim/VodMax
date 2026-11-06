@@ -1,6 +1,7 @@
 package api
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -51,6 +52,22 @@ func TestTimeshiftBuffer(t *testing.T) {
 	}
 	if code, ctype, data := get(t, e, sess.URL); code != 200 || ctype != "application/vnd.apple.mpegurl" || !strings.Contains(string(data), "seg000000.ts") {
 		t.Fatalf("playlist: %d %s %s", code, ctype, data)
+	}
+	// The playlist travels compressed to players that accept it.
+	req, _ := http.NewRequest("GET", e.srv.URL+sess.URL, nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	if resp, err := http.DefaultTransport.RoundTrip(req); err != nil || resp.Header.Get("Content-Encoding") != "gzip" {
+		t.Fatalf("compressed playlist: %v %v", err, resp)
+	} else {
+		zr, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, _ := io.ReadAll(zr)
+		resp.Body.Close()
+		if !strings.Contains(string(data), "seg000000.ts") {
+			t.Fatalf("compressed playlist: %s", data)
+		}
 	}
 	segURL := strings.TrimSuffix(sess.URL, "index.m3u8") + "seg000000.ts"
 	if code, _, data := get(t, e, segURL); code != 200 || len(data) != 4000 {

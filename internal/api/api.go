@@ -10,6 +10,7 @@ package api
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1999,6 +2000,16 @@ func (a *api) timeshiftFile(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(path, ".m3u8") {
 		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
 		w.Header().Set("Cache-Control", "no-store")
+		// A full window lists thousands of segments (~300 KB), fetched
+		// again every couple of seconds: compressed it is ~20 times smaller.
+		w.Header().Set("Vary", "Accept-Encoding")
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			w.Header().Set("Content-Encoding", "gzip")
+			zw := gzip.NewWriter(w)
+			zw.Write(data)
+			zw.Close()
+			return
+		}
 	} else {
 		w.Header().Set("Content-Type", "video/mp2t")
 		w.Header().Set("Cache-Control", "private, max-age=3600")
