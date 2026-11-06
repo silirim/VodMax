@@ -652,3 +652,34 @@ func TestHiddenByIDStaysHiddenWithItsNewKey(t *testing.T) {
 		t.Fatalf("back in continue watching: %+v %v (hidden %q)", l, err, key)
 	}
 }
+
+// A backup made before 0.6.7 brings favourites and rules on the old keys
+// ("|1980", "1") into a database that never held them: the import that
+// fills the catalog again carries them to the new keys.
+func TestOldKeysOfARestoredBackupCarried(t *testing.T) {
+	st, sub := openTest(t)
+	ctx := context.Background()
+	st.w.ExecContext(ctx, `INSERT INTO favorite (profile_id, kind, group_key, position, added_at) VALUES (7, 'movie', '|1980', 0, 1), (7, 'live', '1', 1, 1)`)
+	ruleID, _ := st.AddRecordingRule(ctx, RecordingRule{Name: "Notizie", Spec: RuleSpec{All: []string{"новости"}, Channel: "1"}, Enabled: true})
+	items := []Item{
+		{Kind: "live", SourceID: "3", Title: "Россия 1", DisplayTitle: "Россия 1", GroupKey: "россия 1", LegacyKey: "1"},
+		{Kind: "live", SourceID: "5", Title: "Rai 1", DisplayTitle: "Rai 1", GroupKey: "rai 1", LegacyKey: "rai 1"},
+		{Kind: "movie", SourceID: "10", Title: "Москва слезам не верит", DisplayTitle: "Москва слезам не верит", Year: 1980,
+			GroupKey: "москва слезам не верит|1980", LegacyKey: "|1980"},
+	}
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live", "movie"}, nil, items, false); err != nil {
+		t.Fatal(err)
+	}
+	favs := map[string]bool{}
+	rows, _ := st.r.QueryContext(ctx, `SELECT kind || ':' || group_key FROM favorite WHERE profile_id = 7`)
+	for rows.Next() {
+		var k string
+		rows.Scan(&k)
+		favs[k] = true
+	}
+	rows.Close()
+	rule, _ := st.RecordingRule(ctx, ruleID)
+	if len(favs) != 2 || !favs["movie:москва слезам не верит|1980"] || !favs["live:россия 1"] || rule.Spec.Channel != "россия 1" {
+		t.Fatalf("favourites %v, rule channel %q", favs, rule.Spec.Channel)
+	}
+}

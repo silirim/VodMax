@@ -69,3 +69,22 @@ func TestQualityAndGroupKey(t *testing.T) {
 		t.Error("Cyrillic films of one year must not merge")
 	}
 }
+
+// The keys of 0.6.6 and earlier, kept to carry what was saved with them.
+func TestLegacyGroupKey(t *testing.T) {
+	for _, c := range []struct {
+		kind, title string
+		year        int
+		want        string
+	}{
+		{"live", "Россия 1", 0, "1"},
+		{"live", "الجزيرة", 0, ""},
+		{"movie", "Москва слезам не верит", 1980, "|1980"},
+		{"live", "Rai 1 HD", 0, "rai 1"},
+		{"movie", "Café Society", 2016, "cafe society|2016"},
+	} {
+		if got := LegacyGroupKey(c.kind, c.title, c.year); got != c.want {
+			t.Errorf("%q: %q, want %q", c.title, got, c.want)
+		}
+	}
+}

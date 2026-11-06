@@ -167,6 +167,7 @@ func finish(it *store.Item, info CategoryInfo) {
 		}
 	}
 	it.GroupKey = GroupKey(it.Kind, it.DisplayTitle, year)
+	it.LegacyKey = LegacyGroupKey(it.Kind, it.DisplayTitle, year)
 }
 
 var trailingID = regexp.MustCompile(`^(\d+)\.[A-Za-z0-9]{1,5}$`)

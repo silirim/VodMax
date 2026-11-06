@@ -118,6 +118,8 @@ var (
 	// titles would otherwise all share the key "" (or just their year).
 	// Marks are kept for scripts whose vowels are spacing marks (Hindi).
 	nonAlnum = regexp.MustCompile(`[^\p{L}\p{M}\p{N}+]+`)
+	// legacyNonAlnum is what 0.6.6 and earlier kept: only a-z and digits.
+	legacyNonAlnum = regexp.MustCompile(`[^a-z0-9+]+`)
 )
 
 // GroupKey identifies variants of the same channel or title: case, accents,
@@ -126,6 +128,17 @@ var (
 // rules and recordings hold group keys: when the function changes, the
 // next import carries them over (store.ReplaceCatalog).
 func GroupKey(kind, displayTitle string, year int) string {
+	return groupKey(kind, displayTitle, year, nonAlnum)
+}
+
+// LegacyGroupKey is the key 0.6.6 and earlier computed. References saved
+// with it (an old backup restored, a subscription synchronised later)
+// move to the new key at an import, whatever the database held before.
+func LegacyGroupKey(kind, displayTitle string, year int) string {
+	return groupKey(kind, displayTitle, year, legacyNonAlnum)
+}
+
+func groupKey(kind, displayTitle string, year int, nonAlnum *regexp.Regexp) string {
 	s := strings.ToLower(norm.NFKD.String(displayTitle))
 	s = strings.Map(func(r rune) rune {
 		if unicode.Is(unicode.Mn, r) {

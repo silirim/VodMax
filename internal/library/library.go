@@ -148,6 +148,7 @@ func scanMovies(root string) (*Result, error) {
 			it.AddedAt = st.ModTime().Unix()
 		}
 		it.GroupKey = catalog.GroupKey("movie", it.DisplayTitle, it.Year)
+		it.LegacyKey = catalog.LegacyGroupKey("movie", it.DisplayTitle, it.Year)
 		res.Items = append(res.Items, it)
 	}
 	return res, nil
@@ -239,6 +240,7 @@ func scanSeries(root string) (*Result, error) {
 		})
 		it.AddedAt = newest
 		it.GroupKey = catalog.GroupKey("series", it.DisplayTitle, it.Year)
+		it.LegacyKey = catalog.LegacyGroupKey("series", it.DisplayTitle, it.Year)
 		res.Items = append(res.Items, it)
 		res.Episodes[name] = eps
 	}

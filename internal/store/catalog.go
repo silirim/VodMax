@@ -33,6 +33,7 @@ type Item struct {
 	GroupKey     string // identifies variants of the same title or channel
 	LCN          int    // official channel number, 0 if not recognised
 	NameKey      string // normalised channel name, to match the guide
+	LegacyKey    string // the group key of 0.6.6 and earlier (not stored)
 }
 
 // Category groups items of one kind inside a subscription, with what
@@ -146,8 +147,11 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 		return res, err
 	}
 	defer stmt.Close()
-	written, seen := 0, map[string][]string{}
+	written, seen, legacy := 0, map[string][]string{}, map[string][][2]string{}
 	for _, it := range items {
+		if it.LegacyKey != "" && it.LegacyKey != it.GroupKey {
+			legacy[it.Kind] = append(legacy[it.Kind], [2]string{it.SourceID, it.LegacyKey})
+		}
 		var first int64
 		err := stmt.QueryRowContext(ctx, subID, it.Kind, it.SourceID, it.Title, it.DisplayTitle, zeroNull(it.Year),
 			it.CategoryID, it.Image, it.EPGID, zeroNull(it.Number), zeroNullF(it.Rating), it.TMDBID, it.Extension,
@@ -169,6 +173,16 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 	for kind, ids := range seen {
 		list, _ := json.Marshal(ids)
 		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO temp.seen_item SELECT ?, value FROM json_each(?)`, kind, string(list)); err != nil {
+			return res, err
+		}
+	}
+	// References still on the keys of 0.6.6 (a backup restored, another
+	// subscription synchronised later) are carried as if the key had just
+	// changed: the database may never have held the old key.
+	for kind, pairs := range legacy {
+		list, _ := json.Marshal(pairs)
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO temp.moved_item SELECT i.id, i.kind, j.value ->> 1 FROM json_each(?) j
+			JOIN item i ON i.subscription_id = ? AND i.kind = ? AND i.source_id = j.value ->> 0`, string(list), subID, kind); err != nil {
 			return res, err
 		}
 	}
