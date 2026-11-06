@@ -1749,7 +1749,31 @@
     showBar();
   }
 
-  function recordingError(type, detail) { flash(t("Registrazione non riproducibile ({detail})", { detail })); }
+  function recordingError(type, detail) {
+    const p = state.play;
+    const fail = () => flash(t("Registrazione non riproducibile ({detail})", { detail }));
+    if (!p || !p.recording || !p.reopen || p.swapped) { fail(); return; }
+    // The conversion to MP4 may have ended while it played: the TS is gone
+    // and ?t= now answers the MP4. Once, ask again and play that file from
+    // the same second.
+    p.swapped = true;
+    const at = position();
+    api("POST", "/api/v1/recordings/" + p.recording.id + "/ticket").then((tk) => {
+      if (state.play !== p) return;
+      if (tk.ts || typeof tk.recorded === "number") { fail(); return; }
+      if (p.ts) { p.ts.destroy(); p.ts = null; }
+      p.reopen = false;
+      p.growing = null;
+      p.offset = 0;
+      p.sess.url = tk.url;
+      if (tk.duration) p.duration = tk.duration;
+      $("player-live").hidden = true;
+      video.src = tk.url;
+      video.addEventListener("loadedmetadata", () => { if (state.play === p) video.currentTime = at; }, { once: true });
+      video.play().catch(() => flash(t("Premi OK per avviare")));
+      showBar();
+    }).catch(fail);
+  }
 
   // Opens a TS recording at a second (or "live" while it is recorded).
   // The video's clock starts again at 0: position() adds the offset.
