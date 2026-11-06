@@ -327,12 +327,13 @@
   // A request to record, asked in the "tonight" box: the programmes the
   // guide has at that time, to record once, or a rule for every airing.
   // False when the assistant for rules cannot answer (a viewer, a kids
-  // profile): the box then suggests as usual.
+  // profile): the box then suggests as usual. Any other error (the model
+  // still loading, a timeout) is shown, not swapped for suggestions.
   async function recordWish(text, result) {
     const who = await window.VodMax.me().catch(() => null);
     if (who && who.profile && who.profile.kind === "kids") return false;
     let p;
-    try { p = await api("POST", "/api/v1/assistant/rule", { text }); } catch (e) { return false; }
+    try { p = await api("POST", "/api/v1/assistant/rule", { text }); } catch (e) { if (e.status === 403) return false; throw e; }
     let once = p.once || [], fromRule = false;
     // No day or time ("registra Feyenoord Inter"): the next airings of the
     // rule, the live one first, are what to record once.
