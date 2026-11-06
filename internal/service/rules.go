@@ -502,7 +502,13 @@ func (s *Service) DeleteRecordingRule(ctx context.Context, id int64) error {
 // runRule applies one rule now, so the user sees its effect at once.
 func (s *Service) runRule(ctx context.Context, id int64) {
 	r, err := s.st.RecordingRule(ctx, id)
-	if err != nil || !r.Enabled {
+	if err != nil {
+		return
+	}
+	if !r.Enabled {
+		// Suspended: what it scheduled goes too, or it would still take
+		// the connection (those starting within 10 minutes stay).
+		s.dropStale(ctx, r, nil, true)
 		return
 	}
 	// The stored result is in Italian, like the periodic runs.

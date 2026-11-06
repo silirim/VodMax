@@ -275,3 +275,27 @@ func TestBackToBackProgrammesBothRecorded(t *testing.T) {
 		t.Fatalf("the same programme twice: %d (%d programmes)", code, len(progs))
 	}
 }
+
+// Suspending a rule takes away what it had scheduled.
+func TestSuspendedRuleDropsItsRecordings(t *testing.T) {
+	e, _ := tvSetup(t)
+	film := map[string]any{"name": "Film", "all": []string{"film"}}
+	_, body := e.do(t, "POST", "/api/v1/recording-rules", film, true)
+	var rule struct{ ID int64 }
+	json.Unmarshal(body, &rule)
+	if l := recRows(t, e); len(l) != 1 {
+		t.Fatalf("scheduled: %+v", l)
+	}
+	film["enabled"] = false
+	if code, body := e.do(t, "PUT", "/api/v1/recording-rules/"+strconv.FormatInt(rule.ID, 10), film, true); code != 200 {
+		t.Fatalf("suspend: %d %s", code, body)
+	}
+	if l := recRows(t, e); len(l) != 0 {
+		t.Fatalf("suspended rule, still scheduled: %+v", l)
+	}
+	film["enabled"] = true
+	e.do(t, "PUT", "/api/v1/recording-rules/"+strconv.FormatInt(rule.ID, 10), film, true)
+	if l := recRows(t, e); len(l) != 1 {
+		t.Fatalf("resumed rule: %+v", l)
+	}
+}
