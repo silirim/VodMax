@@ -514,7 +514,9 @@ func parseRange(h string) (from, to int64, ranged bool, err error) {
 }
 
 // directCache returns the session's single-connection cache, making a new
-// one if there is none or the last one failed (e.g. after "take control").
+// one if there is none or the last one failed (e.g. busy, then "take
+// control"). A healthy cache is kept even with force: the player repeats
+// ?force=1 on every range of the same file.
 func (s *Service) directCache(sess *vodSession, force bool) (*rangeCache, error) {
 	s.vod.mu.Lock()
 	defer s.vod.mu.Unlock()
@@ -522,7 +524,7 @@ func (s *Service) directCache(sess *vodSession, force bool) (*rangeCache, error)
 		sess.cache.mu.Lock()
 		failed := sess.cache.err != nil
 		sess.cache.mu.Unlock()
-		if !failed && !force {
+		if !failed {
 			return sess.cache, nil
 		}
 		sess.cache.Close()
@@ -537,9 +539,17 @@ func (s *Service) directCache(sess *vodSession, force bool) (*rangeCache, error)
 		return nil, err
 	}
 	url, subID, viewer := sess.url, sess.subID, sess.viewer
+	// Force takes the connection once. Later acquires (after an idle
+	// pause, or after someone else took control) ask like anyone else,
+	// so the film cannot silently take it back.
+	first := force
 	sess.cache = newRangeCache(dir,
 		func() (context.Context, func(), error) {
-			return s.acquire(context.Background(), subID, viewer, force, false)
+			ctx, release, err := s.acquire(context.Background(), subID, viewer, first, false)
+			if err == nil {
+				first = false
+			}
+			return ctx, release, err
 		},
 		func(ctx context.Context, from int64) (io.ReadCloser, int64, error) {
 			resp, err := s.upstream(ctx, subID, url, fmt.Sprintf("bytes=%d-", from))
