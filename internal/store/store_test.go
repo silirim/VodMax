@@ -30,6 +30,12 @@ func openTest(t *testing.T) (*Store, int64) {
 	return st, subID
 }
 
+// selectAll stands in for the selection that follows an import: new rows
+// start hidden.
+func selectAll(st *Store) {
+	st.w.Exec(`UPDATE item SET visible = 1`)
+}
+
 func movies(n int, prefix string) []Item {
 	out := make([]Item, n)
 	for i := range out {
@@ -47,6 +53,7 @@ func TestReplaceKeepsIDsAndMarksRemovals(t *testing.T) {
 	if err != nil || res.Added != 100 || res.Total["movie"] != 100 {
 		t.Fatalf("first import: %+v %v", res, err)
 	}
+	selectAll(st)
 	first, _ := st.Catalog(ctx, Query{Kind: "movie", Limit: 1})
 
 	// Second import: one title renamed, ten removed.
@@ -71,6 +78,7 @@ func TestSuspiciousDropKeepsPreviousCatalog(t *testing.T) {
 	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(200, "Film"), false); err != nil {
 		t.Fatal(err)
 	}
+	selectAll(st)
 	_, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(50, "Film"), false)
 	if !errors.Is(err, ErrSuspiciousDrop) {
 		t.Fatalf("expected drop protection, got %v", err)
@@ -94,6 +102,7 @@ func TestPaginationAndSearch(t *testing.T) {
 	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false); err != nil {
 		t.Fatal(err)
 	}
+	selectAll(st)
 	seen, cursor, pages := map[int64]bool{}, "", 0
 	for {
 		page, err := st.Catalog(ctx, Query{Kind: "movie", Limit: 60, Cursor: cursor})
@@ -173,6 +182,7 @@ func TestSubscriptionRebuildKeepsCatalog(t *testing.T) {
 		func(int64) []byte { return []byte("sealed") })
 	if err == nil {
 		_, err = st.ReplaceCatalog(ctx, subID, []string{"movie"}, nil, movies(10, "Film"), false)
+		selectAll(st)
 	}
 	st.Close()
 	migrations = all
@@ -459,5 +469,26 @@ func TestGroupKeysCarriedOverAfterUpgrade(t *testing.T) {
 	}
 	if _, err := st.ChannelForGroup(ctx, ""); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("channel for the empty key: %v", err)
+	}
+}
+
+// A new title stays hidden until the selection decides about it: a title
+// of an adult category is never open to kids in between. Titles already
+// shown keep their state on the next import.
+func TestNewTitlesHiddenUntilSelection(t *testing.T) {
+	st, sub := openTest(t)
+	ctx := context.Background()
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(3, "Film"), false); err != nil {
+		t.Fatal(err)
+	}
+	if page, _ := st.Catalog(ctx, Query{Kind: "movie", NoAdult: true}); len(page.Items) != 0 {
+		t.Fatalf("new titles shown before the selection: %d", len(page.Items))
+	}
+	selectAll(st)
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(4, "Film"), false); err != nil {
+		t.Fatal(err)
+	}
+	if page, _ := st.Catalog(ctx, Query{Kind: "movie", NoAdult: true}); len(page.Items) != 3 {
+		t.Fatalf("titles already shown: %d", len(page.Items))
 	}
 }

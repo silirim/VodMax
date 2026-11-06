@@ -110,11 +110,15 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 	}
 
 	now := time.Now().UnixNano() // unique per import: identifies rows seen now
+	// New rows start hidden and the selection that follows the import
+	// shows them: if it fails or the process stops in between, a title of
+	// an adult category or an excluded country is not open to every
+	// profile, kids included, until the next selection.
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO item (subscription_id, kind, source_id, title, display_title, year, category_id, image, epg_id,
 			number, rating, tmdb_id, extension, catchup_days, added_at, locator, first_seen_at, last_seen_at, available,
-			quality, group_key, lcn, name_key)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+			quality, group_key, lcn, name_key, visible)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 0)
 		ON CONFLICT (subscription_id, kind, source_id) DO UPDATE SET
 			title = excluded.title, display_title = excluded.display_title, year = excluded.year,
 			category_id = excluded.category_id, image = excluded.image, epg_id = excluded.epg_id,
