@@ -18,20 +18,34 @@ window.VodMax = (() => {
     return id;
   })();
 
-  // A link may carry the token once: "/#token=…". It is saved and removed
-  // from the address bar.
-  function tokenFromLink() {
-    const t = new URLSearchParams(location.hash.slice(1)).get("token");
-    if (t) {
-      store.set("token", t);
-      store.set("profile", "");
-      history.replaceState(null, "", location.pathname + location.search);
+  // A link may carry the token once: "/#token=…". It is removed from the
+  // address bar and saved when this browser has no token, or one the
+  // server refuses (the Android app's own server sends a link only when its
+  // admin.token changed). A token that still works is replaced only after
+  // asking: a link someone sends must not unpair this device or move it
+  // onto theirs.
+  async function tokenFromLink() {
+    const link = new URLSearchParams(location.hash.slice(1)).get("token");
+    if (!link) return false;
+    history.replaceState(null, "", location.pathname + location.search);
+    const now = token();
+    if (link === now) return false;
+    if (now) {
+      // The device a token belongs to; null when the server refuses it.
+      const me = (tok) => fetch("/api/v1/me", { headers: { Authorization: "Bearer " + tok } })
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      const [cur, next] = await Promise.all([me(now), me(link)]);
+      if (!next) return false; // the link opens nothing: keep this device
+      if (cur && !confirm(t("Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?",
+        { link: next.device.name, current: cur.device.name }))) return false;
     }
-    return Boolean(t);
+    store.set("token", link);
+    store.set("profile", "");
+    return true;
   }
-  tokenFromLink();
+  const linkReady = tokenFromLink();
   // Pasting a new link in the same tab only changes the hash: no reload.
-  addEventListener("hashchange", () => { if (tokenFromLink()) location.reload(); });
+  addEventListener("hashchange", async () => { if (await tokenFromLink()) location.reload(); });
 
   // Back from the sign-in with an account of the house: "/#sso=…" is a
   // one-time code for the tokens, "/#sso_error=…" the reason it failed.
@@ -501,6 +515,7 @@ window.VodMax = (() => {
   // Runs start() once the device is paired, otherwise pairs it.
   async function withToken(start) {
     await ssoReady;
+    await linkReady;
     if (!token()) { showPairing(); return; }
     start();
     decorate();

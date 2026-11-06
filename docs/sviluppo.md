@@ -21,7 +21,7 @@ principi, scenari e direzione in [direzione.md](direzione.md).
 | `internal/library` | Raccolte locali: titoli e anni dai nomi dei file, episodi (`S01E03`, `1x03`, `Stagione N`), `.nfo` e immagini accanto ai video. |
 | `internal/lineup` | Riconoscimento dei canali nazionali e numerazione LCN ufficiale. |
 | `internal/epg` | Lettura in streaming delle guide XMLTV. |
-| `internal/web` | Interfaccia da telecomando: menu (`/`: Home, Film, Serie, Registrazioni), TV (`/tv.html`), guida (`/guide.html`), multiview (`/multiview.html`), Impostazioni (`/settings.html`); HTML/JS senza framework, mpegts.js 1.8.2 incluso, testi tradotti da `static/i18n/`. Un link `/#token=…` salva il token di accesso. |
+| `internal/web` | Interfaccia da telecomando: menu (`/`: Home, Film, Serie, Registrazioni), TV (`/tv.html`), guida (`/guide.html`), multiview (`/multiview.html`), Impostazioni (`/settings.html`); HTML/JS senza framework, mpegts.js 1.8.2 incluso, testi tradotti da `static/i18n/`. Un link `/#token=…` salva il token di accesso; se il browser ne ha già uno che funziona, chiede prima di sostituirlo, dicendo i nomi dei due dispositivi. |
 | `clients/android`, `clients/webos` | App Android (WebView sull'interfaccia del server, lettore Media3, server interno per l'uso da solo) e avvio per TV LG webOS. |
 | `cmd/vodmax-server` | Il server. |
 | `cmd/vodmax-probe` | Strumento di prova: `.conf`, tunnel, login Xtream. |
