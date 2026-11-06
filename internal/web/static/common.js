@@ -111,9 +111,17 @@ window.VodMax = (() => {
   }
 
   // Pairing: the device shows a code, an admin approves it elsewhere.
-  let pairingTimer;
-  async function showPairing(fresh) {
+  // A page fails several requests with 401 at once: they share one run,
+  // or each would ask for a code of its own and keep polling it (the
+  // server allows only a few codes per address).
+  let pairingTimer, pairingRun = null;
+  function showPairing(fresh) {
+    if (!pairingRun) pairingRun = startPairing(fresh).finally(() => { pairingRun = null; });
+    return pairingRun;
+  }
+  async function startPairing(fresh) {
     clearTimeout(pairingTimer);
+    pairingPoll = null; // a poll of the previous code still waiting stops there
     // The code of this device is kept while it is valid: moving between
     // pages does not ask for new ones (the server allows a few per address).
     let req = fresh ? null : store.get("pairing", null);
@@ -134,7 +142,7 @@ window.VodMax = (() => {
       return;
     }
     const code = el("p", { className: "pair-code" }, req.code);
-    const admin = el("button", { type: "button", className: "link", onclick: () => { clearTimeout(pairingTimer); askToken(); } }, t("Ho il token di amministrazione"));
+    const admin = el("button", { type: "button", className: "link", onclick: () => { clearTimeout(pairingTimer); pairingPoll = null; askToken(); } }, t("Ho il token di amministrazione"));
     const sso = await fetch("/api/v1/sso").then((r) => r.json()).catch(() => ({}));
     const ssoButton = sso.enabled ? el("button", { type: "button", className: "sso", onclick: () => { location.href = "/auth/sso/start"; } },
       sso.label ? t("Entra con {name}", { name: sso.label }) : t("Entra con il tuo account")) : null;
@@ -154,8 +162,10 @@ window.VodMax = (() => {
           location.reload();
           return;
         }
-        if (res.status === 404) { store.set("pairing", null); showPairing(true); return; }
+        if (res.status === 404) { if (poll === pairingPoll) { store.set("pairing", null); showPairing(true); } return; }
       } catch { /* network hiccup: keep polling */ }
+      if (poll !== pairingPoll) return; // a newer code has its own loop
+      clearTimeout(pairingTimer); // the foreground check may have polled meanwhile: one loop only
       pairingTimer = setTimeout(poll, 3000);
     };
     pairingTimer = setTimeout(poll, 3000);
@@ -628,7 +638,9 @@ window.VodMax = (() => {
     const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     const data = res.status === 204 ? null : await res.json().catch(() => null);
     if (res.status === 401) {
-      showPairing();
+      // Checks that repeat (server status every 30 s) leave an open pairing
+      // or token panel as it is: no new code, no form wiped while typing.
+      if (!document.querySelector("#pairing, #token-setup")) showPairing();
       throw handled(t("dispositivo non abbinato"));
     }
     if (res.status === 403 && data && data.code === "profile_required") {
