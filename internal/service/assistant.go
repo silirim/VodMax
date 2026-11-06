@@ -461,15 +461,12 @@ func languageName(ctx context.Context) string {
 // RuleProposal is a rule to check in the form, with the model's reasoning.
 type RuleProposal struct {
 	Rule        RuleInput `json:"rule"`
-	ChannelName string    `json:"channel_name,omitempty"`
 	Explanation string    `json:"explanation"`
 	// Once: when the sentence names a day or a time ("tonight at 21"),
 	// the guide's programmes then, so that the person can record just
-	// that one instead of every airing of the title.
+	// that one instead of every airing of the title. It can come without
+	// a rule that stands (no title named).
 	Once []RuleMatch `json:"once,omitempty"`
-	// RuleError: the rule itself does not stand (no title named), while
-	// Once has the programme.
-	RuleError string `json:"rule_error,omitempty"`
 }
 
 const rulePrompt = `You turn a request into a recording rule for VodMax, a TV recorder. A rule records every programme of the TV guide whose title (or subtitle) matches. Fields:
@@ -550,7 +547,7 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (p RuleProposa
 	if want := fold(out.Channel); want != "" {
 		for _, c := range channels {
 			if fold(promptText(c.Name, 60)) == want { // as the model read it
-				p.Rule.ChannelID, p.ChannelName = c.ID, c.Name
+				p.Rule.ChannelID = c.ID
 				break
 			}
 		}
@@ -569,13 +566,10 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (p RuleProposa
 	}
 	p.Once = s.onceCandidates(ctx, onceAsk{date: out.Date, clock: out.Time, evening: eveningRE.MatchString(fold(text)), film: filmRE.MatchString(fold(text))},
 		r, err == nil, channel, time.Now())
-	if err != nil {
-		// "The film at 21 on Rai 1": no title to make a rule of, but the
-		// guide knows the programme.
-		if len(p.Once) == 0 {
-			return p, err
-		}
-		p.RuleError = err.Error()
+	// "The film at 21 on Rai 1": no title to make a rule of, but the guide
+	// knows the programme.
+	if err != nil && len(p.Once) == 0 {
+		return p, err
 	}
 	return p, nil
 }

@@ -78,6 +78,12 @@ func TestAssistant(t *testing.T) {
 	}
 
 	// A rule from a sentence: the model's channel name becomes the channel.
+	var cielo int64
+	for _, c := range channels(t, e, "") {
+		if c.Name == "Cielo" {
+			cielo = c.ID
+		}
+	}
 	m.noJSON = true
 	m.answer = func(system, user string) string {
 		if !strings.Contains(system, "Cielo") || !strings.HasPrefix(user, "registra le partite della Juve in diretta su Cielo") {
@@ -93,11 +99,10 @@ func TestAssistant(t *testing.T) {
 			ChannelID int64 `json:"channel_id"`
 			LiveOnly  bool  `json:"live_only"`
 		}
-		ChannelName string `json:"channel_name"`
 		Explanation string
 	}
 	if code != 200 || json.Unmarshal(body, &p) != nil || p.Rule.Name != "Juventus" || p.Rule.All[0] != "juventus" || !p.Rule.LiveOnly ||
-		p.Rule.ChannelID == 0 || p.ChannelName != "Cielo" || p.Explanation == "" {
+		p.Rule.ChannelID == 0 || p.Rule.ChannelID != cielo || p.Explanation == "" {
 		t.Fatalf("rule: %d %s", code, body)
 	}
 	if n := len(m.requests); n < 2 {
@@ -134,7 +139,6 @@ func TestAssistant(t *testing.T) {
 			Title       string
 			Start, Stop int64
 		}
-		RuleError string `json:"rule_error"`
 	}
 	if code != 200 || json.Unmarshal(body, &o) != nil || len(o.Once) != 2 || o.Once[0].Title != "Film della sera" || o.Once[0].ChannelID == 0 ||
 		o.Once[1].Title != "TG1" {
