@@ -57,6 +57,13 @@ window.VodMax = (() => {
     if (!code && !ssoError) return;
     history.replaceState(null, "", location.pathname + location.search);
     if (!code) return;
+    // As for "#token=": a sign-in link someone sends must not unpair a
+    // device that works.
+    const now = token();
+    const cur = now && await fetch("/api/v1/me", { headers: { Authorization: "Bearer " + now } })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (cur && !confirm(t("Questo accesso con l'account di casa sostituisce il dispositivo «{current}» di questo browser. Continuare?",
+      { current: cur.device.name }))) return;
     try {
       const res = await fetch("/api/v1/sso/claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
       const data = await res.json();
