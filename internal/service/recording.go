@@ -870,7 +870,8 @@ func (s *Service) DeleteRecording(ctx context.Context, id int64) error {
 // ---- Watching recordings ----
 
 // activeRecordingFor returns the running recording of the channel an item
-// belongs to, if any.
+// belongs to, if any. Back to back, the one with the most data: the next
+// one may still be waiting for the connection with an empty file.
 func (s *Service) activeRecordingFor(ctx context.Context, itemID int64) *activeRec {
 	group, err := s.st.GroupKeyOf(ctx, itemID)
 	if err != nil {
@@ -878,12 +879,13 @@ func (s *Service) activeRecordingFor(ctx context.Context, itemID int64) *activeR
 	}
 	s.rec.mu.Lock()
 	defer s.rec.mu.Unlock()
+	var best *activeRec
 	for _, a := range s.rec.running {
-		if a.rec.GroupKey == group {
-			return a
+		if a.rec.GroupKey == group && (best == nil || a.size() > best.size()) {
+			best = a
 		}
 	}
-	return nil
+	return best
 }
 
 // followRecording streams a growing recording from close to its end, like
