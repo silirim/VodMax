@@ -1725,9 +1725,12 @@
     const isTS = growing || Boolean(ts);
     const startSec = from === "live" ? Math.max(0, recorded - 4) : 0;
     if (window.VodMax.native) {
+      // Apps before 0.6.7 show a dead time bar on a reopened stream: a
+      // finished TS goes to them as a plain file, as it did then.
+      const reopen = growing || (isTS && !window.VodMax.newerVersion("0.6.7", window.VodMax.native.version()));
       playNative({ media: "recording", id: r.id, title: r.title + " · " + r.channel, startAt: 0, live: growing,
-        sess: { mode: "direct", url: isTS ? url + "?t=" + from : url },
-        restart: isTS ? { url: url + "?t=", offset: startSec, duration: Math.max(1, growing ? recorded : length || 0), grows: growing } : null });
+        sess: { mode: "direct", url: reopen ? url + "?t=" + from : url },
+        restart: reopen ? { url: url + "?t=", offset: startSec, duration: Math.max(1, growing ? recorded : length || 0), grows: growing } : null });
       return;
     }
     stopPlayback(false);
