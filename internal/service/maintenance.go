@@ -26,6 +26,10 @@ const (
 	vpnStaleAfter = 75 * time.Second
 	vpnMaxBackoff = 5 * time.Minute
 	syncRetry     = time.Hour // after a failed nightly sync
+	// Logos and posters in the database: older or beyond the budget they
+	// go, and are fetched again when asked.
+	imageCacheAge    = 30 * 24 * time.Hour
+	imageCacheBudget = 256 << 20
 )
 
 // VPNHealth is what the watchdog knows about a connection.
@@ -50,6 +54,7 @@ type maintenanceState struct {
 	guideRetry map[int64]time.Time
 	backupDir  string
 	rulesRun   time.Time
+	imagesRun  time.Time
 }
 
 func (s *Service) Schedule(ctx context.Context) (Schedule, error) {
@@ -210,6 +215,19 @@ func (s *Service) runScheduled(ctx context.Context, log *slog.Logger, now time.T
 		return
 	}
 	s.updateDue(ctx, log, now)
+	s.mu.Lock()
+	pruneImages := now.Sub(s.maint.imagesRun) >= 24*time.Hour
+	if pruneImages {
+		s.maint.imagesRun = now
+	}
+	s.mu.Unlock()
+	if pruneImages {
+		if n, err := s.st.PruneImageCache(ctx, now.Add(-imageCacheAge), imageCacheBudget); err != nil {
+			log.Warn("pulizia della cache delle immagini non riuscita", "err", err)
+		} else if n > 0 {
+			log.Info("cache delle immagini ridotta", "tolte", n)
+		}
+	}
 	if s.autoBackupDue() {
 		if _, err := s.AutoBackup(ctx); err != nil && !errors.Is(err, errNoBackupDir) {
 			log.Warn("backup automatico non riuscito", "err", err)

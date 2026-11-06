@@ -320,6 +320,25 @@ func (s *Store) PutCachedImage(ctx context.Context, urlHash string, img CachedIm
 	return err
 }
 
+// PruneImageCache drops the images fetched before old, then the oldest
+// until the rest weighs at most budget bytes. The cache refills itself
+// as images are asked again.
+func (s *Store) PruneImageCache(ctx context.Context, old time.Time, budget int64) (int64, error) {
+	res, err := s.w.ExecContext(ctx, `DELETE FROM image_cache WHERE fetched_at < ?`, old.Unix())
+	if err != nil {
+		return 0, err
+	}
+	aged, _ := res.RowsAffected()
+	res, err = s.w.ExecContext(ctx, `DELETE FROM image_cache WHERE url_hash IN (
+		SELECT url_hash FROM (SELECT url_hash, SUM(length(data)) OVER (ORDER BY fetched_at DESC, url_hash) AS kept FROM image_cache)
+		WHERE kept > ?)`, budget)
+	if err != nil {
+		return aged, err
+	}
+	over, _ := res.RowsAffected()
+	return aged + over, nil
+}
+
 // ItemImage returns the provider image URL and subscription of an item.
 func (s *Store) ItemImage(ctx context.Context, itemID int64) (string, int64, error) {
 	var url string

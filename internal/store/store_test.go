@@ -254,3 +254,29 @@ func TestCopyBeforeMigrating(t *testing.T) {
 		t.Fatalf("copies after a plain start: %v", copies)
 	}
 }
+
+// The image cache keeps the newest images within age and size; the rest
+// goes (it is fetched again when asked).
+func TestPruneImageCache(t *testing.T) {
+	st, _ := openTest(t)
+	ctx := context.Background()
+	now := time.Now()
+	for i, age := range []time.Duration{0, time.Hour, 2 * time.Hour, 3 * time.Hour, 40 * 24 * time.Hour} {
+		hash := fmt.Sprintf("h%d", i)
+		if err := st.PutCachedImage(ctx, hash, CachedImage{ContentType: "image/png", Data: make([]byte, 100)}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.w.ExecContext(ctx, `UPDATE image_cache SET fetched_at = ? WHERE url_hash = ?`, now.Add(-age).Unix(), hash); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n, err := st.PruneImageCache(ctx, now.Add(-30*24*time.Hour), 250)
+	if err != nil || n != 3 {
+		t.Fatalf("pruned %d, %v; want 3", n, err)
+	}
+	for i, want := range []bool{true, true, false, false, false} {
+		if _, ok, _ := st.CachedImage(ctx, fmt.Sprintf("h%d", i)); ok != want {
+			t.Errorf("h%d kept=%v, want %v", i, ok, want)
+		}
+	}
+}
