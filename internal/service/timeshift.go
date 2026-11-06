@@ -32,7 +32,10 @@ const (
 	timeshiftIdle     = 90 * time.Second // no request from the player: stop
 	firstSegmentWait  = 25 * time.Second
 	minFreeTimeshift  = 2 << 30
-	liveModeKey       = "live"
+	// A running buffer stops below this: recordings, which refuse to
+	// start under minFreeToRecord, come before pausing live TV.
+	minKeepTimeshift = minFreeToRecord + 512<<20
+	liveModeKey      = "live"
 )
 
 var timeshiftFile = regexp.MustCompile(`^(index\.m3u8|seg[0-9]{6}\.ts)$`)
@@ -249,7 +252,8 @@ func (s *Service) StartTimeshift(ctx context.Context, itemID int64, viewer strin
 		os.RemoveAll(sess.dir)
 		close(sess.done)
 	}()
-	// Stop when the player is gone.
+	// Stop when the player is gone, or when the disk is nearly full (a
+	// long GOP makes segments, and the buffer, larger than planned).
 	go func() {
 		t := time.NewTicker(15 * time.Second)
 		defer t.Stop()
@@ -262,6 +266,13 @@ func (s *Service) StartTimeshift(ctx context.Context, itemID int64, viewer strin
 				idle := time.Since(sess.lastSeen) > timeshiftIdle
 				sess.mu.Unlock()
 				if idle {
+					cancel()
+					return
+				}
+				if free, _, ok := diskSpace(root); ok && free < minKeepTimeshift {
+					if log != nil {
+						log.Warn("diretta con pausa fermata: disco quasi pieno", "libero_mb", free>>20)
+					}
 					cancel()
 					return
 				}
