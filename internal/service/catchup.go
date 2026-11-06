@@ -85,8 +85,11 @@ func (s *Service) NewCatchupSession(ctx context.Context, channelID int64, start,
 	case !start.Before(now.Add(-time.Minute)):
 		return PlaybackSession{}, invalid("il programma non è ancora iniziato")
 	}
-	if stop.After(now) {
-		stop = now // on air: up to now
+	// On air: what the archive has so far. The programme's stop is kept,
+	// so a later opening (seek, or going on at the end) asks for more.
+	end := stop
+	if end.After(now) {
+		end = now
 	}
 	s.stopViewerTimeshift(viewer)
 	client, err := s.xtreamClient(ctx, it.SubscriptionID, time.Minute)
@@ -106,8 +109,8 @@ func (s *Service) NewCatchupSession(ctx context.Context, channelID int64, start,
 		catchup: &catchupInfo{client: client, streamID: it.SourceID, start: start, stop: stop, loc: loc},
 		// No analysis: the archive is the channel's MPEG-TS (H.264 video
 		// is copied, audio converted to AAC).
-		probe: &probeResult{Duration: stop.Sub(start).Seconds(), VideoCodec: "h264", Audio: []Track{}, Subtitles: []Track{}}}
+		probe: &probeResult{Duration: end.Sub(start).Seconds(), VideoCodec: "h264", Audio: []Track{}, Subtitles: []Track{}}}
 	s.addVODSession(sess)
-	return PlaybackSession{ID: sess.id, Mode: "remux", Title: title, Duration: int(stop.Sub(start).Seconds()),
+	return PlaybackSession{ID: sess.id, Mode: "remux", Title: title, Duration: int(end.Sub(start).Seconds()),
 		URL: "/stream/vod/" + sess.id + "/remux", Audio: []Track{}, Subtitles: []Track{}}, nil
 }

@@ -717,8 +717,14 @@ func (s *Service) OpenRemux(ctx context.Context, sessionID string, position floa
 	if c := sess.catchup; c != nil {
 		minute := time.Duration(position*float64(time.Second)) / time.Minute * time.Minute
 		from := c.start.Add(minute)
+		// A programme on air: the archive grows, so ask up to now (not up
+		// to when playback began).
+		end := c.stop
+		if now := time.Now(); end.After(now) {
+			end = now
+		}
 		s.vod.mu.Lock()
-		sess.url = c.client.CatchupURL(c.streamID, from, c.stop.Sub(from)+time.Minute, c.loc)
+		sess.url = c.client.CatchupURL(c.streamID, from, end.Sub(from)+time.Minute, c.loc)
 		s.vod.mu.Unlock()
 		skip, position = position-minute.Seconds(), 0
 		args = append(args, "-fflags", "+genpts+discardcorrupt", "-f", "mpegts")
