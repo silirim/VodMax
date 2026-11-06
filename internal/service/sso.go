@@ -84,8 +84,9 @@ type ssoLogin struct {
 }
 
 type ssoClaim struct {
-	token, profile string
-	expires        time.Time
+	name    string // of the device paired when the browser claims
+	profile int64
+	expires time.Time
 }
 
 type ssoDiscovery struct {
@@ -317,9 +318,8 @@ func (c ssoClaims) audience(clientID string) bool {
 	return json.Unmarshal(c.Aud, &many) == nil && slices.Contains(many, clientID)
 }
 
-// SSOFinish completes the sign-in the provider sent back: it pairs a new
-// device locked to the linked profile and returns a one-time code with
-// which the browser collects its tokens.
+// SSOFinish completes the sign-in the provider sent back: it returns a
+// one-time code with which the browser collects its tokens (SSOClaim).
 func (s *Service) SSOFinish(ctx context.Context, state, code string) (string, error) {
 	s.sso.mu.Lock()
 	l, ok := s.sso.logins[state]
@@ -383,21 +383,12 @@ func (s *Service) SSOFinish(ctx context.Context, state, code string) (string, er
 	if profile == 0 {
 		return "", ErrSSOAccount
 	}
-	p, err := s.st.Profile(ctx, profile)
-	if err != nil {
+	if _, err := s.st.Profile(ctx, profile); err != nil {
 		return "", ErrSSOAccount
 	}
-	token := randomToken()
 	name := "Accesso " + who
 	if utf8.RuneCountInString(name) > 60 {
 		name = name[:60]
-	}
-	id, err := s.st.AddDevice(ctx, name, hashToken(token))
-	if err != nil {
-		return "", err
-	}
-	if err := s.st.UpdateDevice(ctx, id, name, &p.ID); err != nil {
-		return "", err
 	}
 	once := randomToken()
 	s.sso.mu.Lock()
@@ -409,7 +400,7 @@ func (s *Service) SSOFinish(ctx context.Context, state, code string) (string, er
 			delete(s.sso.claims, k)
 		}
 	}
-	s.sso.claims[once] = ssoClaim{token: token, profile: strconv.FormatInt(p.ID, 10) + "." + s.profileSignature(id, p), expires: time.Now().Add(ssoClaimTTL)}
+	s.sso.claims[once] = ssoClaim{name: name, profile: profile, expires: time.Now().Add(ssoClaimTTL)}
 	s.sso.mu.Unlock()
 	return once, nil
 }
@@ -435,16 +426,30 @@ func ssoMatch(accounts []SSOAccount, c ssoClaims) (int64, string) {
 	return 0, ""
 }
 
-// SSOClaim hands the device and profile tokens out, once.
-func (s *Service) SSOClaim(code string) (token, profile string, err error) {
+// SSOClaim pairs the browser, on a device locked to the linked profile,
+// and hands the device and profile tokens out, once. The device is created
+// only here: a sign-in whose code is never collected leaves nothing behind.
+func (s *Service) SSOClaim(ctx context.Context, code string) (token, profile string, err error) {
 	s.sso.mu.Lock()
-	defer s.sso.mu.Unlock()
 	c, ok := s.sso.claims[code]
 	delete(s.sso.claims, code)
+	s.sso.mu.Unlock()
 	if !ok || time.Now().After(c.expires) {
 		return "", "", ErrSSOLogin
 	}
-	return c.token, c.profile, nil
+	p, err := s.st.Profile(ctx, c.profile)
+	if err != nil {
+		return "", "", ErrSSOAccount
+	}
+	token = randomToken()
+	id, err := s.st.AddDevice(ctx, c.name, hashToken(token))
+	if err != nil {
+		return "", "", err
+	}
+	if err := s.st.UpdateDevice(ctx, id, c.name, &p.ID); err != nil {
+		return "", "", err
+	}
+	return token, strconv.FormatInt(p.ID, 10) + "." + s.profileSignature(id, p), nil
 }
 
 // SetSSOClient replaces the HTTP client towards the sign-in provider (tests).

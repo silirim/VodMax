@@ -61,9 +61,13 @@ func (a *api) ssoClaim(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	token, profile, err := a.svc.SSOClaim(in.Code)
-	if err != nil {
+	token, profile, err := a.svc.SSOClaim(r.Context(), in.Code)
+	if errors.Is(err, service.ErrSSOLogin) || errors.Is(err, service.ErrSSOAccount) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": service.Localize(service.LangOf(r.Context()), err)})
+		return
+	}
+	if err != nil {
+		a.fail(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"token": token, "profile": profile})

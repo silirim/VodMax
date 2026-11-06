@@ -118,6 +118,10 @@ func TestSSOSignIn(t *testing.T) {
 	if frag.Get("sso") == "" {
 		t.Fatalf("no code: %v", frag)
 	}
+	// Not collected yet: no device (a code never claimed leaves none).
+	if _, body := e.do(t, "GET", "/api/v1/devices", nil, true); strings.Contains(string(body), "giulia@example.org") {
+		t.Fatalf("device before the claim: %s", body)
+	}
 	code, body = e.call(t, "POST", "/api/v1/sso/claim", map[string]string{"code": frag.Get("sso")}, "", "")
 	var got struct{ Token, Profile string }
 	if code != 200 || json.Unmarshal(body, &got) != nil || got.Token == "" || got.Profile == "" {
