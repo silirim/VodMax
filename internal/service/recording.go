@@ -337,7 +337,13 @@ func (s *Service) convertRecording(r store.Recording, secs float64) {
 		delete(s.rec.converting, r.ID)
 		s.rec.mu.Unlock()
 	}()
-	if strings.HasSuffix(r.File, ".ts") {
+	// The MP4 is written next to the TS: without room for a second copy it
+	// would fill the disk and cut the recordings running now.
+	if fi, err := os.Stat(r.File); err == nil && strings.HasSuffix(r.File, ".ts") && !roomFor(filepath.Dir(r.File), fi.Size()) {
+		if s.rec.log != nil {
+			s.rec.log.Warn("registrazione lasciata in MPEG-TS: spazio insufficiente per la conversione", "id", r.ID, "mb", fi.Size()>>20)
+		}
+	} else if strings.HasSuffix(r.File, ".ts") {
 		if mp4, err := s.remuxRecording(ctx, r.File, secs); err != nil {
 			if s.rec.log != nil && ctx.Err() == nil {
 				s.rec.log.Warn("registrazione lasciata in MPEG-TS", "id", r.ID, "err", err)

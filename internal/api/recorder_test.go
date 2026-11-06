@@ -366,3 +366,33 @@ func TestFinishedTSRecordingFromASecond(t *testing.T) {
 		t.Fatalf("from second 3 of %v: %d bytes of %d", tk.Duration, len(got), fi.Size())
 	}
 }
+
+// A TS bigger than the free space is not converted: the MP4 next to it
+// would fill the disk and cut the recordings running meanwhile.
+func TestNoConversionWithoutRoom(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.svc.SetFFmpeg(fakeConverter(t, false, true), "") // fails the check: stays TS
+	recordFor(t, e, 2, "Grande")
+	time.Sleep(4 * time.Second)
+	names := recFiles(t, e)
+	if len(names) != 1 || !strings.HasSuffix(names[0], ".ts") {
+		t.Fatalf("before the restart: %v", names)
+	}
+	e.stop()
+	// Sparse: 8 TiB that take no room, more than any test disk has free.
+	if err := os.Truncate(filepath.Join(e.recordings, names[0]), 1<<43); err != nil {
+		t.Skip(err)
+	}
+	called := filepath.Join(t.TempDir(), "called")
+	ff := filepath.Join(t.TempDir(), "ffmpeg")
+	os.WriteFile(ff, []byte("#!/bin/sh\ntouch "+called+"\nexit 1\n"), 0o700)
+	e.prepare = func(s *service.Service) { s.SetFFmpeg(ff, "") }
+	e.start()
+	time.Sleep(time.Second)
+	if _, err := os.Stat(called); err == nil {
+		t.Fatal("conversion started without room for the MP4")
+	}
+	if names := recFiles(t, e); len(names) != 1 || !strings.HasSuffix(names[0], ".ts") {
+		t.Fatalf("after the restart: %v", names)
+	}
+}

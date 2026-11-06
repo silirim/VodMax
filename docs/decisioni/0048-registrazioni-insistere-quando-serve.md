@@ -58,6 +58,10 @@ causa sbagliata.
   Altrimenti resta il TS.
 - A ogni avvio le registrazioni finite rimaste in TS (versioni precedenti,
   conversioni fallite, riavvii) si riconvertono, una alla volta.
+- La conversione parte solo se sul disco c'è posto per una seconda copia
+  (oltre al giga che resta sempre libero): l'MP4 si scrive accanto al TS,
+  e riempire il disco fermerebbe le registrazioni in corso. Altrimenti
+  resta il TS, e si riprova al prossimo avvio.
 
 ## Non ancora
 
