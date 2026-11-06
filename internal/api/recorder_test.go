@@ -154,3 +154,81 @@ func TestRecordingLengthLeavesOutGaps(t *testing.T) {
 		t.Fatalf("ticket after 4 s with 2 short connections: %s", body)
 	}
 }
+
+// slowFFmpeg converts a recording in about 3 s (it copies the file).
+func slowFFmpeg(t *testing.T) string {
+	t.Helper()
+	ff := filepath.Join(t.TempDir(), "ffmpeg")
+	script := "#!/bin/sh\nprev=; for a; do [ \"$prev\" = -i ] && in=\"$a\"; prev=\"$a\"; last=\"$a\"; done\nsleep 3\ncp \"$in\" \"$last\"\n"
+	if err := os.WriteFile(ff, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return ff
+}
+
+func recFiles(t *testing.T, e *env) []string {
+	t.Helper()
+	entries, _ := os.ReadDir(e.recordings)
+	var names []string
+	for _, x := range entries {
+		names = append(names, x.Name())
+	}
+	return names
+}
+
+// Stopping a recording answers once it is saved, without waiting for the
+// conversion to MP4; deleting it while it converts leaves no file behind.
+func TestRecordingConversionAfterTheSave(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.svc.SetFFmpeg(slowFFmpeg(t), "")
+	rai := channels(t, e, "?section=tv")[0]
+	now := time.Now().Unix()
+	_, body := e.do(t, "POST", "/api/v1/recordings", map[string]any{"channel_id": rai.ID, "start": now, "stop": now + 600, "title": "Ferma"}, true)
+	var rec struct{ ID int64 }
+	json.Unmarshal(body, &rec)
+	time.Sleep(time.Second)
+	began := time.Now()
+	if code, body := e.do(t, "POST", fmt.Sprintf("/api/v1/recordings/%d/stop", rec.ID), nil, true); code != 204 || time.Since(began) > 2*time.Second {
+		t.Fatalf("stop: %d %s after %v", code, body, time.Since(began))
+	}
+	if l := recRows(t, e); len(l) != 1 || l[0].Status != "completed" {
+		t.Fatalf("while converting: %+v", l)
+	}
+	time.Sleep(4 * time.Second)
+	if names := recFiles(t, e); len(names) != 1 || !strings.HasSuffix(names[0], ".mp4") {
+		t.Fatalf("after the conversion: %v", names)
+	}
+
+	// Deleted in the middle of its conversion.
+	now = time.Now().Unix()
+	_, body = e.do(t, "POST", "/api/v1/recordings", map[string]any{"channel_id": rai.ID, "start": now, "stop": now + 2, "title": "Breve"}, true)
+	json.Unmarshal(body, &rec)
+	time.Sleep(3500 * time.Millisecond) // ended, converting
+	if code, body := e.do(t, "DELETE", fmt.Sprintf("/api/v1/recordings/%d", rec.ID), nil, true); code != 204 {
+		t.Fatalf("delete while converting: %d %s", code, body)
+	}
+	time.Sleep(4 * time.Second)
+	if l, names := recRows(t, e), recFiles(t, e); len(l) != 1 || len(names) != 1 {
+		t.Fatalf("after deleting during the conversion: %+v, files %v", l, names)
+	}
+}
+
+// A restart while a stopped recording converts: it stays stopped and
+// finished, it does not start again.
+func TestRestartDuringConversionKeepsTheRecordingStopped(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.svc.SetFFmpeg(slowFFmpeg(t), "")
+	rai := channels(t, e, "?section=tv")[0]
+	now := time.Now().Unix()
+	_, body := e.do(t, "POST", "/api/v1/recordings", map[string]any{"channel_id": rai.ID, "start": now, "stop": now + 600, "title": "Ferma"}, true)
+	var rec struct{ ID int64 }
+	json.Unmarshal(body, &rec)
+	time.Sleep(time.Second)
+	e.do(t, "POST", fmt.Sprintf("/api/v1/recordings/%d/stop", rec.ID), nil, true)
+	e.stop()
+	e.start()
+	time.Sleep(6 * time.Second)
+	if l := recRows(t, e); len(l) != 1 || l[0].Status != "completed" || !strings.Contains(l[0].Error, "prima della fine") || l[0].Stop > time.Now().Unix() {
+		t.Fatalf("after the restart: %+v", l)
+	}
+}

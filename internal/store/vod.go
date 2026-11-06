@@ -397,6 +397,17 @@ func (s *Store) UpdateRecording(ctx context.Context, r Recording) error {
 	return err
 }
 
+// SetRecordingFile points a recording at a new file, if it still has the
+// old one; false if not (deleted, or changed meanwhile).
+func (s *Store) SetRecordingFile(ctx context.Context, id int64, old, file string, bytes int64) (bool, error) {
+	res, err := s.w.ExecContext(ctx, `UPDATE recording SET file = ?, bytes = ? WHERE id = ? AND file = ?`, file, bytes, id, old)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
 func (s *Store) DeleteRecording(ctx context.Context, id int64) error {
 	_, err := s.w.ExecContext(ctx, `DELETE FROM recording WHERE id = ?`, id)
 	return err

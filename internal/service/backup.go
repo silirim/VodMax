@@ -187,7 +187,7 @@ func (s *Service) RestoreBackup(ctx context.Context, data []byte, password strin
 		return err
 	}
 	s.rec.mu.Lock()
-	busy := len(s.rec.running) > 0
+	busy := len(s.rec.running) > 0 || len(s.rec.converting) > 0
 	s.rec.mu.Unlock()
 	if busy {
 		return ErrBusyRecording

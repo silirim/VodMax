@@ -59,6 +59,11 @@ type recorderState struct {
 	resumed []int64         // recordings carried on after a restart
 	ctx     context.Context // the recorder's: it ends when the server stops
 	stall   time.Duration   // no data for this long: reconnect (0: recordStall)
+	// converting: finished recordings being turned into MP4.
+	converting map[int64]bool
+	// files serialises the switch to the MP4 with deletions, so that
+	// neither leaves a file without its recording.
+	files sync.Mutex
 	// contention: per subscription, the last recording cut again and
 	// again soon after each reconnection (shown in the status).
 	contention map[int64]contention
@@ -234,21 +239,19 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 	s.rec.running[r.ID] = a
 	s.rec.mu.Unlock()
 	go func() {
-		defer close(a.done)
 		defer cancel()
 		err := s.record(ctx, a)
-		s.rec.mu.Lock()
-		delete(s.rec.running, r.ID)
-		s.rec.mu.Unlock()
 		a.mu.Lock()
 		final := a.rec
 		final.Bytes = a.bytes
+		secs := a.secs
 		a.mu.Unlock()
 		// The server is stopping (restart, update) while the programme is
 		// still on: the recording stays "recording" and the next start
 		// carries on in the same file.
 		if final.Status != "cancelled" && parent.Err() != nil && time.Now().Unix() < final.Stop {
 			s.st.UpdateRecording(context.Background(), final)
+			s.endRunning(a)
 			if s.rec.log != nil {
 				s.rec.log.Info("registrazione sospesa per l'arresto del server", "id", r.ID, "byte", final.Bytes)
 			}
@@ -290,24 +293,82 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 				final.Error += " (forse un altro dispositivo usa l'abbonamento)"
 			}
 		}
-		if final.Status == "completed" {
-			if mp4, err := s.remuxRecording(final.File); err == nil {
-				final.File = mp4
-				if fi, err := os.Stat(mp4); err == nil {
-					final.Bytes = fi.Size()
-				}
-			} else if s.rec.log != nil {
-				s.rec.log.Warn("registrazione lasciata in MPEG-TS", "id", r.ID, "err", err)
-			}
-		}
+		// Saved as finished before the conversion: stopping does not wait
+		// for it, and a restart in the middle cannot bring back a
+		// recording that was stopped.
 		s.st.UpdateRecording(context.Background(), final)
+		s.endRunning(a)
 		if s.rec.log != nil {
 			s.rec.log.Info("registrazione terminata", "id", r.ID, "stato", final.Status, "byte", final.Bytes)
 		}
 		if final.Status == "completed" {
-			s.findCommercials(final.File)
+			s.convertRecording(final, secs)
 		}
 	}()
+}
+
+// endRunning tells the recording's waiters it is saved.
+func (s *Service) endRunning(a *activeRec) {
+	s.rec.mu.Lock()
+	delete(s.rec.running, a.rec.ID)
+	s.rec.mu.Unlock()
+	close(a.done)
+}
+
+// convertRecording turns a finished MPEG-TS recording into an MP4 (with
+// the index at the start, so browsers and TVs can seek in it), then looks
+// for advertising breaks. The recording is already saved: if the server
+// stops in the middle, the TS stays and the next start converts it.
+func (s *Service) convertRecording(r store.Recording, secs float64) {
+	s.rec.mu.Lock()
+	ctx := s.rec.ctx
+	if s.rec.converting[r.ID] || ctx == nil {
+		s.rec.mu.Unlock()
+		return
+	}
+	if s.rec.converting == nil {
+		s.rec.converting = map[int64]bool{}
+	}
+	s.rec.converting[r.ID] = true
+	s.rec.mu.Unlock()
+	defer func() {
+		s.rec.mu.Lock()
+		delete(s.rec.converting, r.ID)
+		s.rec.mu.Unlock()
+	}()
+	if strings.HasSuffix(r.File, ".ts") {
+		if mp4, err := s.remuxRecording(ctx, r.File); err != nil {
+			if s.rec.log != nil && ctx.Err() == nil {
+				s.rec.log.Warn("registrazione lasciata in MPEG-TS", "id", r.ID, "err", err)
+			}
+		} else {
+			s.useMP4(r, mp4)
+		}
+	}
+	if r, err := s.st.Recording(context.Background(), r.ID); err == nil && r.Status == "completed" && r.File != "" &&
+		!fileExists(edlPath(r.File)) && ctx.Err() == nil {
+		s.findCommercials(r.File)
+	}
+}
+
+// useMP4 points the recording at its MP4 and removes the TS, unless the
+// recording was deleted (or its file changed) during the conversion: then
+// the MP4 goes.
+func (s *Service) useMP4(r store.Recording, mp4 string) {
+	var size int64
+	if fi, err := os.Stat(mp4); err == nil {
+		size = fi.Size()
+	}
+	s.rec.files.Lock()
+	defer s.rec.files.Unlock()
+	if ok, err := s.st.SetRecordingFile(context.Background(), r.ID, r.File, mp4, size); err != nil || !ok {
+		os.Remove(mp4)
+		return
+	}
+	if fileExists(edlPath(r.File)) {
+		os.Rename(edlPath(r.File), edlPath(mp4))
+	}
+	os.Remove(r.File)
 }
 
 func (a *activeRec) size() int64 {
@@ -715,7 +776,7 @@ func (s *Service) StopRecording(ctx context.Context, id int64) error {
 	a.mu.Unlock()
 	a.cancel()
 	select {
-	case <-a.done: // closed, converted and saved
+	case <-a.done: // closed and saved (the conversion to MP4 follows)
 	case <-ctx.Done():
 	}
 	return nil
@@ -737,6 +798,12 @@ func (s *Service) DeleteRecording(ctx context.Context, id int64) error {
 		a.mu.Unlock()
 		a.cancel()
 		<-a.done
+	}
+	s.rec.files.Lock()
+	defer s.rec.files.Unlock()
+	// Read again: it may have just finished, or become an MP4.
+	if r, err = s.st.Recording(ctx, id); err != nil {
+		return err
 	}
 	if r.File != "" {
 		if err := os.Remove(r.File); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -894,11 +961,10 @@ func (s *Service) OpenRecording(ctx context.Context, ticket string, from float64
 var ErrNotReady = errNotReady
 
 // remuxRecording copies a finished MPEG-TS recording into an MP4 with the
-// index at the start, so browsers can seek in it; the TS is removed on
-// success. Nothing is re-encoded.
-func (s *Service) remuxRecording(ts string) (string, error) {
+// index at the start, so browsers can seek in it. Nothing is re-encoded.
+func (s *Service) remuxRecording(ctx context.Context, ts string) (string, error) {
 	mp4 := strings.TrimSuffix(ts, ".ts") + ".mp4"
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, s.ffmpegBin(), "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
 		"-i", ts, "-map", "0:v:0", "-map", "0:a?", "-c", "copy", "-movflags", "+faststart", mp4)
@@ -912,6 +978,5 @@ func (s *Service) remuxRecording(ts string) (string, error) {
 		os.Remove(mp4)
 		return "", errors.New("file MP4 vuoto")
 	}
-	os.Remove(ts)
 	return mp4, nil
 }
