@@ -398,6 +398,11 @@ func TestEmptyGuideKeepsThePrevious(t *testing.T) {
 	if err := st.ReplaceGuide(ctx, "sub:1", nil, nil); !errors.Is(err, ErrGuideEmpty) {
 		t.Fatalf("empty guide taken: %v", err)
 	}
+	// A stale file with only yesterday's programmes is no better.
+	stale := []GuideProgramme{{Channel: "c1", Start: now - 90000, Stop: now - 86400, Title: "Ieri"}}
+	if err := st.ReplaceGuide(ctx, "sub:1", chans, stale); !errors.Is(err, ErrGuideEmpty) {
+		t.Fatalf("stale guide taken: %v", err)
+	}
 	var n int
 	st.r.QueryRowContext(ctx, `SELECT count(*) FROM epg_programme WHERE stop >= ?`, now).Scan(&n)
 	if n != 2 {
