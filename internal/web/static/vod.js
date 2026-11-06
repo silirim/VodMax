@@ -145,7 +145,7 @@
     });
     const guide = el("a", { className: "chip focusable", href: "/guide.html" });
     window.VodMax.label(guide, "calendar-days", t("Guida TV"));
-    const items = channels.slice(0, 600).map((c) => {
+    const item = (c) => {
       const p = c.now;
       const pct = p ? Math.min(100, Math.max(0, ((now - p.start) / (p.stop - p.start)) * 100)) : 0;
       const b = el("button", { className: "focusable" }, el("span", { className: "num" }, c.number || ""),
@@ -156,11 +156,25 @@
           p ? el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })) : null));
       b.onclick = () => { location.href = "/tv.html?channel=" + c.id; };
       return el("li", {}, b);
-    });
+    };
+    // 600 at a time (a long list is slow to draw on a TV); the rest on
+    // request, like the films' grid, so no channel is out of reach.
+    const PAGE = 600;
+    const ol = el("ol", { className: "channels" }, ...channels.slice(0, PAGE).map(item));
+    let more = null;
+    if (channels.length > PAGE) {
+      more = el("button", { className: "button more focusable" }, t("Altri canali"));
+      more.onclick = () => {
+        const n = ol.children.length;
+        ol.append(...channels.slice(n, n + PAGE).map(item));
+        if (ol.children.length >= channels.length) more.remove();
+        focusFirst(ol.children[n]);
+      };
+    }
     main.replaceChildren(el("h2", { className: "page-title" }, "TV"), el("div", { className: "tv-tools" }, ...chips, guide),
       query ? el("p", { className: "empty" }, t("{n} canali per “{query}” (nome o numero)", { n: channels.length, query: state.query })) : "",
-      items.length ? el("ol", { className: "channels" }, ...items) : el("p", { className: "empty" }, list === "favorites"
-        ? t("Nessun preferito: in TV premi il tasto giallo (F) su un canale.") : t("Nessun canale.")));
+      channels.length ? ol : el("p", { className: "empty" }, list === "favorites"
+        ? t("Nessun preferito: in TV premi il tasto giallo (F) su un canale.") : t("Nessun canale.")), more || "");
   }
 
   // ---- Home: a featured title on top (it follows the focused card),
