@@ -30,6 +30,16 @@ finite solo come righe INFO nel log: nessuno se ne è accorto.
   avvisa per 12 ore "forse un altro dispositivo usa l'abbonamento" e la
   registrazione finita lo dice nella sua nota.
 
+### Due programmi di seguito sullo stesso canale
+
+I margini (2 minuti prima, 5 dopo) del primo programma coprono l'inizio
+del secondo: una regola lo considerava già in programma e non lo
+registrava mai, e dalla guida si rifiutava. Ora conta solo la parte di un
+programma che i margini dei vicini non raggiungono: si registrano tutti e
+due. Con una sola connessione la seconda registrazione parte quando
+finisce la prima; i suoi primi minuti sono alla fine del file della
+prima.
+
 ### Conversione in MP4
 
 Una registrazione finita si converte in MP4 (il browser e la TV LG ci si

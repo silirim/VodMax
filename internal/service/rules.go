@@ -236,7 +236,8 @@ func (s *Service) ruleCandidates(ctx context.Context, spec store.RuleSpec) ([]Ru
 // assess says what would happen to a candidate.
 func (s *Service) assess(ctx context.Context, m *RuleMatch) error {
 	start, stop := time.Unix(m.Start, 0).Add(-recordBefore).Unix(), time.Unix(m.Stop, 0).Add(recordAfter).Unix()
-	switch status, err := s.st.RecordingCovers(ctx, m.group, m.Start+60, m.Stop-60, start); {
+	from, to := programmeCore(m.Start, m.Stop)
+	switch status, err := s.st.RecordingCovers(ctx, m.group, from, to, start); {
 	case err != nil:
 		return err
 	case status == "cancelled":

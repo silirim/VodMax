@@ -228,3 +228,50 @@ func TestEditedRuleDropsItsRecordings(t *testing.T) {
 		t.Fatalf("recordings left: %s", body)
 	}
 }
+
+// Two programmes back to back on one channel (TG1, then Film della sera):
+// the margins of the first overlap the second, and both are recorded, by
+// a rule as from the guide.
+func TestBackToBackProgrammesBothRecorded(t *testing.T) {
+	e, _ := tvSetup(t)
+	rai := channels(t, e, "?section=tv")[0]
+	rule := map[string]any{"name": "Rai", "all": []string{"rai"}, "channel_id": rai.ID}
+	if p := preview(t, e, rule); len(p) != 2 {
+		t.Fatalf("preview: %+v", p)
+	}
+	if code, body := e.do(t, "POST", "/api/v1/recording-rules", rule, true); code != 201 {
+		t.Fatalf("rule: %d %s", code, body)
+	}
+	var titles []string
+	for _, r := range recRows(t, e) {
+		titles = append(titles, r.Title)
+	}
+	if len(titles) != 2 {
+		t.Fatalf("recordings of the rule: %v", titles)
+	}
+	// The rule's next pass schedules nothing more.
+	if code, body := e.do(t, "PUT", "/api/v1/recording-rules/1", rule, true); code != 200 || len(recRows(t, e)) != 2 {
+		t.Fatalf("second pass: %d %s %+v", code, body, recRows(t, e))
+	}
+
+	// From the guide, on another installation of the same lineup.
+	g, _ := tvSetup(t)
+	rai = channels(t, g, "?section=tv")[0]
+	_, body := g.do(t, "GET", "/api/v1/tv/channels/"+strconv.FormatInt(rai.ID, 10)+"/guide", nil, true)
+	var progs []struct {
+		Title       string
+		Start, Stop int64
+	}
+	json.Unmarshal(body, &progs)
+	for _, p := range progs {
+		code, body := g.do(t, "POST", "/api/v1/recordings", map[string]any{"channel_id": rai.ID, "start": p.Start, "stop": p.Stop,
+			"title": p.Title, "from_guide": true}, true)
+		if code != 201 {
+			t.Fatalf("%s from the guide: %d %s", p.Title, code, body)
+		}
+	}
+	if code, _ := g.do(t, "POST", "/api/v1/recordings", map[string]any{"channel_id": rai.ID, "start": progs[1].Start,
+		"stop": progs[1].Stop, "from_guide": true}, true); code != 400 || len(progs) != 2 {
+		t.Fatalf("the same programme twice: %d (%d programmes)", code, len(progs))
+	}
+}

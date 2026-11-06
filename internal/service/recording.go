@@ -651,6 +651,20 @@ func (k *tsPackets) take(p []byte) []byte {
 
 // ---- Scheduling ----
 
+// programmeCore is the part of a guide programme that the recordings of
+// the programmes before and after it do not reach with their margins: on
+// one channel, programmes back to back overlap only there, and both are
+// recorded (with one connection the second starts when the first ends; its
+// first minutes are at the end of the first file).
+func programmeCore(start, stop int64) (int64, int64) {
+	from, to := start+int64(recordAfter/time.Second), stop-int64(recordBefore/time.Second)
+	if to <= from {
+		from = (start + stop) / 2
+		to = from + 1
+	}
+	return from, to
+}
+
 // RecordingRequest schedules a recording. Without Start/Stop, the
 // programme on air on the channel is recorded, with margins; explicit
 // times are used as given.
@@ -721,7 +735,11 @@ func (s *Service) ScheduleRecording(ctx context.Context, req RecordingRequest) (
 	if title == "" {
 		title = it.Title
 	}
-	if other, err := s.st.OverlappingRecording(ctx, group, start, stop); err != nil {
+	from, to := start, stop
+	if margins {
+		from, to = programmeCore(start+int64(recordBefore/time.Second), stop-int64(recordAfter/time.Second))
+	}
+	if other, err := s.st.OverlappingRecording(ctx, group, from, to); err != nil {
 		return store.Recording{}, err
 	} else if other != nil {
 		return store.Recording{}, invalid("c'è già una registrazione di questo canale in quell'orario: %s", other.Title)
