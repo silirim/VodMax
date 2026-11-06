@@ -90,6 +90,19 @@ func TestSelectRulesAndOverrides(t *testing.T) {
 	}
 }
 
+// A title in a category the provider does not list is shown, but not to
+// kids; one without category is plain home content.
+func TestSelectUnlistedCategory(t *testing.T) {
+	items := []store.SelectionItem{item(1, "movie", "99", "Nascosto", 2000), item(2, "live", "", "Senza gruppo", 0)}
+	Select(map[int64]Rules{}, []store.SelectionCategory{cat("movie", "10", "Commedia")}, items)
+	if !items[0].Visible || !items[0].Adult {
+		t.Errorf("unlisted category: %+v", items[0])
+	}
+	if !items[1].Visible || items[1].Adult || items[1].Section != "tv" {
+		t.Errorf("no category: %+v", items[1])
+	}
+}
+
 func TestRulesValidation(t *testing.T) {
 	if _, err := ParseRules([]byte(`{"movie_min_year": 1850}`)); err == nil {
 		t.Error("year 1850 accepted")

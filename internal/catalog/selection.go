@@ -157,6 +157,10 @@ func Select(rules map[int64]Rules, cats []store.SelectionCategory, items []store
 		e, known := eff[catKey{it.SubscriptionID, it.Kind, it.CategoryID}]
 		if !known {
 			e = EffectiveCategory(store.SelectionCategory{}, r) // uncategorised: home country
+			// A category the provider does not list (a hidden adult group,
+			// say) cannot be checked: shown, but not to kids. No category
+			// at all (M3U entries without group) is plain home content.
+			e.Adult = it.CategoryID != ""
 			if it.Kind == "live" {
 				e.Section = string(SectionTV)
 			}

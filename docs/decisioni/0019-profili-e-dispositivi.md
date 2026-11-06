@@ -34,6 +34,9 @@ la famiglia, profilo bambini, abbinamento con un codice breve)
 - **Bambini**: niente contenuti delle categorie per adulti, né in elenco
   né in riproduzione (il server risponde "non trovato" anche a richieste
   dirette), niente registrazioni da programmare, niente impostazioni.
+  Nemmeno i titoli di una categoria che il provider non elenca (non si
+  può sapere se è per adulti) né i titoli appena importati, finché la
+  selezione non li ha controllati (6 novembre 2026).
   Se esiste un profilo bambini, ogni profilo adulto senza PIN è
   segnalato come avviso.
 
