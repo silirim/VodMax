@@ -384,3 +384,80 @@ func TestEmptyGuideKeepsThePrevious(t *testing.T) {
 		t.Fatalf("empty guide with nothing to come: %v", err)
 	}
 }
+
+// Favourites, hidden titles, recordings and rule channels saved under the
+// group keys of older versions (non-Latin letters dropped: "Первый канал"
+// and "الجزيرة" were both "") follow their titles at the next import.
+func TestGroupKeysCarriedOverAfterUpgrade(t *testing.T) {
+	st, sub := openTest(t)
+	ctx := context.Background()
+	items := func(keys ...string) []Item {
+		titles := []string{"Первый канал", "الجزيرة", "Россия 1", "Беларусь 1", "Rai 1"}
+		out := []Item{}
+		for i, title := range titles {
+			out = append(out, Item{Kind: "live", SourceID: fmt.Sprint(i + 1), Title: title, DisplayTitle: title, GroupKey: keys[i]})
+		}
+		return append(out, Item{Kind: "movie", SourceID: "10", Title: "Москва слезам не верит", DisplayTitle: "Москва слезам не верит",
+			Year: 1980, GroupKey: keys[len(titles)]})
+	}
+	// The database as an older version left it.
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live", "movie"}, nil, items("", "", "1", "1", "rai 1", "|1980"), false); err != nil {
+		t.Fatal(err)
+	}
+	id := func(src string) int64 {
+		var id int64
+		st.r.QueryRowContext(ctx, `SELECT id FROM item WHERE source_id = ?`, src).Scan(&id)
+		return id
+	}
+	for _, src := range []string{"1", "5", "10"} {
+		if err := st.SetFavorite(ctx, 7, id(src), true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.HideContinue(ctx, 7, id("10")); err != nil {
+		t.Fatal(err)
+	}
+	ruleID, _ := st.AddRecordingRule(ctx, RecordingRule{Name: "Notizie", Spec: RuleSpec{All: []string{"новости"}, Channel: "1"}, Enabled: true})
+	anyID, _ := st.AddRecordingRule(ctx, RecordingRule{Name: "Ovunque", Spec: RuleSpec{All: []string{"x"}}, Enabled: true})
+	if _, err := st.AddRecording(ctx, Recording{ItemID: id("3"), GroupKey: "1", Title: "Новости", Start: 1, Stop: 2, RuleID: ruleID}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The next import computes the new keys.
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live", "movie"}, nil,
+		items("первый канал", "الجزيرة", "россия 1", "беларусь 1", "rai 1", "москва слезам не верит|1980"), false); err != nil {
+		t.Fatal(err)
+	}
+	favs := map[string]bool{}
+	rows, _ := st.r.QueryContext(ctx, `SELECT kind || ':' || group_key FROM favorite WHERE profile_id = 7`)
+	for rows.Next() {
+		var k string
+		rows.Scan(&k)
+		favs[k] = true
+	}
+	rows.Close()
+	// "" starred both channels before: both stay starred.
+	want := []string{"live:первый канал", "live:الجزيرة", "live:rai 1", "movie:москва слезам не верит|1980"}
+	if len(favs) != len(want) {
+		t.Fatalf("favourites: %v", favs)
+	}
+	for _, k := range want {
+		if !favs[k] {
+			t.Fatalf("favourite %q missing: %v", k, favs)
+		}
+	}
+	var hidden, recKey string
+	st.r.QueryRowContext(ctx, `SELECT title_key FROM continue_hidden WHERE profile_id = 7`).Scan(&hidden)
+	st.r.QueryRowContext(ctx, `SELECT group_key FROM recording`).Scan(&recKey)
+	if hidden != "movie:москва слезам не верит|1980" || recKey != "россия 1" {
+		t.Fatalf("hidden %q, recording %q", hidden, recKey)
+	}
+	rule, _ := st.RecordingRule(ctx, ruleID)
+	anyRule, _ := st.RecordingRule(ctx, anyID)
+	if rule.Spec.Channel != "россия 1" || anyRule.Spec.Channel != "" || rule.Spec.All[0] != "новости" {
+		t.Fatalf("rules: %+v %+v", rule.Spec, anyRule.Spec)
+	}
+	if _, err := st.ChannelForGroup(ctx, ""); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("channel for the empty key: %v", err)
+	}
+}

@@ -108,12 +108,17 @@ func containsWord(upper string, words ...string) bool {
 
 var (
 	qualityTags = regexp.MustCompile(`(?i)\b(?:4k|uhd|fhd|fullhd|superhd|hd|sd|hevc|h26[45]|2160p|1080p|720p|ita|sub\s*ita|multi(?:sub)?)\b|\[[^\]]*\]`)
-	nonAlnum    = regexp.MustCompile(`[^a-z0-9+]+`)
+	// Letters and digits of every script count: Cyrillic, Greek or Arabic
+	// titles would otherwise all share the key "" (or just their year).
+	// Marks are kept for scripts whose vowels are spacing marks (Hindi).
+	nonAlnum = regexp.MustCompile(`[^\p{L}\p{M}\p{N}+]+`)
 )
 
 // GroupKey identifies variants of the same channel or title: case, accents,
 // punctuation and quality tags are ignored; for films and series the year
-// is part of the key. "+1" timeshift channels stay distinct.
+// is part of the key. "+1" timeshift channels stay distinct. Favourites,
+// rules and recordings hold group keys: when the function changes, the
+// next import carries them over (store.ReplaceCatalog).
 func GroupKey(kind, displayTitle string, year int) string {
 	s := strings.ToLower(norm.NFKD.String(displayTitle))
 	s = strings.Map(func(r rune) rune {

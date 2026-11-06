@@ -52,7 +52,7 @@ var (
 	// Quality tags and resolution markers are not part of a channel's
 	// identity; "+1" timeshift is, and is matched separately.
 	tags     = regexp.MustCompile(`(?i)\b(?:4k|uhd|fhd|fullhd|superhd|hd|sd|hevc|h26[45]|1080p|720p|2160p|backup|ita|it)\b`)
-	nonAlnum = regexp.MustCompile(`[^a-z0-9+!.]+`)
+	nonAlnum = regexp.MustCompile(`[^\p{L}\p{M}\p{N}+!.]+`) // every script, as catalog.GroupKey
 	country  = regexp.MustCompile(`(?i)^\s*(?:it|ita|italia|italy)\s*[:|\-]\s*`)
 )
 

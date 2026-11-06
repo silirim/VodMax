@@ -41,6 +41,7 @@ func TestQualityAndGroupKey(t *testing.T) {
 	same := [][]string{
 		{"Rai 1 HD", "Rai 1 FHD", "Rai 1 4K", "RAI 1", "rai 1 [ITA]"},
 		{"Città di Dio", "Citta di Dio"},
+		{"Первый канал HD", "ПЕРВЫЙ КАНАЛ"},
 	}
 	for _, group := range same {
 		for _, title := range group[1:] {
@@ -54,5 +55,17 @@ func TestQualityAndGroupKey(t *testing.T) {
 	}
 	if GroupKey("movie", "Pinocchio", 1940) == GroupKey("movie", "Pinocchio", 2019) {
 		t.Error("films with different years must not merge")
+	}
+	// Titles in other scripts keep their letters: they used to share "".
+	keys := map[string]string{}
+	for _, title := range []string{"Первый канал", "الجزيرة", "Россия 1", "Беларусь 1", "ΕΡΤ1", "हिन्दी", "Rai 1"} {
+		k := GroupKey("live", title, 0)
+		if other, ok := keys[k]; ok || k == "" {
+			t.Errorf("%q and %q share the key %q", title, other, k)
+		}
+		keys[k] = title
+	}
+	if GroupKey("movie", "Москва слезам не верит", 1980) == GroupKey("movie", "Солярис", 1980) {
+		t.Error("Cyrillic films of one year must not merge")
 	}
 }

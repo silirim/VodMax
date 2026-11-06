@@ -131,7 +131,7 @@ func (s *Store) TVChannels(ctx context.Context, profileID int64, noAdult bool, s
 			i.group_key, f.position IS NOT NULL, coalesce(f.position, 0),
 			`+guideIDExpr+`
 		FROM item i
-		LEFT JOIN favorite f ON f.profile_id = ? AND f.kind = 'live' AND f.group_key = i.group_key
+		LEFT JOIN favorite f ON f.profile_id = ? AND f.kind = 'live' AND f.group_key = i.group_key AND i.group_key <> ''
 		WHERE i.kind = 'live' AND i.available = 1 AND i.visible = 1 AND i.primary_variant = 1 AND (? = 0 OR i.adult = 0)
 		ORDER BY i.lcn IS NULL, i.lcn,
 			CASE i.section WHEN 'tv' THEN 0 WHEN 'sport' THEN 1 ELSE 2 END,

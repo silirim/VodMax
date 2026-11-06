@@ -95,6 +95,20 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 		}
 	}
 
+	// Keys that change in this import are noted, to carry over what is
+	// kept by group key (see carryGroupKeys).
+	for _, q := range []string{
+		`CREATE TEMP TABLE IF NOT EXISTS moved_item (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, old TEXT NOT NULL)`,
+		`CREATE TEMP TRIGGER IF NOT EXISTS item_key_moved AFTER UPDATE OF group_key ON item
+			WHEN old.group_key <> new.group_key AND new.group_key <> ''
+			BEGIN INSERT OR IGNORE INTO moved_item VALUES (old.id, old.kind, old.group_key); END`,
+		`DELETE FROM temp.moved_item`,
+	} {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return res, err
+		}
+	}
+
 	now := time.Now().UnixNano() // unique per import: identifies rows seen now
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO item (subscription_id, kind, source_id, title, display_title, year, category_id, image, epg_id,
@@ -139,6 +153,9 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 			return res, err
 		}
 	}
+	if err := carryGroupKeys(ctx, tx); err != nil {
+		return res, err
+	}
 	for _, c := range categories {
 		if !covered[c.Kind] {
 			continue
@@ -159,6 +176,53 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 	// still hold old snapshots.
 	s.w.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
 	return res, nil
+}
+
+// carryGroupKeys moves what is kept by group key (favourites, titles
+// taken off "continue watching", series markers, rule channels and
+// recordings) to the new key of the titles whose key changed in this
+// import: a provider renaming a title, or a newer VodMax computing keys
+// differently (0.6.7 keeps non-Latin letters, which older versions
+// dropped, so "Первый канал" and "الجزيرة" were both ""). Only a key left
+// on no available title moves; an old key that was shared by several
+// titles moves to all of them, as it applied to all of them before.
+func carryGroupKeys(ctx context.Context, tx *sql.Tx) error {
+	var moved bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM temp.moved_item)`).Scan(&moved); err != nil || !moved {
+		return err
+	}
+	for _, q := range []string{
+		`CREATE TEMP TABLE IF NOT EXISTS moved_key (kind TEXT NOT NULL, old TEXT NOT NULL, new TEXT NOT NULL)`,
+		`DELETE FROM temp.moved_key`,
+		`INSERT INTO temp.moved_key SELECT DISTINCT m.kind, m.old, i.group_key FROM temp.moved_item m JOIN item i ON i.id = m.id
+			WHERE NOT EXISTS (SELECT 1 FROM item v WHERE v.kind = m.kind AND v.group_key = m.old AND v.available = 1)`,
+		`INSERT OR IGNORE INTO favorite (profile_id, kind, group_key, position, added_at)
+			SELECT f.profile_id, f.kind, m.new, f.position, f.added_at FROM favorite f JOIN temp.moved_key m ON m.kind = f.kind AND m.old = f.group_key`,
+		`DELETE FROM favorite WHERE EXISTS (SELECT 1 FROM temp.moved_key m WHERE m.kind = favorite.kind AND m.old = favorite.group_key)`,
+		`INSERT OR IGNORE INTO continue_hidden (profile_id, title_key, hidden_at)
+			SELECT h.profile_id, m.kind || ':' || m.new, h.hidden_at FROM continue_hidden h JOIN temp.moved_key m ON h.title_key = m.kind || ':' || m.old`,
+		`DELETE FROM continue_hidden WHERE title_key IN (SELECT kind || ':' || old FROM temp.moved_key)`,
+		`INSERT OR IGNORE INTO series_marker (series_key, intro_start, intro_end, credits, updated_at)
+			SELECT m.new, s.intro_start, s.intro_end, s.credits, s.updated_at FROM series_marker s JOIN temp.moved_key m ON m.kind = 'series' AND m.old = s.series_key`,
+		`DELETE FROM series_marker WHERE series_key IN (SELECT old FROM temp.moved_key WHERE kind = 'series')`,
+		// A recording follows its own channel.
+		`UPDATE recording SET group_key = (SELECT i.group_key FROM item i WHERE i.id = recording.item_id)
+			WHERE item_id IN (SELECT id FROM temp.moved_item)`,
+		// A rule follows the channel it last recorded, else the only one
+		// its old key leads to; "" means any channel and stays.
+		`UPDATE recording_rule SET spec = json_set(spec, '$.channel', t.new) FROM (
+			SELECT r.id, coalesce(
+				(SELECT rec.group_key FROM recording rec JOIN temp.moved_key m ON m.kind = 'live' AND m.new = rec.group_key
+					WHERE rec.rule_id = r.id AND m.old = json_extract(r.spec, '$.channel') ORDER BY rec.start DESC LIMIT 1),
+				(SELECT min(m.new) FROM temp.moved_key m WHERE m.kind = 'live' AND m.old = json_extract(r.spec, '$.channel') HAVING count(*) = 1)) AS new
+			FROM recording_rule r WHERE json_extract(r.spec, '$.channel') IN (SELECT old FROM temp.moved_key WHERE kind = 'live' AND old <> '')
+		) t WHERE t.id = recording_rule.id AND t.new IS NOT NULL`,
+	} {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("chiavi dei titoli: %w", err)
+		}
+	}
+	return nil
 }
 
 func zeroNull(n int) any {
@@ -499,7 +563,7 @@ func (s *Store) ItemIDs(ctx context.Context, subID int64, kind string) (map[stri
 // added first: one entry per title, its main version.
 func (s *Store) MyList(ctx context.Context, profileID int64, noAdult bool) ([]CatalogItem, error) {
 	rows, err := s.r.QueryContext(ctx, `SELECT `+itemColumns+` FROM favorite f
-		JOIN item i ON i.kind = f.kind AND i.group_key = f.group_key
+		JOIN item i ON i.kind = f.kind AND i.group_key = f.group_key AND f.group_key <> ''
 		WHERE f.profile_id = ? AND f.kind IN ('movie', 'series') AND i.available = 1 AND i.visible = 1 AND i.primary_variant = 1
 			AND (? = 0 OR i.adult = 0)
 		ORDER BY f.added_at DESC, f.rowid DESC`, profileID, noAdult)
@@ -522,7 +586,7 @@ func (s *Store) MyList(ctx context.Context, profileID int64, noAdult bool) ([]Ca
 func (s *Store) InMyList(ctx context.Context, profileID, itemID int64) (bool, error) {
 	var n int
 	err := s.r.QueryRowContext(ctx, `SELECT count(*) FROM favorite f JOIN item i ON i.kind = f.kind AND i.group_key = f.group_key
-		WHERE f.profile_id = ? AND i.id = ?`, profileID, itemID).Scan(&n)
+		WHERE f.profile_id = ? AND i.id = ? AND f.group_key <> ''`, profileID, itemID).Scan(&n)
 	return n > 0, err
 }
 

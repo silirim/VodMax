@@ -427,6 +427,9 @@ func (s *Store) OverlappingRecording(ctx context.Context, groupKey string, start
 // ChannelForGroup returns the item that currently represents a channel
 // (its primary visible variant), falling back to any available variant.
 func (s *Store) ChannelForGroup(ctx context.Context, groupKey string) (PlaybackItem, error) {
+	if groupKey == "" { // no key: not one channel, every channel without one
+		return PlaybackItem{}, ErrNotFound
+	}
 	var id int64
 	err := s.r.QueryRowContext(ctx, `SELECT id FROM item WHERE kind = 'live' AND group_key = ? AND available = 1
 		ORDER BY primary_variant DESC, visible DESC, quality DESC, id LIMIT 1`, groupKey).Scan(&id)
@@ -520,7 +523,7 @@ func (s *Store) CatchupVariant(ctx context.Context, itemID int64) (PlaybackItem,
 	var id int64
 	var days int
 	err := s.r.QueryRowContext(ctx, `SELECT v.id, v.catchup_days FROM item i JOIN item v ON v.group_key = i.group_key AND v.kind = 'live'
-		WHERE i.id = ? AND v.available = 1 AND coalesce(v.catchup_days, 0) > 0 ORDER BY v.catchup_days DESC, v.quality DESC LIMIT 1`, itemID).Scan(&id, &days)
+		WHERE i.id = ? AND (v.id = i.id OR i.group_key <> '') AND v.available = 1 AND coalesce(v.catchup_days, 0) > 0 ORDER BY v.catchup_days DESC, v.quality DESC LIMIT 1`, itemID).Scan(&id, &days)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PlaybackItem{}, 0, nil
 	}
