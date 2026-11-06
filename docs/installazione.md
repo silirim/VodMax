@@ -89,6 +89,10 @@ container: Intel/AMD con `--device /dev/dri` e `--group-add <id del gruppo
 render>` (`getent group render`; l'immagine ha il driver VAAPI Intel su x86-64, AMD funziona con l'installazione nativa),
 NVIDIA con NVIDIA Container Toolkit (`--gpus all`, con un ffmpeg che abbia
 NVENC). Poi Impostazioni → Sistema → *Conversione video* → *Prova*.
+Con l'installazione nativa (`vodmax.service`) la scheda è in `/dev/dri`, che
+solo il gruppo `render` può aprire: `sudo usermod -aG render vodmax`, poi
+`sudo systemctl restart vodmax`. Serve anche all'assistente integrato per
+usare la scheda tramite Vulkan.
 
 ### Aggiornare
 
@@ -164,7 +168,8 @@ una versione nuova.
      le impronte. Gira sul server, in ascolto solo sul server stesso, e si
      spegne dopo 10 minuti senza richieste. *Rimuovi* cancella tutto.
      Linux x86-64 o ARM64; la scheda video si usa tramite Vulkan se ci sono
-     `libvulkan1` e i suoi driver. Con **Docker** il modello gira nel
+     `libvulkan1` e i suoi driver e `vodmax` è nel gruppo `render` (vedi
+     *Scheda grafica*). Con **Docker** il modello gira nel
      servizio facoltativo `assistant` del compose:
      `docker compose --profile assistant up -d`.
    - **Servizio online**: Claude, OpenAI, Mistral, Gemini o OpenRouter con

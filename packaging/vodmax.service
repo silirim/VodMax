@@ -3,6 +3,7 @@
 #   install -m 755 vodmax-server vodmax-update /usr/local/bin/
 #   install -d -o vodmax -g vodmax -m 700 /var/lib/vodmax
 #   cp vodmax.service /etc/systemd/system/ && systemctl enable --now vodmax
+#   usermod -aG render vodmax   (only with a graphics card in /dev/dri)
 # The admin token is in /var/lib/vodmax/admin.token. ffmpeg (and ffprobe)
 # from the distribution are needed for MKV/AVI in the browser, pause of
 # live TV and recordings.

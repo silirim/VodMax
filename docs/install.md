@@ -89,6 +89,10 @@ Intel/AMD with `--device /dev/dri` and `--group-add <render group id>`
 (`getent group render`; the image has the Intel VAAPI driver on x86-64, AMD works with a native install), NVIDIA
 with the NVIDIA Container Toolkit (`--gpus all`, with an ffmpeg that has
 NVENC). Then Settings → System → *Video conversion* → *Test*.
+With the native install (`vodmax.service`) the card is in `/dev/dri`, which
+only the `render` group can open: `sudo usermod -aG render vodmax`, then
+`sudo systemctl restart vodmax`. The built-in assistant needs the same to
+use the card through Vulkan.
 
 ### Updating
 
@@ -164,7 +168,7 @@ is out.
      the server itself, and stops after 10 minutes without requests.
      *Remove* deletes everything. Linux x86-64 or ARM64; a graphics card
      is used through Vulkan when `libvulkan1` and its drivers are
-     installed. With **Docker** the model runs in the optional `assistant`
+     installed and `vodmax` is in the `render` group (see *Graphics card*). With **Docker** the model runs in the optional `assistant`
      service of the compose file: `docker compose --profile assistant up -d`.
    - **Online service**: Claude, OpenAI, Mistral, Gemini or OpenRouter with
      an **API key** (a Claude Pro/Max or ChatGPT Plus subscription can't be
