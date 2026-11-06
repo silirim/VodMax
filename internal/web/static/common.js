@@ -613,11 +613,18 @@ window.VodMax = (() => {
     go.focus();
   }
 
-  async function api(method, path, body) {
-    const headers = { "Content-Type": "application/json" };
+  // Who is asking: the device, the profile in use and the language of the
+  // server's messages. Also for the requests that do not go through api()
+  // (backup files): admin routes need the profile as much as the token.
+  function authHeaders() {
+    const headers = { "X-VodMax-Lang": window.VodMaxI18n.lang };
     if (token()) headers.Authorization = "Bearer " + token();
     if (profileToken()) headers["X-Profile"] = profileToken();
-    headers["X-VodMax-Lang"] = window.VodMaxI18n.lang; // server messages in the same language
+    return headers;
+  }
+
+  async function api(method, path, body) {
+    const headers = { "Content-Type": "application/json", ...authHeaders() };
     const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     const data = res.status === 204 ? null : await res.json().catch(() => null);
     if (res.status === 401) {
@@ -869,5 +876,5 @@ window.VodMax = (() => {
   // The Android app's native player (window.VodMaxNative), if present.
   const native = window.VodMaxNative || null;
 
-  return { countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, bottomNav, closeSheet, sheetOpen, label, store, viewer, token, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
+  return { countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, bottomNav, closeSheet, sheetOpen, label, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
 })();

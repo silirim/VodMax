@@ -1192,7 +1192,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
 
   // ---- Backup ----
   async function download(method, path, body, headers = {}) {
-    const res = await fetch(path, { method, body, headers: { Authorization: "Bearer " + window.VodMax.token(), ...headers } });
+    const res = await fetch(path, { method, body, headers: { ...window.VodMax.authHeaders(), ...headers } });
     if (!res.ok) {
       const data = await res.json().catch(() => null);
       throw new Error(data && data.error ? data.error : t("errore {status}", { status: res.status }));
@@ -1254,7 +1254,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       if (!file.files[0]) { flash(t("Scegli il file del backup")); return; }
       restoreFrom(async () => {
         const res = await fetch("/api/v1/restore", { method: "POST", body: file.files[0],
-          headers: { Authorization: "Bearer " + window.VodMax.token(), "X-Backup-Password": rpass.value } });
+          headers: { ...window.VodMax.authHeaders(), "X-Backup-Password": rpass.value } });
         if (!res.ok) { const d = await res.json().catch(() => null); throw new Error(d && d.error ? d.error : t("errore {status}", { status: res.status })); }
       });
     };
