@@ -4,8 +4,8 @@
 # The current stable Alpine branch: ffmpeg comes from its community
 # repository, which gets fixes only until the next stable branch, so move
 # to each new branch (May and December) and re-test conversion with the
-# graphics card.
-FROM alpine:3.24
+# graphics card. Pinned by digest: Dependabot proposes the updates.
+FROM alpine:3.24@sha256:3f4d6b32e26703c6082839234f43769d5046b3ac7c910033911d1e71d8cd630a
 
 # ffmpeg: pause of live TV, recordings, MKV/AVI in the browser.
 # su-exec: see packaging/docker-entrypoint.sh (PUID/PGID).

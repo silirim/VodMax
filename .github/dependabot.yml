@@ -1,0 +1,12 @@
+# Actions and the base image are pinned by digest; Dependabot proposes the
+# updates (security fixes of the Alpine branch included) as pull requests.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
