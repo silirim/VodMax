@@ -222,22 +222,23 @@ func (s *Service) tryPIN(deviceID int64, p store.Profile, pin string) error {
 		s.auth.pinFail = map[string]*pinFails{}
 	}
 	f := s.auth.pinFail[key]
-	if f != nil && time.Now().Before(f.until) {
+	if f == nil {
+		f = &pinFails{}
+		s.auth.pinFail[key] = f
+	}
+	if time.Now().Before(f.until) {
 		s.auth.mu.Unlock()
 		return ErrPINLocked
 	}
+	// Count the attempt before the slow check: parallel requests would
+	// otherwise all pass the lock test while pbkdf2 runs, and test far
+	// more than pinMaxFails PINs.
+	f.n++
+	if f.n >= pinMaxFails {
+		f.n, f.until = 0, time.Now().Add(pinLockFor)
+	}
 	s.auth.mu.Unlock()
 	if !checkPIN(p.PINHash, pin) {
-		s.auth.mu.Lock()
-		if f == nil {
-			f = &pinFails{}
-			s.auth.pinFail[key] = f
-		}
-		f.n++
-		if f.n >= pinMaxFails {
-			f.n, f.until = 0, time.Now().Add(pinLockFor)
-		}
-		s.auth.mu.Unlock()
 		return ErrPIN
 	}
 	s.auth.mu.Lock()
