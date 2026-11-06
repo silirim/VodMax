@@ -747,7 +747,10 @@ window.VodMax = (() => {
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (destroyed || !data.fatal) return;
         const status = data.response && data.response.code;
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && (status === 403 || status === 404) && data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR) {
+        // The buffer is gone: on the first load, or on a later reload of
+        // the live playlist (hls.js calls that a level load).
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && (status === 403 || status === 404) &&
+          (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR || data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR)) {
           if (onError) onError("ended", status);
         } else if (data.type === Hls.ErrorTypes.NETWORK_ERROR && recoveries < 5) {
           recoveries++;

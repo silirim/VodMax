@@ -79,7 +79,10 @@
     if (message) cell.box.append(el("div", { className: "mv-empty" }, icon("triangle-alert"), el("span", {}, message)));
   }
 
+  // Stopping also bumps the box's generation: a ticket still on its way
+  // belongs to the channel the box had before, and is dropped.
   function stop(cell) {
+    cell.gen = (cell.gen || 0) + 1;
     if (cell.player) { cell.player.destroy(); cell.player = null; }
   }
 
@@ -90,11 +93,12 @@
     cell.message = "";
     const c = channel(state.ids[cell.i]);
     if (!c) return;
+    const gen = cell.gen;
     let url;
     try {
       url = (await api("POST", "/api/v1/live/" + c.id + "/ticket", { viewer: viewer + "-mv" + cell.i })).url;
-    } catch (e) { render(cell, e.message); return; }
-    if (channel(state.ids[cell.i]) !== c) return; // changed meanwhile
+    } catch (e) { if (cell.gen === gen) render(cell, e.message); return; }
+    if (cell.gen !== gen) return; // changed meanwhile
     if (!window.mpegts || !mpegts.isSupported()) { render(cell, t("Questo dispositivo non supporta la riproduzione MPEG-TS nel browser")); return; }
     const player = window.VodMax.tsPlayer(cell.video, url, {
       live: true,
