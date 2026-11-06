@@ -1458,9 +1458,26 @@
   video.addEventListener("ended", () => {
     const p = state.play;
     if (p && p.sess.next && !p.nextCancelled) { playNext(false); return; }
+    if (p && p.media === "catchup" && goOnCatchup(p)) return;
     saveProgress();
     stopPlayback(true);
   });
+
+  // "From the start" of a programme still on air: each opening holds the
+  // archive up to when it was made, so at its end the stream is opened
+  // again from there with what aired meanwhile. Live TV takes over only
+  // near the edge, where an opening would hold a minute at most; an
+  // opening that brought nothing new (an archive shorter than the guide)
+  // ends too.
+  function goOnCatchup(p) {
+    const c = state.catchup, at = position();
+    const edge = Math.min(c.stop, Date.now() / 1000) - c.start;
+    if (at >= edge - 120 || (p.wentOn !== undefined && at < p.wentOn + 30)) return false;
+    p.wentOn = at;
+    p.duration = edge;
+    load(at);
+    return true;
+  }
 
   // ---- Episodes: skip the opening, go on to the next one ----
   // Where the opening ends and how long the credits are is learned from
