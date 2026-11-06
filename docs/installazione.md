@@ -128,6 +128,20 @@ una versione nuova.
   `vodmax.db` e poi installa la versione precedente. Dalla 0.5.x indica la
   versione (`sudo vodmax-update v0.6.0`): lo script della 0.5.x prenderebbe
   anche una beta.
+- **File del servizio**: `vodmax-update` non sostituisce
+  `/etc/systemd/system/vodmax.service`. Quello della 0.6.7 è più stretto
+  (`ProtectKernelTunables`, `RestrictNamespaces`, `SystemCallFilter`...);
+  per usarlo, dall'archivio scompattato:
+  ```sh
+  sudo cp /etc/systemd/system/vodmax.service ~/vodmax.service.old
+  sudo cp vodmax.service /etc/systemd/system/
+  sudo systemctl daemon-reload && sudo systemctl restart vodmax
+  ```
+  Con una scheda grafica l'utente `vodmax` deve essere nel gruppo
+  `render` (vedi sopra). Se il servizio non parte (`status=226/NAMESPACE`, succede in
+  alcuni container), rimetti `~/vodmax.service.old` in
+  `/etc/systemd/system/vodmax.service` ed esegui
+  `sudo systemctl daemon-reload && sudo systemctl restart vodmax`.
 - **App Android** (telefono, Android TV, Fire TV): propongono da sole
   l'aggiornamento: *Aggiorna*, poi conferma nella finestra di Android (la
   prima volta permetti a VodMax di installare app). Funziona dalla 0.4.0,

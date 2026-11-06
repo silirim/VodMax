@@ -127,6 +127,20 @@ is out.
   that copy in place of `vodmax.db`, then install the older version.
   From 0.5.x, name the version (`sudo vodmax-update v0.6.0`): the 0.5.x
   updater would also take a beta.
+- **Service file**: `vodmax-update` does not replace
+  `/etc/systemd/system/vodmax.service`. The one in 0.6.7 is stricter
+  (`ProtectKernelTunables`, `RestrictNamespaces`, `SystemCallFilter`...);
+  to use it, from the unpacked archive:
+  ```sh
+  sudo cp /etc/systemd/system/vodmax.service ~/vodmax.service.old
+  sudo cp vodmax.service /etc/systemd/system/
+  sudo systemctl daemon-reload && sudo systemctl restart vodmax
+  ```
+  With a graphics card the `vodmax` user must be in the `render` group
+  (see above). If the
+  service does not start (`status=226/NAMESPACE`, seen in some containers),
+  put `~/vodmax.service.old` back in `/etc/systemd/system/vodmax.service`
+  and run `sudo systemctl daemon-reload && sudo systemctl restart vodmax`.
 - **Android apps** (phone, Android TV, Fire TV) offer the update by
   themselves: *Update*, then confirm in the Android window (the first time,
   allow VodMax to install apps). It works from version 0.4.0, the first
