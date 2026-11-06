@@ -1,0 +1,36 @@
+# 0048 — Registrazioni: insistere quando serve, non quando è inutile
+
+Stato: **Proposta** (6 novembre 2026, da una revisione del registratore)
+
+## Il problema
+
+Una registrazione che si interrompe si ricollega dopo 3 s, e ogni volta
+prende la connessione a chi sta guardando. Il 05/11 questa insistenza ha
+salvato la partita mentre un altro client dell'account continuava a
+prendersi la connessione. Ma quando il canale non funziona più (il
+provider risponde 404) o il disco è pieno, la registrazione riprova ogni
+3 s per tutto il programma, fino a 6 ore: a ogni tentativo la TV di chi
+guarda si interrompe, il provider riceve circa 1200 richieste l'ora e alla
+fine non resta niente. Il 05/11, invece, 55 espulsioni in 23 minuti sono
+finite solo come righe INFO nel log: nessuno se ne è accorto.
+
+## Decisione
+
+- Dopo una connessione che ha portato dati la registrazione si ricollega
+  subito (3 s) e prende la connessione a chi guarda, come prima.
+- Dopo una connessione che non ha portato niente l'attesa raddoppia fino
+  a 1 minuto, e la connessione si toglie a chi guarda al massimo una volta
+  ogni 5 minuti. Un canale che torna viene comunque registrato.
+- Se la connessione è occupata (da chi guarda o dalla registrazione del
+  programma prima) la registrazione riprova ogni 3 s senza chiedere niente
+  al provider.
+- Un errore di scrittura sul disco (disco pieno) ferma la registrazione e
+  tiene quanto registrato.
+- Dopo 3 connessioni di fila chiuse dal provider entro un minuto, lo stato
+  avvisa per 12 ore "forse un altro dispositivo usa l'abbonamento" e la
+  registrazione finita lo dice nella sua nota.
+
+## Non ancora
+
+- Vedere gli altri client dell'account: il provider non lo dice.
+- Avvisare in un altro modo (notifica, e-mail).

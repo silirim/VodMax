@@ -125,8 +125,10 @@ func (s *Service) acquireConn(ctx context.Context, subID int64, viewer string, f
 				break
 			}
 		}
+		// A recording asks with force only when it has a reason to (see
+		// recordPriorityEvery).
 		for i, other := range kept {
-			if victim < 0 && !background && !other.recording && (force || recording) {
+			if victim < 0 && !background && !other.recording && force {
 				victim = i
 				break
 			}

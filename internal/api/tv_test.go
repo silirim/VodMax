@@ -28,6 +28,8 @@ type tvProvider struct {
 	refused  int             // live requests refused for exceeding the connection limit
 	broken   map[string]bool // live streams ("101.ts") the provider does not serve
 	stalls   map[string]bool // live streams that stop sending after a few packets, connection open
+	kicks    map[string]bool // live streams closed after a few packets, as when another client takes the connection
+	hits     map[string]int  // live requests per stream, served or not
 	extra    string          // more live streams, JSON objects
 }
 
@@ -80,6 +82,10 @@ func newTVProvider() *tvProvider {
 			// Like a real provider with max_connections=1: a request
 			// arriving while a stream is still open is refused, not served.
 			p.mu.Lock()
+			if p.hits == nil {
+				p.hits = map[string]int{}
+			}
+			p.hits[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]]++
 			if p.broken[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]] {
 				p.mu.Unlock()
 				http.Error(w, "stream not found", http.StatusNotFound)
@@ -101,10 +107,14 @@ func newTVProvider() *tvProvider {
 			packet[0] = 0x47
 			p.mu.Lock()
 			stalls := p.stalls[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]]
+			kicks := p.kicks[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]]
 			p.mu.Unlock()
 			for sent := 0; ; sent++ {
 				if stalls && sent >= 20 {
 					<-r.Context().Done()
+					return
+				}
+				if kicks && sent >= 20 {
 					return
 				}
 				if _, err := w.Write(packet); err != nil {

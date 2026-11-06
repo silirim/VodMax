@@ -272,5 +272,8 @@
   "aggiungi almeno un indirizzo da cui si apre VodMax": "add at least one address VodMax is opened from",
   "sostituita da una richiesta più recente dello stesso dispositivo": "replaced by a newer request from the same device",
   "indirizzo locale non permesso per le immagini": "local address not allowed for images",
-  "immagine non raggiungibile per ora": "image not reachable right now"
+  "immagine non raggiungibile per ora": "image not reachable right now",
+  "scrittura sul disco non riuscita: disco pieno o non scrivibile": "could not write to the disk: disk full or not writable",
+  " (forse un altro dispositivo usa l'abbonamento)": " (another device may be using the subscription)",
+  "La registrazione “%s” è stata interrotta più volte dal provider: forse un altro dispositivo usa l'abbonamento “%s”": "The recording “%s” was cut by the provider again and again: another device may be using the subscription “%s”"
 }

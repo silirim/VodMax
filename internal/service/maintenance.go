@@ -405,6 +405,11 @@ func (s *Service) Status(ctx context.Context) (SystemStatus, error) {
 	}
 	s.mu.Unlock()
 	out.Problems = append(out.Problems, s.diskProblems(ctx)...)
+	subName := map[int64]string{}
+	for _, sub := range subs {
+		subName[sub.ID] = sub.Name
+	}
+	out.Problems = append(out.Problems, s.contentionProblems(ctx, subName)...)
 	// An admin profile without PIN, with other profiles, can be chosen by
 	// anyone (it has no admin rights until the PIN is set); with a kids
 	// profile, so can an adult one.

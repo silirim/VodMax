@@ -39,6 +39,9 @@ type activeRec struct {
 	bytes  int64
 	began  time.Time // when the file started: with the size, how many bytes a second
 	early  bool      // stopped by a person before the end: what is there is kept
+	// contended: the provider closed it again and again soon after it
+	// opened, as when another device uses the same account.
+	contended bool
 }
 
 type recorderState struct {
@@ -51,11 +54,44 @@ type recorderState struct {
 	resumed []int64         // recordings carried on after a restart
 	ctx     context.Context // the recorder's: it ends when the server stops
 	stall   time.Duration   // no data for this long: reconnect (0: recordStall)
+	// contention: per subscription, the last recording cut again and
+	// again soon after each reconnection (shown in the status).
+	contention map[int64]contention
+}
+
+type contention struct {
+	title string
+	at    time.Time
 }
 
 // recordStall is how long a recording waits for data before it reconnects:
 // a provider can keep the connection open and send nothing.
 const recordStall = 20 * time.Second
+
+const (
+	// A recording reconnects at once (3 s) after a connection that brought
+	// data: insisting saved the match of 05/11 while another client of the
+	// account kept taking the connection. While nothing arrives (channel
+	// gone, provider refusing) the pause doubles up to a minute.
+	recordRetry    = 3 * time.Second
+	recordRetryMax = time.Minute
+	// After a connection that brought nothing, a recording takes the
+	// connection from a viewer only this often: a channel that does not
+	// work would otherwise cut the family's TV every few seconds for the
+	// whole programme. A channel that comes back is still recorded.
+	recordPriorityEvery = 5 * time.Minute
+	// shortSessions connections in a row that the provider closes within
+	// shortSession of opening them: probably another device using the
+	// account (the status and the recording say so).
+	shortSession  = time.Minute
+	shortSessions = 3
+	// contentionShown is how long the status keeps saying it.
+	contentionShown = 12 * time.Hour
+)
+
+// errDiskWrite ends a recording: retrying cannot help, and what was
+// written is kept.
+var errDiskWrite = errors.New("scrittura sul disco non riuscita: disco pieno o non scrivibile")
 
 type recTicket struct {
 	id      int64
@@ -235,6 +271,15 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 			} else if resumed {
 				final.Error = "registrazione parziale: interrotta da un riavvio del server"
 			}
+			a.mu.Lock()
+			contended := a.contended
+			a.mu.Unlock()
+			if contended {
+				if final.Error == "" {
+					final.Error = "registrazione parziale"
+				}
+				final.Error += " (forse un altro dispositivo usa l'abbonamento)"
+			}
 		}
 		if final.Status == "completed" {
 			if mp4, err := s.remuxRecording(final.File); err == nil {
@@ -319,12 +364,18 @@ func (s *Service) record(ctx context.Context, a *activeRec) error {
 	}
 	defer f.Close()
 	var gap error // the last interruption: it stays, the file has a hole
+	wait, priority, prioritySince := recordRetry, true, time.Time{}
+	short, wasBusy := 0, false
 	for ctx.Err() == nil {
 		it, err := s.st.ChannelForGroup(ctx, a.rec.GroupKey)
 		if err != nil {
 			return fmt.Errorf("canale non più disponibile: %w", err)
 		}
-		err = s.recordOnce(ctx, a, it, f)
+		before, opened := a.size(), time.Now()
+		if priority {
+			prioritySince = opened
+		}
+		err = s.recordOnce(ctx, a, it, f, priority)
 		if ctx.Err() != nil {
 			// Reaching the stop time closes the stream: not an error
 			// (earlier interruptions still count).
@@ -334,19 +385,80 @@ func (s *Service) record(ctx context.Context, a *activeRec) error {
 			break
 		}
 		gap = err
-		if err != nil && s.rec.log != nil {
-			s.rec.log.Info("registrazione interrotta: mi ricollego", "id", a.rec.ID, "err", err)
+		if errors.Is(err, errDiskWrite) {
+			return err
 		}
+		busy := errors.As(err, new(ConnectionBusy))
+		switch {
+		case a.size() > before:
+			wait, priority = recordRetry, true
+			if time.Since(opened) < shortSession {
+				short++
+			} else {
+				short = 0
+			}
+			if short == shortSessions {
+				s.contended(a, it.SubscriptionID)
+			}
+		case busy:
+			// Nothing was asked of the provider: try again soon, the
+			// connection frees up when the recording of the programme
+			// before ends or when nobody watches any more.
+			wait = recordRetry
+			priority = time.Since(prioritySince) >= recordPriorityEvery
+		default:
+			wait = min(wait*2, recordRetryMax)
+			priority = time.Since(prioritySince) >= recordPriorityEvery
+		}
+		if err != nil && s.rec.log != nil && !(busy && wasBusy) {
+			s.rec.log.Info("registrazione interrotta: mi ricollego", "id", a.rec.ID, "err", err, "tra", wait)
+		}
+		wasBusy = busy
 		select {
 		case <-ctx.Done():
-		case <-time.After(3 * time.Second): // reconnect
+		case <-time.After(wait): // reconnect
 		}
 	}
 	return gap
 }
 
-func (s *Service) recordOnce(ctx context.Context, a *activeRec, it store.PlaybackItem, f *os.File) error {
-	streamCtx, release, err := s.acquire(ctx, it.SubscriptionID, "recording:"+strconv.FormatInt(a.rec.ID, 10), true, true)
+// contended notes that the provider keeps closing a recording soon after
+// each reconnection.
+func (s *Service) contended(a *activeRec, subID int64) {
+	a.mu.Lock()
+	a.contended = true
+	a.mu.Unlock()
+	s.rec.mu.Lock()
+	if s.rec.contention == nil {
+		s.rec.contention = map[int64]contention{}
+	}
+	s.rec.contention[subID] = contention{title: a.rec.Title, at: time.Now()}
+	s.rec.mu.Unlock()
+	if s.rec.log != nil {
+		s.rec.log.Warn("registrazione interrotta più volte di seguito: forse un altro dispositivo usa l'abbonamento",
+			"id", a.rec.ID, "abbonamento", subID)
+	}
+}
+
+// contentionProblems are the recent recordings cut again and again.
+func (s *Service) contentionProblems(ctx context.Context, subName map[int64]string) []Problem {
+	var out []Problem
+	s.rec.mu.Lock()
+	defer s.rec.mu.Unlock()
+	for sub, c := range s.rec.contention {
+		if time.Since(c.at) > contentionShown || subName[sub] == "" {
+			continue
+		}
+		out = append(out, Problem{Level: "warning", Area: "subscription",
+			Text: T(ctx, "La registrazione “%s” è stata interrotta più volte dal provider: forse un altro dispositivo usa l'abbonamento “%s”", c.title, subName[sub])})
+	}
+	return out
+}
+
+// recordOnce records from one provider connection. priority: it may take
+// the connection from a viewer.
+func (s *Service) recordOnce(ctx context.Context, a *activeRec, it store.PlaybackItem, f *os.File, priority bool) error {
+	streamCtx, release, err := s.acquire(ctx, it.SubscriptionID, "recording:"+strconv.FormatInt(a.rec.ID, 10), priority, true)
 	if err != nil {
 		return err
 	}
@@ -393,7 +505,10 @@ func (s *Service) recordOnce(ctx context.Context, a *activeRec, it store.Playbac
 			last.Store(time.Now().UnixNano())
 			if whole := pk.take(buf[:n]); len(whole) > 0 {
 				if _, werr := f.Write(whole); werr != nil {
-					return werr
+					if s.rec.log != nil {
+						s.rec.log.Warn("registrazione: scrittura sul disco non riuscita", "id", a.rec.ID, "err", werr)
+					}
+					return errDiskWrite
 				}
 				a.mu.Lock()
 				a.bytes += int64(len(whole))

@@ -52,6 +52,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0044](0044-token-di-amministrazione-fuori-dal-browser.md) | Il token di amministrazione non resta nel browser | Proposta |
 | [0045](0045-accesso-con-account-da-indirizzi-noti.md) | Accesso con account solo dagli indirizzi di VodMax elencati | Proposta |
 | [0046](0046-spazio-prima-le-registrazioni.md) | Disco quasi pieno: prima le registrazioni, poi la pausa della diretta | Proposta |
+| [0048](0048-registrazioni-insistere-quando-serve.md) | Registrazioni: insistere quando serve, non quando è inutile | Proposta |
 
 ## Ordine consigliato per decidere
 
