@@ -76,7 +76,7 @@ guasto; il client la ignora.
 | `GET /api/v1/series/{id}/episodes` | Episodi di una serie, con avanzamento |
 | `GET` · `PUT /api/v1/progress/{movie\|episode}/{id}` | Avanzamento (`position`, `duration` in secondi) |
 | `GET /api/v1/continue` · `DELETE …/{id}` | Continua a guardare; togliere un film o una serie (id del titolo) finché non lo si riguarda |
-| `POST /api/v1/vod/{movie\|episode}/{id}/session` `{viewer, mode?}` | Sessione di riproduzione: `direct` (MP4, intervalli) o `remux` (ffmpeg, `?t=` secondi) |
+| `POST /api/v1/vod/{movie\|episode}/{id}/session` `{viewer, mode?, force?}` | Sessione di riproduzione: `direct` (MP4, intervalli) o `remux` (ffmpeg, `?t=` secondi). Con la connessione occupata da un altro dispositivo risponde 409 (423 se la tiene una registrazione); `force: true` la prende per l'analisi del file |
 | `GET` · `POST /api/v1/recordings` | Registrazioni; `{channel_id}` registra il programma in onda, oppure `start`/`stop` esatti |
 | `DELETE /api/v1/recordings/{id}` · `POST …/{id}/ticket` | Annulla o elimina; permesso di visione (`recorded`: secondi già registrati, se in corso) |
 | `POST /api/v1/recordings/{id}/stop` | Ferma una registrazione in corso tenendo quanto registrato |

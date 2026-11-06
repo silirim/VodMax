@@ -282,7 +282,9 @@ type Track struct {
 
 // NewPlaybackSession prepares a film or episode for a viewer. mode may
 // force "remux" (e.g. after the browser failed to play the direct file).
-func (s *Service) NewPlaybackSession(ctx context.Context, media string, id int64, viewer, mode string) (PlaybackSession, error) {
+// force takes the connection from another viewer for the analysis ("take
+// control"); without it a busy connection is ConnectionBusy.
+func (s *Service) NewPlaybackSession(ctx context.Context, media string, id int64, viewer, mode string, force bool) (PlaybackSession, error) {
 	if !viewerID.MatchString(viewer) {
 		return PlaybackSession{}, invalid("identificativo del player non valido")
 	}
@@ -359,9 +361,12 @@ func (s *Service) NewPlaybackSession(ctx context.Context, media string, id int64
 	if mode == "direct" {
 		probeCtx, cancel = context.WithTimeout(ctx, directProbeLimit)
 	}
-	probe, err := s.probe(probeCtx, sess)
+	probe, err := s.probe(probeCtx, sess, force)
 	cancel()
-	if err != nil && mode == "remux" {
+	// A direct file can play without the analysis, but when the page
+	// chose the mode a busy connection is reported now: taking control
+	// here also lets the analysis pick the Italian audio.
+	if err != nil && (mode == "remux" || auto && errors.As(err, new(ConnectionBusy))) {
 		return PlaybackSession{}, err
 	}
 	if err == nil {
@@ -645,12 +650,12 @@ func (p *probeResult) preferredAudio() int {
 }
 
 // probe reads duration and codecs with ffprobe through the loopback relay.
-func (s *Service) probe(ctx context.Context, sess *vodSession) (*probeResult, error) {
+func (s *Service) probe(ctx context.Context, sess *vodSession, force bool) (*probeResult, error) {
 	addr, err := s.loopback()
 	if err != nil {
 		return nil, err
 	}
-	streamCtx, release, err := s.acquire(ctx, sess.subID, sess.viewer, false, false)
+	streamCtx, release, err := s.acquire(ctx, sess.subID, sess.viewer, force, false)
 	if err != nil {
 		return nil, err
 	}

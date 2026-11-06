@@ -1077,6 +1077,7 @@ func (a *api) vodSession(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Viewer string `json:"viewer"`
 		Mode   string `json:"mode"`
+		Force  bool   `json:"force"` // take the connection from another device
 	}
 	if err := decode(r, &in); err != nil {
 		a.fail(w, r, err)
@@ -1084,7 +1085,7 @@ func (a *api) vodSession(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 	defer cancel()
-	sess, err := a.svc.NewPlaybackSession(ctx, r.PathValue("media"), id, in.Viewer, in.Mode)
+	sess, err := a.svc.NewPlaybackSession(ctx, r.PathValue("media"), id, in.Viewer, in.Mode, in.Force)
 	if err != nil {
 		a.fail(w, r, err)
 		return

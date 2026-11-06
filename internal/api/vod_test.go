@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -584,5 +585,53 @@ func TestHideFromContinue(t *testing.T) {
 	e.do(t, "PUT", "/api/v1/progress/movie/"+film, map[string]int{"position": 700, "duration": 6000}, true)
 	if _, body := e.do(t, "GET", "/api/v1/continue", nil, true); !strings.Contains(string(body), `"title":"1408"`) || strings.Contains(string(body), "Twin Peaks") {
 		t.Fatalf("watched again: %s", body)
+	}
+}
+
+// fakeFFprobe describes every file as H.264 with English then Italian
+// audio, without reading it.
+func fakeFFprobe(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "ffprobe")
+	script := `#!/bin/sh
+echo '{"format":{"duration":"60"},"streams":[{"codec_type":"video","codec_name":"h264"},
+{"codec_type":"audio","codec_name":"aac","tags":{"language":"eng"}},{"codec_type":"audio","codec_name":"aac","tags":{"language":"ita"}}]}'
+`
+	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// One connection, a channel playing on another device: opening a film
+// answers 409 ("take control?"), and the same request with force takes
+// the connection, for converted files (MKV) and for MP4 alike.
+func TestFilmSessionTakesControl(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.svc.SetFFmpeg("", fakeFFprobe(t))
+	rai := channels(t, e, "?section=tv")[0]
+	for _, title := range []string{"Psycho", "1408"} {
+		live, err := openStream(t, e, ticket(t, e, rai.ID, "camera-tablet-02"))
+		if err != nil || live.StatusCode != 200 {
+			t.Fatalf("live: %v %v", err, live)
+		}
+		readSome(t, live)
+		path := "/api/v1/vod/movie/" + strconv.FormatInt(findItem(t, e, "movie", title), 10) + "/session"
+		if code, body := e.do(t, "POST", path, map[string]any{"viewer": "salotto-tv-01"}, true); code != 409 {
+			t.Fatalf("%s while busy: %d %s", title, code, body)
+		}
+		code, body := e.do(t, "POST", path, map[string]any{"viewer": "salotto-tv-01", "force": true}, true)
+		var sess struct {
+			Mode         string `json:"mode"`
+			DefaultAudio int    `json:"default_audio"`
+		}
+		// The analysis ran: the Italian audio is chosen, so the MP4 is converted too.
+		if code != 200 || json.Unmarshal(body, &sess) != nil || sess.Mode != "remux" || sess.DefaultAudio != 1 {
+			t.Fatalf("%s with force: %d %s", title, code, body)
+		}
+		if _, err := io.ReadAll(live.Body); err != nil && !strings.Contains(err.Error(), "EOF") {
+			t.Logf("tablet stream ended: %v", err)
+		}
+		live.Body.Close()
 	}
 }
