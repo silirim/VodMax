@@ -55,7 +55,10 @@ vodmax-server -version
   token di amministrazione, registrazioni, download, backup). I download
   possono andare su un altro disco con `-downloads /percorso` in
   `vodmax.service` (la cartella deve essere scrivibile dall'utente `vodmax`,
-  per esempio aggiunta a `ReadWritePaths`).
+  per esempio aggiunta a `ReadWritePaths`). VodMax crea ogni file privato
+  dell'utente `vodmax` (umask 077), anche download e registrazioni: un
+  altro programma (Jellyfin, Kodi, una condivisione Samba) che gira con un
+  altro utente non li legge.
 - **Cartelle delle raccolte**: il servizio gira come utente `vodmax` e, con
   il file fornito, non vede `/home` né `/tmp`. Metti o monta le cartelle dei
   film sotto `/mnt`, `/srv` o `/media`, leggibili dall'utente `vodmax`.

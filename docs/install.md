@@ -55,7 +55,10 @@ vodmax-server -version
 - **Data**: everything is in `/var/lib/vodmax` (database, encryption key,
   admin token, recordings, downloads, backups). Downloads can go to another
   disk with `-downloads /path` in `vodmax.service` (the folder must be
-  writable by `vodmax`, e.g. listed in `ReadWritePaths`).
+  writable by `vodmax`, e.g. listed in `ReadWritePaths`). VodMax creates
+  every file private to the `vodmax` user (umask 077), downloads and
+  recordings too: another program (Jellyfin, Kodi, a Samba share) running
+  as a different user cannot read them.
 - **Folders for collections**: the service runs as the `vodmax` user and,
   with the provided unit, cannot see `/home` or `/tmp`. Put or mount your
   movie folders under `/mnt`, `/srv` or `/media` and make them readable by
