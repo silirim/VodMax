@@ -27,22 +27,23 @@ func FromStalker(ctx context.Context, c *stalker.Client, seal func(plain []byte,
 	snap := &Snapshot{Kinds: []string{"live"}, Account: json.RawMessage(`{"status":"Active","active":true,"max_connections":1}`)}
 	for _, g := range genres {
 		if id := g.ID.String(); id != "" && id != "*" {
-			snap.Categories = append(snap.Categories, newCategory("live", id, g.Title))
+			snap.Categories = append(snap.Categories, newCategory("live", id, g.Title.String()))
 		}
 	}
 	infos := categoryInfos(snap.Categories)
 	seen := map[string]bool{}
 	for _, ch := range channels {
 		id := ch.ID.String()
-		if id == "" || seen[id] || ch.Cmd == "" || IsSeparator(ch.Name) {
+		name := ch.Name.String()
+		if id == "" || seen[id] || ch.Cmd == "" || IsSeparator(name) {
 			snap.Skipped++
 			continue
 		}
 		seen[id] = true
-		it := store.Item{Kind: "live", SourceID: id, Title: ch.Name, DisplayTitle: ChannelTitle(ch.Name),
-			CategoryID: ch.GenreID.String(), Image: ch.Logo, EPGID: ch.XMLTVID, Number: int(ch.Number.Int())}
+		it := store.Item{Kind: "live", SourceID: id, Title: name, DisplayTitle: ChannelTitle(name),
+			CategoryID: ch.GenreID.String(), Image: ch.Logo.String(), EPGID: ch.XMLTVID.String(), Number: int(ch.Number.Int())}
 		finish(&it, infos["live\x00"+it.CategoryID])
-		it.Locator = seal([]byte(ch.Cmd), fmt.Sprintf("locator:%d:live:%s", subID, id))
+		it.Locator = seal([]byte(ch.Cmd.String()), fmt.Sprintf("locator:%d:live:%s", subID, id))
 		snap.Items = append(snap.Items, it)
 	}
 	return snap, nil

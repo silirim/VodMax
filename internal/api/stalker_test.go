@@ -60,7 +60,9 @@ func newFakePortal(t *testing.T) *fakePortal {
 			w.Write([]byte(`{"js":{"total_items":3,"data":[
 				{"id":"501","name":"Rai 1 HD","number":"1","cmd":"ffmpeg http://localhost/ch/501","logo":"","tv_genre_id":"10","xmltv_id":"rai1.it"},
 				{"id":"502","name":"Sport Uno","number":"2","cmd":"ffmpeg http://localhost/ch/502","tv_genre_id":11,"xmltv_id":""},
-				{"id":"503","name":"Senza comando","number":"3","cmd":"","tv_genre_id":"10"}]}}`))
+				{"id":"503","name":"Senza comando","number":"3","cmd":"","tv_genre_id":"10"},
+				{"id":"504","name":24,"number":"4","cmd":"ffmpeg http://localhost/ch/504","logo":false,"tv_genre_id":"10","xmltv_id":null},
+				"rotto"]}}`)) // loose types and a broken entry: the rest still syncs
 		case "create_link":
 			if q.Get("cmd") != "ffmpeg http://localhost/ch/501" && q.Get("cmd") != "ffmpeg http://localhost/ch/502" {
 				w.Write([]byte(`{"js":{"cmd":""}}`))
@@ -92,11 +94,11 @@ func TestStalkerPortal(t *testing.T) {
 		t.Fatalf("MAC returned: %s", body)
 	}
 	code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true)
-	if code != 200 || !strings.Contains(string(body), `"live":2`) {
+	if code != 200 || !strings.Contains(string(body), `"live":3`) {
 		t.Fatalf("sync: %d %s", code, body)
 	}
 	all := channels(t, e, "")
-	if len(all) != 2 {
+	if len(all) != 3 {
 		t.Fatalf("channels: %+v", all)
 	}
 	var rai tvChannel

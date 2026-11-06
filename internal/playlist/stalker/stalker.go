@@ -202,21 +202,22 @@ func (c *Client) retry(ctx context.Context, f func() error) error {
 	return err
 }
 
-// Genre is a channel category.
+// Genre is a channel category. Fields are Flex: portals are as loose
+// about JSON types as Xtream panels.
 type Genre struct {
 	ID    xtream.Flex `json:"id"`
-	Title string      `json:"title"`
+	Title xtream.Flex `json:"title"`
 }
 
 // Channel is a live channel; Cmd is what create_link needs.
 type Channel struct {
 	ID      xtream.Flex `json:"id"`
-	Name    string      `json:"name"`
+	Name    xtream.Flex `json:"name"`
 	Number  xtream.Flex `json:"number"`
-	Cmd     string      `json:"cmd"`
-	Logo    string      `json:"logo"`
+	Cmd     xtream.Flex `json:"cmd"`
+	Logo    xtream.Flex `json:"logo"`
 	GenreID xtream.Flex `json:"tv_genre_id"`
-	XMLTVID string      `json:"xmltv_id"`
+	XMLTVID xtream.Flex `json:"xmltv_id"`
 }
 
 func (c *Client) Genres(ctx context.Context) ([]Genre, error) {
@@ -225,12 +226,21 @@ func (c *Client) Genres(ctx context.Context) ([]Genre, error) {
 	return out, err
 }
 
+// Channels lists every channel, leaving out the entries that do not
+// decode: one malformed channel must not stop the portal from updating.
 func (c *Client) Channels(ctx context.Context) ([]Channel, error) {
 	var out struct {
-		Data []Channel `json:"data"`
+		Data []json.RawMessage `json:"data"`
 	}
 	err := c.retry(ctx, func() error { return c.call(ctx, url.Values{"type": {"itv"}, "action": {"get_all_channels"}}, &out) })
-	return out.Data, err
+	list := make([]Channel, 0, len(out.Data))
+	for _, raw := range out.Data {
+		var ch Channel
+		if json.Unmarshal(raw, &ch) == nil {
+			list = append(list, ch)
+		}
+	}
+	return list, err
 }
 
 // Link asks the address to play a channel now (it usually carries a
