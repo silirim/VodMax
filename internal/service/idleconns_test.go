@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/silirim/vodmax/internal/store"
 )
 
 // Provider clients are built per request: once a logo or a range has
@@ -76,5 +78,24 @@ func TestImagesRefuseLoopback(t *testing.T) {
 	}
 	if hits.Load() != 0 {
 		t.Fatal("loopback reached")
+	}
+}
+
+// A source that cannot be reached (VPN down, timeout) is tried once, then
+// left alone for a while instead of at every request.
+func TestUnreachableImageRemembered(t *testing.T) {
+	s, _ := oneConnectionService(t)
+	var calls atomic.Int32
+	fetch := func(context.Context) (store.CachedImage, error) {
+		calls.Add(1)
+		return store.CachedImage{}, errors.New("immagine: dial tcp: i/o timeout")
+	}
+	for i := 0; i < 3; i++ {
+		if _, err := s.cachedImage(context.Background(), "http://logos.invalid/a.png", fetch); !errors.Is(err, ErrImageUnreachable) {
+			t.Fatalf("attempt %d: %v", i, err)
+		}
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("source asked %d times", calls.Load())
 	}
 }

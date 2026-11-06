@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -29,6 +30,9 @@ import (
 const (
 	maxImageBytes   = 1 << 20
 	imageRetryAfter = 24 * time.Hour // failed fetches are retried after this
+	// A fetch that could not reach the source (VPN down, timeout) is not
+	// an image problem: it is retried sooner, but not at every request.
+	imageRetryUnreachable = 10 * time.Minute
 )
 
 var allowedImageTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true}
@@ -36,12 +40,17 @@ var allowedImageTypes = map[string]bool{"image/png": true, "image/jpeg": true, "
 // ErrNoImage means the item has no usable image.
 var ErrNoImage = errors.New("immagine non disponibile")
 
+// ErrImageUnreachable means the image's source could not be reached a
+// moment ago; it is tried again after imageRetryUnreachable.
+var ErrImageUnreachable = errors.New("immagine non raggiungibile per ora")
+
 type imageState struct {
 	once     sync.Once
 	key      []byte
 	mu       sync.Mutex
 	inflight map[string]*imageCall
 	slots    chan struct{}
+	failed   map[string]time.Time // unreachable sources, by URL hash
 }
 
 type imageCall struct {
@@ -55,6 +64,7 @@ func (s *Service) imageKey() []byte {
 		s.images.key = s.box.Derive("image-url-signing")
 		s.images.inflight = map[string]*imageCall{}
 		s.images.slots = make(chan struct{}, 4)
+		s.images.failed = map[string]time.Time{}
 	})
 	return s.images.key
 }
@@ -148,6 +158,10 @@ func (s *Service) cachedImage(ctx context.Context, src string, fetch func(contex
 	}
 	s.imageKey()
 	s.images.mu.Lock()
+	if at, ok := s.images.failed[hash]; ok && time.Since(at) < imageRetryUnreachable {
+		s.images.mu.Unlock()
+		return store.CachedImage{}, ErrImageUnreachable
+	}
 	call := s.images.inflight[hash]
 	if call == nil {
 		// Another request may have just stored it.
@@ -165,6 +179,19 @@ func (s *Service) cachedImage(ctx context.Context, src string, fetch func(contex
 			}
 			s.images.mu.Lock()
 			delete(s.images.inflight, hash)
+			if call.err != nil && !errors.Is(call.err, ErrNoImage) {
+				// Logged once here, at info: a channel list with the VPN
+				// down would otherwise log an error per logo per page.
+				slog.Info("immagine non scaricata: nuovo tentativo tra qualche minuto", "err", call.err)
+				now := time.Now()
+				for h, at := range s.images.failed {
+					if now.Sub(at) >= imageRetryUnreachable {
+						delete(s.images.failed, h)
+					}
+				}
+				s.images.failed[hash] = now
+				call.err = ErrImageUnreachable
+			}
 			s.images.mu.Unlock()
 			close(call.done)
 		}()

@@ -271,5 +271,6 @@
   "indirizzo di VodMax non valido: %s (per esempio https://vodmax.example.org)": "indirizzo di VodMax non valido: %s (per esempio https://vodmax.example.org)",
   "aggiungi almeno un indirizzo da cui si apre VodMax": "aggiungi almeno un indirizzo da cui si apre VodMax",
   "sostituita da una richiesta più recente dello stesso dispositivo": "sostituita da una richiesta più recente dello stesso dispositivo",
-  "indirizzo locale non permesso per le immagini": "indirizzo locale non permesso per le immagini"
+  "indirizzo locale non permesso per le immagini": "indirizzo locale non permesso per le immagini",
+  "immagine non raggiungibile per ora": "immagine non raggiungibile per ora"
 }

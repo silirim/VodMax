@@ -72,3 +72,22 @@ func TestClientAddr(t *testing.T) {
 		}
 	}
 }
+
+// Logos: a client that went away is not a server error, and a source
+// that cannot be reached is 502, not a 500 logged as an error.
+func TestFailQuietForImages(t *testing.T) {
+	var logged strings.Builder
+	a := &api{log: slog.New(slog.NewTextHandler(&logged, nil))}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	w := httptest.NewRecorder()
+	a.fail(w, httptest.NewRequest("GET", "/img/logo/1", nil).WithContext(ctx), context.Canceled)
+	if w.Body.Len() != 0 || logged.Len() != 0 {
+		t.Fatalf("client gone: %d %q, log %q", w.Code, w.Body.String(), logged.String())
+	}
+	w = httptest.NewRecorder()
+	a.fail(w, httptest.NewRequest("GET", "/img/logo/1", nil), service.ErrImageUnreachable)
+	if w.Code != 502 || logged.Len() != 0 {
+		t.Fatalf("unreachable: %d, log %q", w.Code, logged.String())
+	}
+}

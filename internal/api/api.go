@@ -280,6 +280,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, context.Canceled) && r.Context().Err() != nil {
+		return // the client went away (zapping, a list scrolled past): nobody to answer, nothing broke
+	}
 	var bad service.ErrInvalid
 	var busy service.ConnectionBusy
 	status := http.StatusInternalServerError
@@ -319,6 +322,8 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusBadGateway
 	case errors.Is(err, service.ErrNoImage), errors.Is(err, service.ErrNotReady):
 		status = http.StatusNotFound
+	case errors.Is(err, service.ErrImageUnreachable):
+		status = http.StatusBadGateway
 	case errors.As(err, new(*service.UpstreamError)):
 		status = http.StatusBadGateway
 	case errors.Is(err, context.DeadlineExceeded):
@@ -811,6 +816,9 @@ func (a *api) image(w http.ResponseWriter, r *http.Request, img store.CachedImag
 	if err != nil {
 		if errors.Is(err, service.ErrNoImage) {
 			w.Header().Set("Cache-Control", "max-age=3600")
+		}
+		if errors.Is(err, service.ErrImageUnreachable) {
+			w.Header().Set("Cache-Control", "max-age=600") // the server tries again after that
 		}
 		a.fail(w, r, err)
 		return
