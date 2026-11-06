@@ -96,8 +96,11 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 	}
 
 	// Keys that change in this import are noted, to carry over what is
-	// kept by group key (see carryGroupKeys).
+	// kept by group key (see carryGroupKeys). seen_item lists what the
+	// provider still offers: unchanged rows are not written at all.
 	for _, q := range []string{
+		`CREATE TEMP TABLE IF NOT EXISTS seen_item (kind TEXT NOT NULL, source_id TEXT NOT NULL, PRIMARY KEY (kind, source_id)) WITHOUT ROWID`,
+		`DELETE FROM temp.seen_item`,
 		`CREATE TEMP TABLE IF NOT EXISTS moved_item (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, old TEXT NOT NULL)`,
 		`CREATE TEMP TRIGGER IF NOT EXISTS item_key_moved AFTER UPDATE OF group_key ON item
 			WHEN old.group_key <> new.group_key AND new.group_key <> ''
@@ -109,11 +112,15 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 		}
 	}
 
-	now := time.Now().UnixNano() // unique per import: identifies rows seen now
+	now := time.Now().UnixNano() // unique per import: identifies rows added now
 	// New rows start hidden and the selection that follows the import
 	// shows them: if it fails or the process stops in between, a title of
 	// an adult category or an excluded country is not open to every
 	// profile, kids included, until the next selection.
+	// A row whose fields are all the same is left alone (no RETURNING
+	// row): the import holds the only writer connection, and rewriting
+	// every row and its indexes made a nightly re-import of a large
+	// catalog keep progress saves and favourites waiting for seconds.
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO item (subscription_id, kind, source_id, title, display_title, year, category_id, image, epg_id,
 			number, rating, tmdb_id, extension, catchup_days, added_at, locator, first_seen_at, last_seen_at, available,
@@ -127,27 +134,47 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 			locator = excluded.locator, last_seen_at = excluded.last_seen_at,
 			available = 1, quality = excluded.quality, group_key = excluded.group_key,
 			lcn = excluded.lcn, name_key = excluded.name_key
+		WHERE (item.title, item.display_title, item.year, item.category_id, item.image, item.epg_id, item.number, item.rating,
+				item.tmdb_id, item.extension, item.catchup_days, item.added_at, item.locator, item.available, item.quality,
+				item.group_key, item.lcn, item.name_key)
+			IS NOT (excluded.title, excluded.display_title, excluded.year, excluded.category_id, excluded.image, excluded.epg_id,
+				excluded.number, excluded.rating, excluded.tmdb_id, excluded.extension, excluded.catchup_days, excluded.added_at,
+				excluded.locator, excluded.available, excluded.quality, excluded.group_key, excluded.lcn, excluded.name_key)
 		RETURNING first_seen_at`)
 	if err != nil {
 		return res, err
 	}
 	defer stmt.Close()
+	written, seen := 0, map[string][]string{}
 	for _, it := range items {
 		var first int64
 		err := stmt.QueryRowContext(ctx, subID, it.Kind, it.SourceID, it.Title, it.DisplayTitle, zeroNull(it.Year),
 			it.CategoryID, it.Image, it.EPGID, zeroNull(it.Number), zeroNullF(it.Rating), it.TMDBID, it.Extension,
 			it.CatchupDays, zeroNull64(it.AddedAt), it.Locator, now, now, max(it.Quality, 1), it.GroupKey, zeroNull(it.LCN), it.NameKey).Scan(&first)
-		if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows): // unchanged
+		case err != nil:
 			return res, fmt.Errorf("titolo %q: %w", it.Title, err)
+		default:
+			written++
+			if first == now {
+				res.Added++
+			}
 		}
-		if first == now {
-			res.Added++
+		seen[it.Kind] = append(seen[it.Kind], it.SourceID)
+	}
+	// One statement per kind: a statement per title would cost as much
+	// as the upserts.
+	for kind, ids := range seen {
+		list, _ := json.Marshal(ids)
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO temp.seen_item SELECT ?, value FROM json_each(?)`, kind, string(list)); err != nil {
+			return res, err
 		}
 	}
 
 	for _, kind := range kinds {
-		r, err := tx.ExecContext(ctx, `UPDATE item SET available = 0 WHERE subscription_id = ? AND kind = ? AND available = 1 AND last_seen_at <> ?`,
-			subID, kind, now)
+		r, err := tx.ExecContext(ctx, `UPDATE item SET available = 0 WHERE subscription_id = ? AND kind = ? AND available = 1
+			AND NOT EXISTS (SELECT 1 FROM temp.seen_item s WHERE s.kind = item.kind AND s.source_id = item.source_id)`, subID, kind)
 		if err != nil {
 			return res, err
 		}
@@ -169,8 +196,10 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 			return res, err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO item_search(item_search) VALUES ('rebuild')`); err != nil {
-		return res, err
+	if written > 0 || res.Removed > 0 {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO item_search(item_search) VALUES ('rebuild')`); err != nil {
+			return res, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return res, err

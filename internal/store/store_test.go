@@ -70,6 +70,21 @@ func TestReplaceKeepsIDsAndMarksRemovals(t *testing.T) {
 	if counts["movie"] != 90 {
 		t.Fatalf("available count %d", counts["movie"])
 	}
+	// Third import: the ten come back; titles that did not change are
+	// not written again.
+	var seenBefore int64
+	st.r.QueryRowContext(ctx, `SELECT last_seen_at FROM item WHERE source_id = '50'`).Scan(&seenBefore)
+	res, err = st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false)
+	if err != nil || res.Added != 0 || res.Removed != 0 {
+		t.Fatalf("third import: %+v %v", res, err)
+	}
+	var seenAfter int64
+	var available int
+	st.r.QueryRowContext(ctx, `SELECT last_seen_at FROM item WHERE source_id = '50'`).Scan(&seenAfter)
+	st.r.QueryRowContext(ctx, `SELECT count(*) FROM item WHERE available = 1`).Scan(&available)
+	if seenAfter != seenBefore || available != 100 {
+		t.Fatalf("unchanged row rewritten (%d → %d) or removed ones not back: %d", seenBefore, seenAfter, available)
+	}
 }
 
 func TestSuspiciousDropKeepsPreviousCatalog(t *testing.T) {
