@@ -310,6 +310,24 @@ func redactURL(err error) error {
 	return err
 }
 
+// looseInt is a number that small models sometimes write as a string
+// ("2004"); anything else reads as 0, unknown, rather than failing the
+// whole answer.
+type looseInt int
+
+func (n *looseInt) UnmarshalJSON(b []byte) error {
+	var v any
+	json.Unmarshal(b, &v)
+	switch x := v.(type) {
+	case float64:
+		*n = looseInt(x)
+	case string:
+		i, _ := strconv.Atoi(strings.TrimSpace(x))
+		*n = looseInt(i)
+	}
+	return nil
+}
+
 // jsonObject finds the JSON object in an answer: models sometimes wrap it
 // in text or in a code block.
 func jsonObject(answer string, v any) error {
@@ -663,24 +681,26 @@ type request struct {
 // titles it names in the catalog. When the request names a person or a
 // year, each title found is checked on its detail page (cast, director,
 // release): the model can be wrong about who played in what, the page
-// cannot. Titles that cannot be checked are left out.
-func (s *Service) requestFor(ctx context.Context, a AssistantSettings, wish string) request {
+// cannot. Titles that cannot be checked are left out. An answer it cannot
+// read is an error: without it nothing says the request was precise, and
+// any programme would pass as "a film with…".
+func (s *Service) requestFor(ctx context.Context, a AssistantSettings, wish string) (request, error) {
 	var req request
 	answer, err := s.chat(ctx, a, []chatMessage{{Role: "system", Content: titlesPrompt}, {Role: "user", Content: wish}}, true)
 	if err != nil {
-		return req
+		return req, err
 	}
 	var raw struct {
 		About  string   `json:"about"`
 		Person string   `json:"person"`
 		Genres []string `json:"genres"`
 		Titles []struct {
-			Title string `json:"title"`
-			Year  int    `json:"year"`
+			Title string   `json:"title"`
+			Year  looseInt `json:"year"`
 		} `json:"titles"`
 	}
-	if jsonObject(answer, &raw) != nil {
-		return req
+	if err := jsonObject(answer, &raw); err != nil {
+		return req, err
 	}
 	req.person = truncate(strings.TrimSpace(raw.Person), 80)
 	req.precise = raw.About == "person" || raw.About == "title" || req.person != ""
@@ -721,7 +741,7 @@ func (s *Service) requestFor(ctx context.Context, a AssistantSettings, wish stri
 				continue
 			}
 			for _, it := range page.Items {
-				want := cmp.Or(year, t.Year)
+				want := cmp.Or(year, int(t.Year))
 				if seen[it.ID] || (want > 0 && it.Year != nil && (*it.Year < want-1 || *it.Year > want+1)) {
 					continue
 				}
@@ -744,7 +764,7 @@ func (s *Service) requestFor(ctx context.Context, a AssistantSettings, wish stri
 		}
 	}
 	if req.person == "" && year == 0 || len(req.found) == 0 {
-		return req
+		return req, nil
 	}
 	keep := make([]bool, len(req.found))
 	vctx, cancel := context.WithTimeout(ctx, 25*time.Second)
@@ -788,7 +808,7 @@ func (s *Service) requestFor(ctx context.Context, a AssistantSettings, wish stri
 		}
 	}
 	req.found = checked
-	return req
+	return req, nil
 }
 
 // seriesRE: a request that names series (films are filmRE).
@@ -921,7 +941,9 @@ func (s *Service) AssistantTonight(ctx context.Context, wish string) (Tonight, e
 	var req request
 	if wish != "" {
 		// What they asked for comes first, without repeating a title.
-		req = s.requestFor(ctx, a, wish)
+		if req, err = s.requestFor(ctx, a, wish); err != nil {
+			return out, err
+		}
 		asked := slices.Clone(req.found)
 		have := map[int64]bool{}
 		for _, c := range asked {

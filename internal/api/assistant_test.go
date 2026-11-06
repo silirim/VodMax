@@ -333,6 +333,49 @@ func TestAssistant(t *testing.T) {
 	}
 }
 
+// The first step of a precise request ("a film with…") reads what is
+// asked. An answer VodMax cannot read is an error, not a request with
+// nothing to check: otherwise a quiz show passed as a film with that
+// actor. A year written as a string still reads.
+func TestAssistantRequestUnreadable(t *testing.T) {
+	e, _ := tvSetup(t)
+	m := newFakeModel(t)
+	cfg := map[string]any{"enabled": true, "url": m.URL + "/v1", "model": "llama3", "key": "sk-test"}
+	if code, body := e.do(t, "PUT", "/api/v1/settings/assistant", cfg, true); code != 200 {
+		t.Fatalf("settings: %d %s", code, body)
+	}
+	everything := func(user string) string {
+		var picks []string
+		for _, line := range strings.Split(user, "\n") {
+			if c := strings.TrimSpace(strings.SplitN(line, "|", 2)[0]); regexp.MustCompile(`^[LT][0-9]+$`).MatchString(c) {
+				picks = append(picks, `{"code":"`+c+`","why":"C'è lui."}`)
+			}
+		}
+		return `{"intro":"Ecco un film con John Cusack.","picks":[` + strings.Join(picks, ",") + `]}`
+	}
+	m.answer = func(system, user string) string {
+		if strings.Contains(system, "home catalog") {
+			return "Sure! John Cusack starred in many films."
+		}
+		return everything(user)
+	}
+	code, body := e.do(t, "POST", "/api/v1/assistant/tonight", map[string]string{"wish": "un film con john cusack"}, true)
+	if code != 502 || len(m.requests) != 1 {
+		t.Fatalf("unreadable first answer: %d %s, %d requests", code, body, len(m.requests))
+	}
+	m.answer = func(system, user string) string {
+		if strings.Contains(system, "home catalog") {
+			return `{"about":"person","person":"John Cusack","titles":[{"title":"1408","year":"2007"}]}`
+		}
+		return everything(user)
+	}
+	code, body = e.do(t, "POST", "/api/v1/assistant/tonight", map[string]string{"wish": "un film con john cusack"}, true)
+	var tn struct{ Picks []struct{ Title string } }
+	if code != 200 || json.Unmarshal(body, &tn) != nil || len(tn.Picks) != 1 || tn.Picks[0].Title != "1408" {
+		t.Fatalf("year as a string: %d %s", code, body)
+	}
+}
+
 // The people index (decision 0036): opened pages and the night fill it;
 // the assistant finds every title of a person in it.
 // A detail page that cannot be read is noted without people and the
