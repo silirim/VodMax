@@ -89,6 +89,7 @@ public class PlayerActivity extends Activity {
     // for recordings in MPEG-TS, finished too: their clock restarts at each
     // reconnection, so Media3's own seek in the file lands in the wrong place.
     private String restartUrl;
+    private boolean restarts;
     private long offsetMs, firstOffsetMs, knownDurationMs;
     // A recording in progress: its length grows with the clock.
     private boolean grows;
@@ -167,7 +168,7 @@ public class PlayerActivity extends Activity {
         view = new PlayerView(this);
         // The next episode is the controller's own ⏭ button: an overlay of
         // ours over the controls fought with them (only the time bar left).
-        boolean restarts = restartUrl != null && !restartUrl.isEmpty();
+        restarts = restartUrl != null && !restartUrl.isEmpty();
         view.setPlayer(nextTitle == null && !restarts ? player : new ForwardingPlayer(player) {
             @Override
             public boolean isCommandAvailable(int command) {
@@ -314,6 +315,7 @@ public class PlayerActivity extends Activity {
             @Override
             public void onPlaybackStateChanged(int state) {
                 updatePip();
+                if (state == Player.STATE_READY) maybePlainFile();
                 // In the small window the app cannot come forward to open
                 // the next episode: that waits until the window is reopened.
                 if (state == Player.STATE_ENDED && !inPip) ended();
@@ -422,6 +424,24 @@ public class PlayerActivity extends Activity {
         player.setMediaItem(b.build());
         player.prepare();
         player.play();
+    }
+
+    /**
+     * The server converted the TS recording to MP4 while it played: ?t= now
+     * answers the whole MP4, which seeks by itself (a converted stream is a
+     * fragmented MP4 that never does). It goes on from the same second as a
+     * plain file, as the browser does.
+     */
+    private void maybePlainFile() {
+        if (!restarts || !player.isCurrentMediaItemSeekable() || player.getCurrentTracks().getGroups().isEmpty()) return;
+        String container = player.getCurrentTracks().getGroups().get(0).getTrackFormat(0).containerMimeType;
+        if (container == null || !container.endsWith("/mp4")) return;
+        long at = offsetMs;
+        restarts = false;
+        restartUrl = null;
+        offsetMs = knownDurationMs = 0;
+        grows = false;
+        if (at > 0) player.seekTo(at);
     }
 
     /** The title's length; a recording in progress grows while it plays. */
