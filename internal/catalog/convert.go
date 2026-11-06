@@ -177,32 +177,29 @@ var trailingID = regexp.MustCompile(`^(\d+)\.[A-Za-z0-9]{1,5}$`)
 func FromM3U(p *m3u.Playlist, seal func(plain []byte, owner string) []byte, subID int64) *Snapshot {
 	snap := &Snapshot{Kinds: []string{"live", "movie"}, EPGURLs: p.EPGURLs}
 	groups := map[string]map[string]bool{"live": {}, "movie": {}}
-	seen := map[string]bool{}
+	seen, lines := map[string]bool{}, map[string]bool{}
 	for _, e := range p.Entries {
 		kind, sourceID := classify(e)
-		if kind == "" || IsSeparator(e.Name) {
+		line := kind + "\x00" + e.Name + "\x00" + e.Group + "\x00" + e.URL
+		if kind == "" || IsSeparator(e.Name) || lines[line] {
+			// The same line twice is one channel.
 			snap.Skipped++
 			continue
 		}
-		key, byName := kind+"\x00"+sourceID, ""
-		if strings.HasPrefix(sourceID, "tvg:") {
-			byName = kind + "\x00" + nameID(e)
-		}
-		if seen[key] && byName != "" {
+		lines[line] = true
+		key := kind + "\x00" + sourceID
+		if seen[key] && strings.HasPrefix(sourceID, "tvg:") {
 			// HD, FHD and regional feeds often share one tvg-id: each is
 			// a channel of its own. The first keeps the tvg id, so ids of
-			// existing rows do not change; the same line twice is still
-			// one channel.
-			sourceID, key = nameID(e), byName
+			// existing rows do not change.
+			sourceID = nameID(e)
+			key = kind + "\x00" + sourceID
 		}
 		if seen[key] {
 			snap.Skipped++
 			continue
 		}
 		seen[key] = true
-		if byName != "" {
-			seen[byName] = true
-		}
 		it := store.Item{
 			Kind: kind, SourceID: sourceID, Title: e.Name, DisplayTitle: ChannelTitle(e.Name),
 			CategoryID: e.Group, Image: e.Logo, EPGID: e.TvgID, CatchupDays: e.CatchupDays,

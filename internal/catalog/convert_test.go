@@ -60,3 +60,24 @@ http://cdn.example/hls/tg24/index.m3u8?token=abc
 		t.Errorf("epg %v categories %v", snap.EPGURLs, snap.Categories)
 	}
 }
+
+// A merged list with each channel twice: the main feed with a tvg-id and a
+// backup feed without one, same name and group. Both stay channels.
+func TestM3UBackupFeedWithoutTvgID(t *testing.T) {
+	playlist := `#EXTM3U
+#EXTINF:-1 tvg-id="Rai1.it" group-title="Italia",Rai 1
+http://cdn.example/hls/rai1/a.m3u8?token=x
+#EXTINF:-1 group-title="Italia",Rai 1
+http://backup.example/hls/rai1/b.m3u8?token=y
+#EXTINF:-1 group-title="Italia",Rai 1
+http://backup.example/hls/rai1/b.m3u8?token=y
+`
+	p, err := m3u.Parse(strings.NewReader(playlist), m3u.Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap := FromM3U(p, func(plain []byte, owner string) []byte { return plain }, 7)
+	if len(snap.Items) != 2 || snap.Skipped != 1 {
+		t.Fatalf("items %d skipped %d", len(snap.Items), snap.Skipped)
+	}
+}
