@@ -1920,8 +1920,11 @@
     showDownloadsTab();
     if (asked.get("catchup")) {
       state.catchup = { start: Number(asked.get("start")), stop: Number(asked.get("stop")), title: asked.get("title") || "" };
-      const back = asked.get("back") || "";
-      state.catchupBack = back.startsWith("/") && !back.startsWith("//") ? back : "";
+      // Only a page of this server: browsers read "/\host" and "/\t/host"
+      // as another host, so the check is the parsed origin, not the text.
+      let back = null;
+      try { back = asked.get("back") ? new URL(asked.get("back"), location.origin) : null; } catch { /* not a URL */ }
+      state.catchupBack = back && back.origin === location.origin ? back.pathname + back.search + back.hash : "";
       history.replaceState(null, "", "/");
       play("catchup", Number(asked.get("catchup")), state.catchup.title, 0, "remux");
     }
