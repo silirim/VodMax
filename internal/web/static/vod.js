@@ -1571,7 +1571,10 @@
     clearInterval(subTimer);
     if (subTrack) subTrack.mode = "disabled";
     closeMenu();
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    // Only when the player closes: play() also passes here (save false) for
+    // the next episode, another audio track or the server's conversion,
+    // and full screen must stay.
+    if (save && document.fullscreenElement) document.exitFullscreen().catch(() => {});
     if (state.play && state.play.ts) state.play.ts.destroy();
     video.pause();
     video.removeAttribute("src");
