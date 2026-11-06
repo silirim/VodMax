@@ -402,25 +402,6 @@ func ftsQuery(text string) string {
 	return strings.Join(parts, " AND ")
 }
 
-// Categories lists the categories of a kind, optionally for one subscription.
-func (s *Store) Categories(ctx context.Context, kind string, subID int64) ([]Category, error) {
-	rows, err := s.r.QueryContext(ctx, `SELECT kind, source_id, name, country, adult, low_res, section FROM category
-		WHERE kind = ? AND (? = 0 OR subscription_id = ?) ORDER BY name COLLATE NOCASE`, kind, subID, subID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Category
-	for rows.Next() {
-		var c Category
-		if err := rows.Scan(&c.Kind, &c.SourceID, &c.Name, &c.Country, &c.Adult, &c.LowRes, &c.Section); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
-}
-
 // Counts returns, per kind, the titles shown after the user's selection
 // (one per group of variants).
 func (s *Store) Counts(ctx context.Context, subID int64) (map[string]int, error) {

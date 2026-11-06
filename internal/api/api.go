@@ -95,7 +95,6 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	route("GET /api/v1/settings/metadata", levelAdmin, a.getMetadataSettings)
 	route("PUT /api/v1/settings/metadata", levelAdmin, a.putMetadataSettings)
 	route("GET /api/v1/catalog/{kind}", levelViewer, a.catalog)
-	route("GET /api/v1/categories/{kind}", levelViewer, a.categories)
 	route("GET /api/v1/browse/{kind}/categories", levelViewer, a.browseCategories)
 	route("GET /api/v1/tv/channels", levelViewer, a.tvChannels)
 	route("GET /api/v1/tv/channels/{id}/guide", levelViewer, a.channelGuide)
@@ -491,19 +490,6 @@ func (a *api) catalog(w http.ResponseWriter, r *http.Request) {
 		page.Items = []store.CatalogItem{}
 	}
 	writeJSON(w, http.StatusOK, page)
-}
-
-func (a *api) categories(w http.ResponseWriter, r *http.Request) {
-	sub, _ := strconv.ParseInt(r.URL.Query().Get("subscription"), 10, 64)
-	list, err := a.svc.Categories(r.Context(), r.PathValue("kind"), sub)
-	if err != nil {
-		a.fail(w, r, err)
-		return
-	}
-	if list == nil {
-		list = []store.Category{}
-	}
-	writeJSON(w, http.StatusOK, list)
 }
 
 func (a *api) getRules(w http.ResponseWriter, r *http.Request) {

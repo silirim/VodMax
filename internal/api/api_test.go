@@ -209,10 +209,6 @@ func TestFullFlow(t *testing.T) {
 	if len(page.Items) != 1 || page.Items[0]["display_title"] != "1408" || page.Items[0]["year"] != float64(2007) {
 		t.Fatalf("search: %s", body)
 	}
-	_, body = e.do(t, "GET", "/api/v1/categories/movie", nil, true)
-	if !strings.Contains(string(body), "Horror") {
-		t.Fatalf("categories: %s", body)
-	}
 
 	_, body = e.do(t, "GET", "/api/v1/subscriptions", nil, true)
 	if strings.Contains(string(body), password) || !strings.Contains(string(body), `"max_connections":1`) {

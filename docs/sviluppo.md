@@ -50,7 +50,6 @@ di accesso di ognuna, è in `internal/api/api.go`.
 | `GET /api/v1/folders?path=` | Cartelle del server, per scegliere una raccolta |
 | `POST /api/v1/subscriptions/{id}/sync` | Sincronizza il catalogo (`?allow_drop=true` per accettare un calo anomalo) |
 | `GET /api/v1/catalog/{live\|movie\|series}` | Catalogo selezionato, una scheda per titolo: `q`, `section` (tv, sport, radio), `category`, `subscription`, `sort=recent`, `cursor`, `limit`, `all=true` per vedere anche l'escluso |
-| `GET /api/v1/categories/{kind}` | Categorie |
 | `GET` · `PUT /api/v1/subscriptions/{id}/rules` | Regole di selezione (il proprio paese `home`, altri paesi, adulti, SD, anno minimo; 0042) |
 | `POST /api/v1/subscriptions/{id}/rules/preview` | Effetto di nuove regole senza salvarle |
 | `GET /api/v1/subscriptions/{id}/selection` | Conteggi: offerti, visibili, schede, per sezione |
