@@ -1850,6 +1850,14 @@
       if (horizontal && across > 0) continue;
       found.push({ e, b, score: along + across * 3 });
     }
+    // The header stays on top while the page scrolls under it: a row gone
+    // up under it is still the row above, and nothing is above the header.
+    const top = document.querySelector("header.top");
+    if (dir === "ArrowUp" && top) {
+      const inTop = (c) => top.contains(c.e);
+      if (top.contains(current)) found = found.filter(inTop);
+      else if (found.some((c) => !inTop(c))) found = found.filter((c) => !inTop(c));
+    }
     // Up and Down go to the nearest row: the element whose edge is closest
     // and those level with it. Scored on centres alone, a button straight
     // above but far away beat the row just above it, offset sideways (from
