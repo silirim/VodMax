@@ -616,3 +616,34 @@ func TestSwappedStreamIDsKeepRecordingChannel(t *testing.T) {
 		t.Fatalf("recording on Rai 1 now records %q (key %q, %v)", ch.Title, key, err)
 	}
 }
+
+// A title without a key (non-Latin, no year, before 0.6.7) was taken off
+// "continue watching" by its id: once it has a key it stays off.
+func TestHiddenByIDStaysHiddenWithItsNewKey(t *testing.T) {
+	st, sub := openTest(t)
+	ctx := context.Background()
+	film := func(key string) []Item {
+		return []Item{{Kind: "movie", SourceID: "1", Title: "Солярис", DisplayTitle: "Солярис", GroupKey: key}}
+	}
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, film(""), false); err != nil {
+		t.Fatal(err)
+	}
+	selectAll(st)
+	var id int64
+	st.r.QueryRowContext(ctx, `SELECT id FROM item WHERE source_id = '1'`).Scan(&id)
+	if _, err := st.SaveProgress(ctx, 1, "movie", id, 600, 6000); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1100 * time.Millisecond) // hidden after the last progress
+	if err := st.HideContinue(ctx, 1, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, film("солярис"), false); err != nil {
+		t.Fatal(err)
+	}
+	var key string
+	st.r.QueryRowContext(ctx, `SELECT title_key FROM continue_hidden`).Scan(&key)
+	if l, err := st.Continue(ctx, 1, false, 10); err != nil || len(l) != 0 || key != "movie:солярис" {
+		t.Fatalf("back in continue watching: %+v %v (hidden %q)", l, err, key)
+	}
+}

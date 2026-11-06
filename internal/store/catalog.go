@@ -237,6 +237,9 @@ func carryGroupKeys(ctx context.Context, tx *sql.Tx) error {
 		`INSERT OR IGNORE INTO continue_hidden (profile_id, title_key, hidden_at)
 			SELECT h.profile_id, m.kind || ':' || m.new, h.hidden_at FROM continue_hidden h JOIN temp.moved_key m ON h.title_key = m.kind || ':' || m.old`,
 		`DELETE FROM continue_hidden WHERE title_key IN (SELECT kind || ':' || old FROM temp.moved_key)`,
+		// A title without a key was hidden by its id ("movie:#12").
+		`UPDATE OR IGNORE continue_hidden SET title_key = (SELECT m.kind || ':' || i.group_key FROM temp.moved_item m JOIN item i ON i.id = m.id
+			WHERE continue_hidden.title_key = m.kind || ':#' || m.id) WHERE title_key IN (SELECT kind || ':#' || id FROM temp.moved_item WHERE old = '')`,
 		`INSERT OR IGNORE INTO series_marker (series_key, intro_start, intro_end, credits, updated_at)
 			SELECT m.new, s.intro_start, s.intro_end, s.credits, s.updated_at FROM series_marker s JOIN temp.moved_key m ON m.kind = 'series' AND m.old = s.series_key`,
 		`DELETE FROM series_marker WHERE series_key IN (SELECT old FROM temp.moved_key WHERE kind = 'series')`,
