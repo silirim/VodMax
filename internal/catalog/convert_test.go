@@ -19,6 +19,10 @@ http://provider.example/movie/mario/secret/555.mkv
 http://provider.example/series/mario/secret/9001.mp4
 #EXTINF:-1 tvg-id="tg24.it" group-title="News",TG24
 http://cdn.example/hls/tg24/index.m3u8?token=abc
+#EXTINF:-1 tvg-id="tg24.it" group-title="News",TG24 FHD
+http://cdn.example/hls/tg24fhd/index.m3u8?token=abc
+#EXTINF:-1 tvg-id="tg24.it" group-title="News",TG24
+http://cdn.example/hls/tg24/index.m3u8?token=abc
 `
 	p, err := m3u.Parse(strings.NewReader(playlist), m3u.Limits{})
 	if err != nil {
@@ -30,11 +34,15 @@ http://cdn.example/hls/tg24/index.m3u8?token=abc
 		return []byte("sealed")
 	}
 	snap := FromM3U(p, seal, 7)
-	if len(snap.Items) != 3 || snap.Skipped != 2 {
+	// Feeds sharing a tvg-id are each a channel; the same line twice is one.
+	if len(snap.Items) != 4 || snap.Skipped != 3 {
 		t.Fatalf("items %d skipped %d", len(snap.Items), snap.Skipped)
 	}
 	want := map[string]string{"101": "live", "555": "movie", "tvg:tg24.it": "live"}
 	for _, it := range snap.Items {
+		if it.Title == "TG24 FHD" && strings.HasPrefix(it.SourceID, "h:") {
+			continue
+		}
 		if want[it.SourceID] != it.Kind {
 			t.Errorf("unexpected item %s/%s", it.Kind, it.SourceID)
 		}

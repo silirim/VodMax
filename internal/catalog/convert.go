@@ -184,12 +184,25 @@ func FromM3U(p *m3u.Playlist, seal func(plain []byte, owner string) []byte, subI
 			snap.Skipped++
 			continue
 		}
-		key := kind + "\x00" + sourceID
+		key, byName := kind+"\x00"+sourceID, ""
+		if strings.HasPrefix(sourceID, "tvg:") {
+			byName = kind + "\x00" + nameID(e)
+		}
+		if seen[key] && byName != "" {
+			// HD, FHD and regional feeds often share one tvg-id: each is
+			// a channel of its own. The first keeps the tvg id, so ids of
+			// existing rows do not change; the same line twice is still
+			// one channel.
+			sourceID, key = nameID(e), byName
+		}
 		if seen[key] {
 			snap.Skipped++
 			continue
 		}
 		seen[key] = true
+		if byName != "" {
+			seen[byName] = true
+		}
 		it := store.Item{
 			Kind: kind, SourceID: sourceID, Title: e.Name, DisplayTitle: ChannelTitle(e.Name),
 			CategoryID: e.Group, Image: e.Logo, EPGID: e.TvgID, CatchupDays: e.CatchupDays,
@@ -227,8 +240,12 @@ func classify(e m3u.Entry) (string, string) {
 	if e.TvgID != "" && kind == "live" {
 		return kind, "tvg:" + e.TvgID
 	}
+	return kind, nameID(e)
+}
+
+func nameID(e m3u.Entry) string {
 	sum := sha256.Sum256([]byte(e.Name + "\x00" + e.Group))
-	return kind, "h:" + hex.EncodeToString(sum[:12])
+	return "h:" + hex.EncodeToString(sum[:12])
 }
 
 func urlPath(raw string) string {
