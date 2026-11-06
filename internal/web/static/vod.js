@@ -1182,8 +1182,14 @@
   // the app go to the background.
   window.VodMaxNativeBack = () => {
     if (window.VodMax.sheetOpen()) { window.VodMax.closeSheet(); return true; }
-    if ($("picker") || !$("player").hidden || !$("detail").hidden || state.query) {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    // Panels with a Back of their own (my profile, the update notice, the
+    // PIN of "Chi guarda?"); not the profile choice or pairing, where Back
+    // still sends the app to the background.
+    const panel = document.querySelector("#my-profile, #update-banner") || [...document.querySelectorAll(".setup-panel")].find((p) => p.back);
+    if (panel || $("picker") || !$("player").hidden || !$("detail").hidden || state.query) {
+      // From the focused element, so that the panels' capture handlers on
+      // document stop it before the menu's own handler sees it.
+      (document.activeElement || document.body).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       return true;
     }
     if (state.view !== "home") { state.view = "home"; render(); return true; }
