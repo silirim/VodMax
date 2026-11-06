@@ -2,8 +2,6 @@
 // categories. Secrets are written, never read back.
 "use strict";
 
-const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o; }, {});
-
 (() => {
   const { store, api, hhmm, countryName, proposeCountry } = window.VodMax;
   const t = window.VodMaxI18n.t;
@@ -221,7 +219,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     // "No VPN" is a choice only when the providers may be reached without
     // one (Settings → VPN); a subscription left without one says so.
     const vpns = net.vpn_only ? list : [...list, { id: 0, name: t("Nessuna VPN (rete normale)") }];
-    const vpnName = fromEntries(vpns.map((v) => [v.id, v.name]));
+    const vpnName = Object.fromEntries(vpns.map((v) => [v.id, v.name]));
     if (net.vpn_only) vpnName[0] = t("nessuna: in attesa di una VPN");
     const parts = [el("h2", {}, t("Abbonamenti")),
       el("p", { className: "note" }, net.vpn_only ? t("Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla sua VPN: senza VPN il provider non viene mai contattato.")
@@ -284,7 +282,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       try {
         const r = await api("POST", "/api/v1/subscriptions/" + s.id + "/sync");
         const sel = r.selection || {};
-        const n = fromEntries(["live", "movie", "series"].map((k) => [k, sel[k] ? sel[k].cards : 0]));
+        const n = Object.fromEntries(["live", "movie", "series"].map((k) => [k, sel[k] ? sel[k].cards : 0]));
         flash(r.guide ? t("Sincronizzato: {live} canali, {movie} film, {series} serie, guida {programmes} programmi", { ...n, programmes: r.guide.programmes })
           : t("Sincronizzato: {live} canali, {movie} film, {series} serie", n));
       } catch (e) { flash(e.message); }
@@ -964,8 +962,8 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
         return b;
       })));
     if (mode === "local") parts.push(...localPanel(a, local, save));
-    if (mode === "online") parts.push(...onlinePanel(a, save, result));
-    if (mode === "server") parts.push(...serverPanel(a, save, result));
+    if (mode === "online") parts.push(...onlinePanel(a, save));
+    if (mode === "server") parts.push(...serverPanel(a, save));
     if (!a.enabled && mode !== "local") parts.push(result);
     main.replaceChildren(...parts.filter(Boolean));
     assistantPromo();
@@ -1054,7 +1052,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     return { model, row: el("div", { className: "cmd-row" }, model, loadButton, list) };
   }
 
-  function onlinePanel(a, save, result) {
+  function onlinePanel(a, save) {
     const provider = el("select", { className: "focusable" }, ...a.providers.map((p) => el("option", { value: p.id, selected: p.id === (a.provider || "anthropic") }, p.name)));
     const keyLink = el("a", { target: "_blank", rel: "noopener" }, t("Crea una chiave API"));
     const keepKey = a.mode === "online" && a.has_key;
@@ -1082,7 +1080,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       form];
   }
 
-  function serverPanel(a, save, result) {
+  function serverPanel(a, save) {
     const url = input({ value: a.mode === "server" || !a.mode ? a.url : "", placeholder: "http://ollama:11434/v1", spellcheck: false });
     const key = input({ type: "password", autocomplete: "new-password", spellcheck: false,
       placeholder: a.has_key && a.mode !== "online" ? t("configurata: lascia vuoto per non cambiarla") : t("solo se il servizio la chiede") });
@@ -1387,7 +1385,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
   // ---- Devices ----
   async function renderDevices(main) {
     const [devices, profiles] = await Promise.all([api("GET", "/api/v1/devices"), api("GET", "/api/v1/profiles")]);
-    const profileName = fromEntries(profiles.map((p) => [p.id, p.name]));
+    const profileName = Object.fromEntries(profiles.map((p) => [p.id, p.name]));
     const lockSelect = (value) => {
       const s = el("select", { className: "focusable" }, el("option", { value: "" }, t("Tutti i profili (si sceglie all'avvio)")),
         ...profiles.map((p) => el("option", { value: p.id }, t("Solo {name}", { name: p.name }))));

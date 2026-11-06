@@ -447,7 +447,6 @@ window.VodMax = (() => {
   // ---- Phone: navigation bar at the bottom, like the streaming apps;
   // "Altro" opens a sheet with the rest. On the menu page the entries
   // press its tabs; elsewhere they are links. ----
-  const phoneNav = window.matchMedia("(max-width: 800px)");
   let navBar = null;
   function bottomNav(active) {
     if (!navBar) {

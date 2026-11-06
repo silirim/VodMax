@@ -10,7 +10,7 @@
 
 (() => {
   const $ = (id) => document.getElementById(id);
-  const { store, api, viewer, keyOf, hhmm } = window.VodMax;
+  const { store, api, viewer, keyOf } = window.VodMax;
   const t = window.VodMaxI18n.t;
   const icon = (name) => window.VodMaxIcons.icon(name);
 
