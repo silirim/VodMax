@@ -25,7 +25,9 @@ func TestRecordingOffsetAt(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	a := &activeRec{bytes: int64(len(data)), began: time.Now().Add(-100 * time.Second)}
+	now := time.Now()
+	// 100 s with data, in two connections with a minute's gap between.
+	a := &activeRec{bytes: int64(len(data)), secs: 60, from: now.Add(-40 * time.Second), last: now}
 	rate := float64(len(data)) / 100
 	for _, c := range []struct {
 		second float64

@@ -389,10 +389,11 @@ func (s *Store) queryRecordings(ctx context.Context, q string, args ...any) ([]R
 	return out, rows.Err()
 }
 
-// UpdateRecording stores status, file, size and error of a recording.
+// UpdateRecording stores status, file, size, error and stop (the real
+// one, when it ended early) of a recording.
 func (s *Store) UpdateRecording(ctx context.Context, r Recording) error {
-	_, err := s.w.ExecContext(ctx, `UPDATE recording SET status = ?, file = ?, bytes = ?, error = ? WHERE id = ?`,
-		r.Status, r.File, r.Bytes, r.Error, r.ID)
+	_, err := s.w.ExecContext(ctx, `UPDATE recording SET status = ?, file = ?, bytes = ?, error = ?, stop = ? WHERE id = ?`,
+		r.Status, r.File, r.Bytes, r.Error, r.Stop, r.ID)
 	return err
 }
 
@@ -461,12 +462,13 @@ func (s *Store) ActiveRecordingsBetween(ctx context.Context, start, stop int64) 
 }
 
 // RecordingCovers returns the state of a recording of the channel that
-// overlaps [start, stop), cancelled ones too ("" if none): rules do not
-// record a programme twice, nor again after the user cancelled it.
-func (s *Store) RecordingCovers(ctx context.Context, groupKey string, start, stop int64) (string, error) {
+// overlaps [start, stop), or that started at own, cancelled ones too (""
+// if none): rules do not record a programme twice, nor again after the
+// user cancelled it or stopped it early (it then ends sooner).
+func (s *Store) RecordingCovers(ctx context.Context, groupKey string, start, stop, own int64) (string, error) {
 	var status string
-	err := s.r.QueryRowContext(ctx, `SELECT status FROM recording WHERE group_key = ? AND start < ? AND stop > ?
-		ORDER BY status = 'cancelled' LIMIT 1`, groupKey, stop, start).Scan(&status)
+	err := s.r.QueryRowContext(ctx, `SELECT status FROM recording WHERE group_key = ? AND ((start < ? AND stop > ?) OR start = ?)
+		ORDER BY status = 'cancelled' LIMIT 1`, groupKey, stop, start, own).Scan(&status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}

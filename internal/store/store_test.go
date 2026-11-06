@@ -280,3 +280,28 @@ func TestPruneImageCache(t *testing.T) {
 		}
 	}
 }
+
+// A recording stopped early ends before the programme it was for, but
+// still covers it: a rule must not record the programme again.
+func TestRecordingCoversItsProgrammeAfterAnEarlyStop(t *testing.T) {
+	s, _ := openTest(t)
+	ctx := context.Background()
+	id, err := s.AddRecording(ctx, Recording{ItemID: 1, GroupKey: "g", Channel: "C", Title: "P", Start: 1000, Stop: 5000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, _ := s.Recording(ctx, id)
+	r.Status, r.Stop = "completed", 1100 // stopped during the margin before the programme
+	if err := s.UpdateRecording(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if r, _ := s.Recording(ctx, id); r.Stop != 1100 {
+		t.Fatalf("real stop not saved: %d", r.Stop)
+	}
+	if got, _ := s.RecordingCovers(ctx, "g", 1180, 4640, 1000); got != "completed" {
+		t.Fatalf("covers: %q", got)
+	}
+	if got, _ := s.RecordingCovers(ctx, "g", 5180, 8000, 5000); got != "" {
+		t.Fatalf("the next programme: %q", got)
+	}
+}

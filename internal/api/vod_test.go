@@ -519,11 +519,13 @@ func TestStopAndDeleteRecordingInProgress(t *testing.T) {
 		ID     int64
 		Status string
 		Bytes  int64
+		Stop   int64
 		Error  string
 	}
 	json.Unmarshal(body, &list)
-	if len(list) != 1 || list[0].Status != "completed" || list[0].Bytes == 0 || !strings.Contains(list[0].Error, "prima della fine") {
-		t.Fatalf("stopped: %s", body)
+	if len(list) != 1 || list[0].Status != "completed" || list[0].Bytes == 0 || !strings.Contains(list[0].Error, "prima della fine") ||
+		list[0].Stop > time.Now().Unix() {
+		t.Fatalf("stopped (the real end, not the scheduled one): %s", body)
 	}
 	if code, _ := e.do(t, "POST", "/api/v1/recordings/"+id+"/stop", nil, true); code != 400 {
 		t.Fatalf("stop of a finished recording: %d", code)

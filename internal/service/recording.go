@@ -37,8 +37,13 @@ type activeRec struct {
 	done   chan struct{}
 	mu     sync.Mutex
 	bytes  int64
-	began  time.Time // when the file started: with the size, how many bytes a second
-	early  bool      // stopped by a person before the end: what is there is kept
+	// The seconds the file holds: those of the connections that ended
+	// (and of the part before a restart), plus the current connection's
+	// from its first to its latest data. Gaps between connections hold no
+	// bytes: counting them put seeks minutes off.
+	secs       float64
+	from, last time.Time
+	early      bool // stopped by a person before the end: what is there is kept
 	// contended: the provider closed it again and again soon after it
 	// opened, as when another device uses the same account.
 	contended bool
@@ -217,10 +222,11 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 	s.rec.mu.Lock()
 	resumed := slices.Contains(s.rec.resumed, r.ID)
 	s.rec.mu.Unlock()
-	a.began = time.Now()
 	if fi, err := os.Stat(r.File); err == nil && resumed {
 		a.bytes = fi.Size() // the file continues (record appends)
-		a.began = time.Unix(r.Start, 0)
+		// Last written when the server stopped: the time it was off holds
+		// nothing.
+		a.secs = max(0, fi.ModTime().Sub(time.Unix(r.Start, 0)).Seconds())
 	}
 	a.rec = r
 	s.st.UpdateRecording(parent, r)
@@ -247,6 +253,9 @@ func (s *Service) startRecording(parent context.Context, r store.Recording) {
 				s.rec.log.Info("registrazione sospesa per l'arresto del server", "id", r.ID, "byte", final.Bytes)
 			}
 			return
+		}
+		if now := time.Now().Unix(); final.Status != "cancelled" && now < final.Stop {
+			final.Stop = now // ended before its time: the list and keep_days use the real end
 		}
 		switch {
 		case final.Status == "cancelled":
@@ -311,16 +320,13 @@ func (a *activeRec) size() int64 {
 func (a *activeRec) recorded() float64 {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.began.IsZero() {
-		return 0
-	}
-	return max(0, time.Since(a.began).Seconds())
+	return a.secs + a.last.Sub(a.from).Seconds()
 }
 
 // offsetAt is where, in bytes, the file reaches the given second
 // (negative: close to the live edge), at the start of a TS packet. The
-// rate is the average so far: the time is approximate, as with a seek in
-// any constant-rate stream.
+// rate is the average over the time with data: the position is
+// approximate, as with a seek in any constant-rate stream.
 func (a *activeRec) offsetAt(f *os.File, second float64) int64 {
 	size, secs := a.size(), a.recorded()
 	if size <= 0 || secs <= 1 {
@@ -499,6 +505,12 @@ func (s *Service) recordOnce(ctx context.Context, a *activeRec, it store.Playbac
 	}()
 	buf := make([]byte, 188*512)
 	var pk tsPackets // per connection: a packet cut by its end is dropped
+	defer func() {
+		a.mu.Lock()
+		a.secs += a.last.Sub(a.from).Seconds()
+		a.from, a.last = time.Time{}, time.Time{}
+		a.mu.Unlock()
+	}()
 	for {
 		n, err := resp.Body.Read(buf)
 		if n > 0 {
@@ -510,8 +522,13 @@ func (s *Service) recordOnce(ctx context.Context, a *activeRec, it store.Playbac
 					}
 					return errDiskWrite
 				}
+				now := time.Now()
 				a.mu.Lock()
 				a.bytes += int64(len(whole))
+				if a.from.IsZero() {
+					a.from = now
+				}
+				a.last = now
 				a.mu.Unlock()
 			}
 		}

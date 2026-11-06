@@ -132,3 +132,25 @@ func TestContendedRecordingSaysSo(t *testing.T) {
 		t.Fatalf("contended: %d connections, %+v", hits, l)
 	}
 }
+
+// A recording in progress counts only the time with data: after a
+// reconnection its length (and so where a seek lands) leaves out the
+// seconds without a stream.
+func TestRecordingLengthLeavesOutGaps(t *testing.T) {
+	e, p := tvSetup(t)
+	e.svc.SetRecordStall(300 * time.Millisecond)
+	p.mu.Lock()
+	p.stalls = map[string]bool{"101.ts": true}
+	p.mu.Unlock()
+	rai := channels(t, e, "?section=tv")[0]
+	now := time.Now().Unix()
+	_, body := e.do(t, "POST", "/api/v1/recordings", map[string]any{"channel_id": rai.ID, "start": now, "stop": now + 30, "title": "Buchi"}, true)
+	var rec struct{ ID int64 }
+	json.Unmarshal(body, &rec)
+	time.Sleep(4 * time.Second) // ~0.1 s of data, a stall, 3 s of pause, a second connection
+	_, body = e.do(t, "POST", fmt.Sprintf("/api/v1/recordings/%d/ticket", rec.ID), nil, true)
+	var tk struct{ Recorded *float64 }
+	if json.Unmarshal(body, &tk) != nil || tk.Recorded == nil || *tk.Recorded > 1 {
+		t.Fatalf("ticket after 4 s with 2 short connections: %s", body)
+	}
+}
