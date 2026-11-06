@@ -1071,11 +1071,18 @@
     let sess;
     flash(mode === "remux" ? t("Preparazione della conversione…") : t("Avvio…"));
     const native = window.VodMax.native;
+    // The Android player reads MKV, AC-3, HEVC: the file as it is.
+    const ask = { viewer, mode: native ? "direct" : mode || "" };
+    const vodSession = (body) => api("POST", "/api/v1/vod/" + media + "/" + id + "/session", body);
     try {
       sess = media === "catchup"
         ? await api("POST", "/api/v1/catchup/" + id + "/session", { viewer, ...state.catchup })
-        // The Android player reads MKV, AC-3, HEVC: the file as it is.
-        : await api("POST", "/api/v1/vod/" + media + "/" + id + "/session", { viewer, mode: native ? "direct" : mode || "" });
+        // The only connection is busy on another device (409): asked
+        // first, then taken over, once.
+        : await vodSession(ask).catch((e) => {
+          if (e.status !== 409 || !confirm(t("La connessione dell'abbonamento è in uso su un altro dispositivo. Prendere il controllo?"))) throw e;
+          return vodSession({ ...ask, force: true });
+        });
     } catch (e) {
       flash(e.message);
       // The next episode did not start: its card goes, the error stays read.
