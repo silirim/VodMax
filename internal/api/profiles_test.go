@@ -465,3 +465,45 @@ func TestAdoptAdminToken(t *testing.T) {
 		t.Fatalf("a device token adopted again: %d", code)
 	}
 }
+
+// The device in use cannot revoke or lock itself: alone on a phone (the
+// Android app's own server) that would leave no way back to admin.
+func TestDeviceCannotRevokeOrLockItself(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.do(t, "PATCH", "/api/v1/profiles/1", map[string]any{"pin": "9753"}, true)
+	code, out := e.do(t, "POST", "/api/v1/profiles", map[string]any{"name": "Bimbi", "kind": "kids"}, true)
+	var kids struct{ ID int64 }
+	if code != 201 || json.Unmarshal(out, &kids) != nil {
+		t.Fatalf("add: %d %s", code, out)
+	}
+	_, out = e.do(t, "POST", "/api/v1/devices/adopt", nil, true)
+	var got struct{ Token, Profile string }
+	if json.Unmarshal(out, &got) != nil || got.Token == "" {
+		t.Fatalf("adopt: %s", out)
+	}
+	_, me := e.call(t, "GET", "/api/v1/me", nil, got.Token, got.Profile)
+	var who struct{ Device struct{ ID int64 } }
+	if json.Unmarshal(me, &who) != nil || who.Device.ID == 0 {
+		t.Fatalf("me: %s", me)
+	}
+	path := "/api/v1/devices/" + strconv.FormatInt(who.Device.ID, 10)
+	if code, out := e.call(t, "PATCH", path, map[string]any{"name": "Telefono", "profile_lock": kids.ID}, got.Token, got.Profile); code != 400 || !strings.Contains(string(out), "dispositivo che stai usando") {
+		t.Fatalf("device locked itself: %d %s", code, out)
+	}
+	if code, _ := e.call(t, "PATCH", path, map[string]any{"name": "Telefono", "profile_lock": nil}, got.Token, got.Profile); code != 204 {
+		t.Fatalf("device could not rename itself: %d", code)
+	}
+	if code, _ := e.call(t, "DELETE", path, nil, got.Token, got.Profile); code != 400 {
+		t.Fatalf("device revoked itself: %d", code)
+	}
+	if code, _ := e.call(t, "GET", "/api/v1/me", nil, got.Token, got.Profile); code != 200 {
+		t.Fatalf("device lost access: %d", code)
+	}
+	// From another device (here the admin token) both still work.
+	if code, _ := e.do(t, "PATCH", path, map[string]any{"name": "Telefono", "profile_lock": kids.ID}, true); code != 204 {
+		t.Fatalf("lock from another device: %d", code)
+	}
+	if code, _ := e.do(t, "DELETE", path, nil, true); code != 204 {
+		t.Fatalf("revoke from another device: %d", code)
+	}
+}

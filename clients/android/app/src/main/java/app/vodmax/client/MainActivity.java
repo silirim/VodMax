@@ -130,7 +130,10 @@ public class MainActivity extends Activity {
         };
         connect.setOnClickListener(v -> go.run());
         findViewById(R.id.standalone).setOnClickListener(v -> {
-            prefs().edit().putBoolean(KEY_LOCAL, true).apply();
+            // Choosing it again hands the admin token to the page once more:
+            // the way back to admin when the device token in it was revoked,
+            // locked or its PIN forgotten (no other device exists here).
+            prefs().edit().putBoolean(KEY_LOCAL, true).remove(KEY_LOCAL_TOKEN).apply();
             openLocal();
         });
         field.setOnEditorActionListener((v, action, event) -> {

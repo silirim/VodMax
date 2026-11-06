@@ -200,6 +200,7 @@
   "portale: risposta non valida: %w": "portal: invalid answer: %w",
   "posizione non valida": "invalid position",
   "prima visione secondo la guida": "first showing according to the guide",
+  "è il dispositivo che stai usando: revocalo o bloccalo da un altro dispositivo": "this is the device you are using: revoke or lock it from another device",
   "profilo inesistente": "profile not found",
   "profilo inesistente per %s": "no such profile for %s",
   "provider di accesso non raggiungibile: %w": "sign-in provider unreachable: %w",

@@ -1546,6 +1546,8 @@ func (a *api) adoptMaster(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"token": token, "profile": profile})
 }
 
+var errThisDevice = service.Invalid("è il dispositivo che stai usando: revocalo o bloccalo da un altro dispositivo")
+
 func (a *api) patchDevice(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
@@ -1560,6 +1562,13 @@ func (a *api) patchDevice(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
+	// Locking the device in use could leave no way back to admin (the
+	// Android app alone on the phone has no other device).
+	if self := identity(r); id == self.DeviceID && (in.ProfileLock == nil) != (self.Lock == nil) ||
+		id == self.DeviceID && in.ProfileLock != nil && *in.ProfileLock != *self.Lock {
+		a.fail(w, r, errThisDevice)
+		return
+	}
 	if err := a.svc.UpdateDevice(r.Context(), id, in.Name, in.ProfileLock); err != nil {
 		a.fail(w, r, err)
 		return
@@ -1571,6 +1580,10 @@ func (a *api) deleteDevice(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
 		a.fail(w, r, err)
+		return
+	}
+	if id == identity(r).DeviceID {
+		a.fail(w, r, errThisDevice)
 		return
 	}
 	if err := a.svc.DeleteDevice(r.Context(), id); err != nil {

@@ -258,7 +258,10 @@ avvia un server VodMax tutto suo dentro il dispositivo e apre Impostazioni
 come sopra. Limiti: niente registrazioni né pausa della diretta (sul
 dispositivo non c'è ffmpeg); film, serie e diretta funzionano. Il
 dispositivo contatta la playlist da sé (tramite la sua VPN, se l'hai
-scelta).
+scelta). Hai perso i diritti di amministratore (PIN dimenticato, un backup
+ripristinato con un PIN che non conosci)? Scegli *Cambia server* e poi di
+nuovo *Usa questo dispositivo da solo*: l'app ripassa alla pagina il token
+di amministrazione.
 
 ### TV LG (webOS)
 

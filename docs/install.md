@@ -254,7 +254,10 @@ VodMax server inside the device and opens Settings → Subscriptions: choose
 how to reach the provider and add the playlist as above. Limits: no
 recordings and no pause of live TV (no ffmpeg on the device); films, series
 and live TV work. The device contacts the playlist itself (through its VPN,
-if you chose one).
+if you chose one). Lost admin rights on it (forgotten PIN, a backup
+restored with a PIN you do not know)? Choose *Change server*, then
+*Use this device on its own* again: the app hands the admin token to the
+page once more.
 
 ### LG TV (webOS)
 
