@@ -1108,7 +1108,13 @@
       if (state.play) { state.play.nextCancelled = true; state.play.nextStarted = false; updateEpisodeExtras(); }
       return;
     }
-    if (native) { playNative({ media, id, title: title || sess.title, sess, startAt: startAt || 0 }); return; }
+    if (native) {
+      // Taken over: the player's file takes the connection too (a direct
+      // file has no query of its own).
+      if (forced) sess = { ...sess, url: sess.url + "?force=" + Date.now() };
+      playNative({ media, id, title: title || sess.title, sess, startAt: startAt || 0 });
+      return;
+    }
     stopPlayback(false);
     const tracks = chooseTracks(sess, keep);
     state.play = { media, id, title, sess, offset: 0, duration: sess.duration || 0, fellBack: mode === "remux", ...tracks };

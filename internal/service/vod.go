@@ -364,10 +364,10 @@ func (s *Service) NewPlaybackSession(ctx context.Context, media string, id int64
 	}
 	probe, err := s.probe(probeCtx, sess, force)
 	cancel()
-	// A direct file can play without the analysis, but when the page
-	// chose the mode a busy connection is reported now: taking control
-	// here also lets the analysis pick the Italian audio.
-	if err != nil && (mode == "remux" || auto && errors.As(err, new(ConnectionBusy))) {
+	// A direct file can play without the analysis, but a busy connection
+	// is reported now, also to the Android player that asks for direct:
+	// taking control here also lets the analysis pick the Italian audio.
+	if err != nil && (mode == "remux" || errors.As(err, new(ConnectionBusy))) {
 		return PlaybackSession{}, err
 	}
 	if err == nil {

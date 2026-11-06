@@ -640,3 +640,25 @@ func TestFilmSessionTakesControl(t *testing.T) {
 		live.Body.Close()
 	}
 }
+
+// The Android player asks for the file as it is (direct): a busy
+// connection is reported to it too, and force takes it.
+func TestDirectSessionAsksToTakeControl(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.svc.SetFFmpeg("", fakeFFprobe(t))
+	rai := channels(t, e, "?section=tv")[0]
+	live, err := openStream(t, e, ticket(t, e, rai.ID, "camera-tablet-02"))
+	if err != nil || live.StatusCode != 200 {
+		t.Fatalf("live: %v %v", err, live)
+	}
+	readSome(t, live)
+	defer live.Body.Close()
+	path := "/api/v1/vod/movie/" + strconv.FormatInt(findItem(t, e, "movie", "Psycho"), 10) + "/session"
+	if code, body := e.do(t, "POST", path, map[string]any{"viewer": "telefono-03", "mode": "direct"}, true); code != 409 {
+		t.Fatalf("direct while busy: %d %s", code, body)
+	}
+	code, body := e.do(t, "POST", path, map[string]any{"viewer": "telefono-03", "mode": "direct", "force": true}, true)
+	if code != 200 || !strings.Contains(string(body), `"mode":"direct"`) {
+		t.Fatalf("direct with force: %d %s", code, body)
+	}
+}
