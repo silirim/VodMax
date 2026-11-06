@@ -33,6 +33,12 @@ const guideIDExpr = `coalesce((SELECT c.id FROM epg_channel c
 	ORDER BY EXISTS (SELECT 1 FROM epg_programme p WHERE p.channel = c.id) DESC, c.id = lower(i.epg_id) DESC
 	LIMIT 1), '')`
 
+// ErrGuideEmpty refuses a guide without programmes for a source that
+// still has some to come: an overloaded panel answers 200 with an empty
+// body, a busy page or <tv></tv>, and taking it would blank the grid until
+// the next sync. Once the old programmes are over an empty guide is taken.
+var ErrGuideEmpty = errors.New("guida vuota: mantenuta la precedente")
+
 // ReplaceGuide makes channels and programmes the guide of a source
 // ("sub:<id>" or "ext:<id>"). Programmes of its channels are replaced as a
 // whole.
@@ -45,6 +51,15 @@ func (s *Store) ReplaceGuide(ctx context.Context, source string, channels []Guid
 	// Programmes already over stay (catch-up needs them; a new guide
 	// usually starts today); everything else is replaced.
 	now := time.Now().Unix()
+	if len(programmes) == 0 {
+		var upcoming bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM epg_programme WHERE source = ? AND stop >= ?)`, source, now).Scan(&upcoming); err != nil {
+			return err
+		}
+		if upcoming {
+			return ErrGuideEmpty
+		}
+	}
 	if err := deleteGuide(ctx, tx, source, now-3600); err != nil {
 		return err
 	}

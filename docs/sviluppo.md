@@ -70,7 +70,7 @@ guasto; il client la ignora.
 | `GET /api/v1/tv/channels` | Canali in ordine da telecomando con numero, ora e a seguire: `section`, `list=favorites` |
 | `GET /api/v1/tv/channels/{id}/guide` | Guida di un canale (`hours`, massimo 72) |
 | `PUT /api/v1/tv/favorites/{id}` `{favorite}` | Aggiunge o toglie un canale dai preferiti |
-| `POST /api/v1/subscriptions/{id}/guide/sync` | Aggiorna la guida (fatto anche a ogni sincronizzazione) |
+| `POST /api/v1/subscriptions/{id}/guide/sync` | Aggiorna la guida (fatto anche a ogni sincronizzazione); una guida vuota non cancella i programmi in arrivo e si riprova dopo un'ora |
 | `POST /api/v1/live/{id}/ticket` `{viewer}` | Permesso di visione monouso (30 s) → `{url}` |
 | `GET /stream/live/{permesso}` | Il flusso MPEG-TS ritrasmesso dal server (`?force=1` per prendere il controllo della connessione) |
 | `GET /api/v1/series/{id}/episodes` | Episodi di una serie, con avanzamento |

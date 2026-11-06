@@ -357,3 +357,30 @@ func TestImportBackupFromAnOlderVersion(t *testing.T) {
 		t.Fatalf("download points at %d, the film is %d", list[0].MediaID, filmID())
 	}
 }
+
+// An empty guide (a busy panel's blank or HTML answer) does not wipe the
+// programmes still to come; once they are over it is taken.
+func TestEmptyGuideKeepsThePrevious(t *testing.T) {
+	st, _ := openTest(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+	chans := []GuideChannel{{ID: "c1", NameKey: "uno"}}
+	progs := []GuideProgramme{{Channel: "c1", Start: now - 600, Stop: now + 600, Title: "In onda"},
+		{Channel: "c1", Start: now + 600, Stop: now + 1800, Title: "Dopo"}}
+	if err := st.ReplaceGuide(ctx, "sub:1", chans, progs); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ReplaceGuide(ctx, "sub:1", nil, nil); !errors.Is(err, ErrGuideEmpty) {
+		t.Fatalf("empty guide taken: %v", err)
+	}
+	var n int
+	st.r.QueryRowContext(ctx, `SELECT count(*) FROM epg_programme WHERE stop >= ?`, now).Scan(&n)
+	if n != 2 {
+		t.Fatalf("programmes left: %d", n)
+	}
+	// Only past programmes: an empty guide is accepted.
+	st.w.ExecContext(ctx, `UPDATE epg_programme SET start = start - 7200, stop = stop - 7200`)
+	if err := st.ReplaceGuide(ctx, "sub:1", nil, nil); err != nil {
+		t.Fatalf("empty guide with nothing to come: %v", err)
+	}
+}

@@ -277,5 +277,6 @@
   "La registrazione “%s” è stata interrotta più volte dal provider: forse un altro dispositivo usa l'abbonamento “%s”": "La registrazione “%s” è stata interrotta più volte dal provider: forse un altro dispositivo usa l'abbonamento “%s”",
   "file della registrazione non trovato dopo il ripristino": "file della registrazione non trovato dopo il ripristino",
   "interrotta (ripristino da backup)": "interrotta (ripristino da backup)",
-  "il provider riprende il file da un altro punto (%d invece di %d): si ricomincia": "il provider riprende il file da un altro punto (%d invece di %d): si ricomincia"
+  "il provider riprende il file da un altro punto (%d invece di %d): si ricomincia": "il provider riprende il file da un altro punto (%d invece di %d): si ricomincia",
+  "guida vuota: mantenuta la precedente": "guida vuota: mantenuta la precedente"
 }
