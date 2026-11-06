@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/silirim/vodmax/internal/store"
 )
 
 // fakeIdP is a minimal OpenID Connect provider: one code per sign-in.
@@ -207,5 +210,51 @@ func TestSSORefusedFormSavesNothing(t *testing.T) {
 	_, body := e.do(t, "GET", "/api/v1/settings/sso", nil, true)
 	if strings.Contains(string(body), `"has_secret":true`) {
 		t.Fatalf("secret saved by a refused form: %s", body)
+	}
+}
+
+// A copy made before the address list existed (any address) restored over
+// a list: the list in force stays, sign-in from another Host stays off.
+func TestRestoreOfOldCopyKeepsSSOAddresses(t *testing.T) {
+	e := setup(t, true)
+	f := newFakeIdP(t)
+	e.svc.SetSSOClient(f.srv.Client())
+	cfg := map[string]any{"enabled": true, "issuer": f.srv.URL, "client_id": "vodmax", "client_secret": "s3cret",
+		"accounts": []map[string]any{{"account": "a@example.org", "profile_id": 1}}, "addresses": []string{e.srv.URL}}
+	if code, body := e.do(t, "PUT", "/api/v1/settings/sso", cfg, true); code != 200 {
+		t.Fatalf("sso: %d %s", code, body)
+	}
+	// The setting as 0.6.6 saved it, then the copy.
+	e.stop()
+	st, err := store.Open(e.dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.SetSetting(context.Background(), "sso", map[string]any{"enabled": true, "issuer": f.srv.URL, "client_id": "vodmax",
+		"accounts": []map[string]any{{"account": "a@example.org", "profile_id": 1}}})
+	st.Close()
+	e.start()
+	e.svc.SetSSOClient(f.srv.Client())
+	_, file := e.do(t, "POST", "/api/v1/backup", map[string]string{"password": "una password lunga"}, true)
+	cfg["addresses"] = []string{e.srv.URL} // the restart moved the test server
+	if code, body := e.do(t, "PUT", "/api/v1/settings/sso", cfg, true); code != 200 {
+		t.Fatalf("sso again: %d %s", code, body)
+	}
+	if code, body := restore(t, e, file, "una password lunga"); code != 204 {
+		t.Fatalf("restore: %d %s", code, body)
+	}
+	req, _ := http.NewRequest("GET", e.srv.URL+"/api/v1/sso", nil)
+	req.Host = "evil.example"
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if strings.Contains(string(body), `"enabled":true`) {
+		t.Fatalf("sign-in offered to any address after the restore: %s", body)
+	}
+	if _, view := e.do(t, "GET", "/api/v1/settings/sso", nil, true); !strings.Contains(string(view), `"addresses":["`+e.srv.URL+`"]`) {
+		t.Fatalf("settings after the restore: %s", view)
 	}
 }

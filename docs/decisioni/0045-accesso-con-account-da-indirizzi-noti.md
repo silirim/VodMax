@@ -27,7 +27,8 @@ suo codice e un dispositivo nel profilo amministratore.
 Per chi ha già l'accesso con account acceso: finché non salva di nuovo la
 configurazione, si entra da qualsiasi indirizzo come prima (nessuno resta
 fuori dopo l'aggiornamento). Al primo salvataggio vale l'elenco: chi entra
-anche da fuori casa deve aggiungere l'indirizzo del tunnel.
+anche da fuori casa deve aggiungere l'indirizzo del tunnel. Ripristinare
+un backup fatto prima dell'elenco non lo toglie: resta l'elenco in uso.
 
 ## Non ancora
 
