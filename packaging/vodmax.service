@@ -24,6 +24,25 @@ ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
 ReadWritePaths=/var/lib/vodmax
+# ffmpeg reads the provider's streams and the assistant runs a downloaded
+# engine: if one of them is exploited, it gets no kernel knobs, raw or
+# packet sockets, namespaces or unusual system calls. Left out on purpose:
+# PrivateDevices and ProtectClock (both close /dev/dri, the graphics card),
+# MemoryDenyWriteExecute (Vulkan and llama.cpp generate code) and
+# SystemCallArchitectures (an armv7 build on a 64-bit kernel). The VPN runs
+# in user space: no TUN device, no namespaces.
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+# A refused call fails with an error instead of killing the service.
+SystemCallErrorNumber=EPERM
 # Local collections are read where the service can see them (/mnt, /srv,
 # /media...); with ProtectHome=yes folders under /home are hidden.
 
