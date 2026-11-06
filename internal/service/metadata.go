@@ -324,12 +324,16 @@ func (s *Service) MetaImage(ctx context.Context, itemID int64, which, sig string
 
 // ---- Trending: TMDB's week, as far as the catalog has it ----
 
-const trendingFor = 6 * time.Hour
+const (
+	trendingFor   = 6 * time.Hour
+	trendingRetry = 15 * time.Minute // after a failure
+)
 
 type trendingCache struct {
-	mu   sync.Mutex
-	at   time.Time
-	list map[string][]tmdb.Trend // movie, tv
+	mu       sync.Mutex
+	at       time.Time
+	list     map[string][]tmdb.Trend // movie, tv
+	fetching bool
 }
 
 // Trending lists the titles of the catalog in TMDB's weekly ranking,
@@ -339,17 +343,31 @@ func (s *Service) Trending(ctx context.Context) ([]store.CatalogItem, error) {
 	if c == nil {
 		return []store.CatalogItem{}, nil
 	}
+	// One request fetches, outside the lock: the others use the list they
+	// have (none the first time) instead of queueing behind TMDB for up
+	// to 30 s. A failure keeps the old list and tries again later, not at
+	// every home page.
 	s.trend.mu.Lock()
-	if time.Since(s.trend.at) > trendingFor || s.trend.list == nil {
+	if time.Since(s.trend.at) > trendingFor && !s.trend.fetching {
+		s.trend.fetching = true
+		s.trend.mu.Unlock()
 		list := map[string][]tmdb.Trend{}
 		var err error
 		for _, kind := range []string{"movie", "tv"} {
-			if list[kind], err = c.Trending(ctx, kind); err != nil && len(list[kind]) == 0 {
+			// A closed page must not count as a TMDB failure.
+			if list[kind], err = c.Trending(context.WithoutCancel(ctx), kind); err != nil && len(list[kind]) == 0 {
 				break
 			}
 		}
-		if err == nil || s.trend.list == nil {
+		s.trend.mu.Lock()
+		s.trend.fetching = false
+		if err == nil {
 			s.trend.list, s.trend.at = list, time.Now()
+		} else {
+			if s.trend.list == nil {
+				s.trend.list = list // what came, until the next try
+			}
+			s.trend.at = time.Now().Add(trendingRetry - trendingFor)
 		}
 	}
 	ranking := s.trend.list
