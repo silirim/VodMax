@@ -1830,8 +1830,8 @@
     if (!current || !all.includes(current)) { all[0] && all[0].focus(); return; }
     const a = current.getBoundingClientRect();
     const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
-    let best = null, bestScore = Infinity;
     const horizontal = dir === "ArrowLeft" || dir === "ArrowRight";
+    let found = [];
     for (const e of all) {
       if (e === current) continue;
       const b = e.getBoundingClientRect();
@@ -1848,9 +1848,19 @@
       // season tab above is nearer than the next card, and at the end of a
       // row the nearest thing to the right is a card rows below.
       if (horizontal && across > 0) continue;
-      const score = along + across * 3;
-      if (score < bestScore) { bestScore = score; best = e; }
+      found.push({ e, b, score: along + across * 3 });
     }
+    // Up and Down go to the nearest row: the element whose edge is closest
+    // and those level with it. Scored on centres alone, a button straight
+    // above but far away beat the row just above it, offset sideways (from
+    // the season tab Up jumped to "Indietro" over the action buttons).
+    if (!horizontal && found.length) {
+      const gap = (b) => dir === "ArrowUp" ? a.top - b.bottom : b.top - a.bottom;
+      const n = found.reduce((x, y) => gap(y.b) < gap(x.b) ? y : x).b;
+      found = found.filter((c) => c.b === n || (c.b.bottom > n.top && c.b.top < n.bottom));
+    }
+    let best = null, bestScore = Infinity;
+    for (const c of found) if (c.score < bestScore) { bestScore = c.score; best = c.e; }
     if (!best) return;
     // Scrolled by the least that shows it whole (scroll-margin keeps the
     // focus ring in view): focus() alone centres a card that is off screen,
