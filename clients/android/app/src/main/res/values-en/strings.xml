@@ -23,6 +23,7 @@
     <string name="save_cancelled">saving cancelled</string>
     <string name="save_failed">file not saved</string>
     <string name="update_refused">update refused: it does not come from the VodMax releases</string>
+    <string name="update_not_vodmax">update refused: the file is not the VodMax app</string>
     <string name="update_bad_checksum">the downloaded file does not match the release (different checksum)</string>
     <string name="pip_play">Play</string>
     <string name="pip_pause">Pause</string>

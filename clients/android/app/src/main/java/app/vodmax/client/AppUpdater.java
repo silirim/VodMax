@@ -16,16 +16,27 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
+import java.util.regex.Pattern;
 
 /**
  * Updates the app from the project's GitHub releases: downloads the APK the
  * server announced, checks its SHA-256 against the release's checksums and
- * hands it to the Android installer, where the user confirms. Android only
- * accepts it when it is signed with the same key as the installed app.
+ * hands it to the Android installer, where the user confirms. The APK must
+ * be this app (package name): Android then only accepts it when it is
+ * signed with the same key as the installed app.
  */
 final class AppUpdater {
-    /** Only the project's release files are downloaded. */
-    static final String RELEASES = "https://github.com/silirim/VodMax/releases/download/";
+    /**
+     * Only the project's release APKs are downloaded. The whole address is
+     * matched: dot segments ("..", "%2e%2e") and escapes would let the
+     * connection resolve a prefix-checked path to another repository.
+     */
+    private static final Pattern RELEASE_APK = Pattern.compile(
+        "https://github\\.com/silirim/VodMax/releases/download/(?!\\.\\.?/)[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\\.apk");
+
+    static boolean releaseApk(String url) {
+        return url != null && RELEASE_APK.matcher(url).matches();
+    }
 
     interface Listener {
         void progress(int percent);
@@ -46,7 +57,7 @@ final class AppUpdater {
     }
 
     void start(String url, String sha256, String version, Listener listener) {
-        if (url == null || !url.startsWith(RELEASES) || sha256 == null || !sha256.matches("[0-9a-f]{64}")) {
+        if (!releaseApk(url) || sha256 == null || !sha256.matches("[0-9a-f]{64}")) {
             listener.done(activity.getString(R.string.update_refused));
             return;
         }
@@ -58,6 +69,11 @@ final class AppUpdater {
                 if (old != null) for (File f : old) f.delete();
                 File apk = new File(dir, "VodMax-" + version.replaceAll("[^0-9A-Za-z.]", "") + ".apk");
                 download(url, apk, sha256, listener);
+                android.content.pm.PackageInfo info = activity.getPackageManager().getPackageArchiveInfo(apk.getPath(), 0);
+                if (info == null || !activity.getPackageName().equals(info.packageName)) {
+                    apk.delete();
+                    throw new IOException(activity.getString(R.string.update_not_vodmax));
+                }
                 activity.runOnUiThread(() -> {
                     pending = apk;
                     String error = install();
