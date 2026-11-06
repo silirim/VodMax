@@ -179,7 +179,9 @@
     });
   }
 
+  let renderSeq = 0;
   async function render() {
+    const my = ++renderSeq;
     document.body.classList.toggle("at-list", !state.view);
     document.body.classList.toggle("view-system", state.view === "system");
     for (const b of document.querySelectorAll(".item[data-view]")) b.classList.toggle("active", b.dataset.view === state.view);
@@ -196,10 +198,16 @@
     const was = again && main.contains(document.activeElement) ? document.activeElement : null;
     const wasKey = was ? was.tagName + "|" + was.textContent.trim() : "";
     if (!again) main.replaceChildren(el("p", { className: "note" }, t("Caricamento…")));
+    // The section is drawn aside and shown only if no newer render started
+    // meanwhile: a slow answer must not cover the section picked after it.
+    const next = el("div");
     try {
-      await ({ subscriptions: renderSubscriptions, libraries: renderLibraries, vpn: renderVPN, rules: renderRules, categories: renderCategories, system: renderSystem, assistant: renderAssistant, profiles: renderProfiles, devices: renderDevices, guide: renderGuideSources, language: renderLanguage })[state.view](main);
-      cards(main);
+      await ({ subscriptions: renderSubscriptions, libraries: renderLibraries, vpn: renderVPN, rules: renderRules, categories: renderCategories, system: renderSystem, assistant: renderAssistant, profiles: renderProfiles, devices: renderDevices, guide: renderGuideSources, language: renderLanguage })[state.view](next);
+      if (my !== renderSeq) return;
+      cards(next);
+      main.replaceChildren(...next.childNodes);
     } catch (e) {
+      if (my !== renderSeq) return;
       main.replaceChildren(el("p", { className: "note bad" }, e.message));
     }
     if (was && !main.contains(document.activeElement)) {
