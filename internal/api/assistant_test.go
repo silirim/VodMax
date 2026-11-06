@@ -115,7 +115,11 @@ func TestAssistant(t *testing.T) {
 	// their title, to record just once: first what starts nearest the time
 	// ("Film della sera", in 20 minutes on Rai 1), then what is on air
 	// (TG1). Without a title there is no rule to propose.
-	at := time.Now().Add(20 * time.Minute)
+	// The model names minutes, not seconds: asking for 20 minutes from now
+	// lands exactly on the film's start (TG1 then over) whenever the guide
+	// was made in the first second of a minute or a minute ago. 19 minutes
+	// is always inside TG1.
+	at := time.Now().Add(19 * time.Minute)
 	m.answer = func(system, user string) string {
 		if !strings.Contains(system, time.Now().Format("2006-01-02")) {
 			return "?"
