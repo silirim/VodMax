@@ -588,12 +588,13 @@ public class MainActivity extends Activity {
         long duration = data == null ? 0 : data.getLongExtra(PlayerActivity.DURATION, 0);
         String error = data == null ? null : data.getStringExtra(PlayerActivity.ERROR);
         boolean next = data != null && data.getBooleanExtra(PlayerActivity.NEXT, false);
+        boolean ended = data != null && data.getBooleanExtra(PlayerActivity.ENDED, false);
         int introStart = data == null ? 0 : data.getIntExtra(PlayerActivity.INTRO_START, 0);
         int introEnd = data == null ? 0 : data.getIntExtra(PlayerActivity.INTRO_END, 0);
         int credits = data == null ? 0 : data.getIntExtra(PlayerActivity.CREDITS, 0);
         web.evaluateJavascript("window.VodMaxNativeDone && window.VodMaxNativeDone({position:" + position / 1000.0
             + ",duration:" + duration / 1000.0 + ",error:" + (error == null ? "null" : JSONObject.quote(error))
-            + ",next:" + next + ",intro_start:" + introStart + ",intro_end:" + introEnd + ",credits:" + credits + "})", null);
+            + ",next:" + next + ",ended:" + ended + ",intro_start:" + introStart + ",intro_end:" + introEnd + ",credits:" + credits + "})", null);
     }
 
     // Back: the page decides (close a panel, go to the menu); with nothing

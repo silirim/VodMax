@@ -1181,6 +1181,10 @@
           else if (state.view === "home") render();
         }).catch(() => {});
     }
+    // At the end of the archive of a programme still on air, from where the
+    // player stopped (apps before 0.6.7 do not say it ended: live TV).
+    if (c.media === "catchup" && r.ended && goOnCatchup(c, (c.offset || 0) + r.position,
+      (at) => playNative({ ...c, startAt: at, sess: { ...c.sess, duration: c.duration } }))) return;
     if (c.media === "catchup" && state.catchupBack) location.href = state.catchupBack;
     if (c.media === "episode" && c.sess.series_id) {
       // The same care as in the browser (guessMarker): two episodes agree.
@@ -1481,14 +1485,14 @@
   // again from there with what aired meanwhile. Live TV takes over only
   // near the edge, where an opening would hold a minute at most; an
   // opening that brought nothing new (an archive shorter than the guide)
-  // ends too.
-  function goOnCatchup(p) {
-    const c = state.catchup, at = position();
+  // ends too. The Android player reopens the same way (reopen).
+  function goOnCatchup(p, at = position(), reopen = load) {
+    const c = state.catchup;
     const edge = Math.min(c.stop, Date.now() / 1000) - c.start;
     if (at >= edge - 120 || (p.wentOn !== undefined && at < p.wentOn + 30)) return false;
     p.wentOn = at;
     p.duration = edge;
-    load(at);
+    reopen(at);
     return true;
   }
 

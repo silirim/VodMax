@@ -66,6 +66,8 @@ public class PlayerActivity extends Activity {
     static final String RESTART_URL = "restart_url", RESTART_OFFSET = "restart_offset", KNOWN_DURATION = "known_duration";
     static final String GROWS = "grows";
     static final String SUPERSEDED = "superseded";
+    // The stream came to its end (not Back): a catch-up still on air goes on.
+    static final String ENDED = "ended";
 
     private static final int ACCENT = 0xFF00D6CA, PANEL = 0xEB13151B, LINE = 0x1FFFFFFF, TEXT = 0xFFF5F5F7, SOFT = 0xFFA9ABB5;
 
@@ -100,7 +102,7 @@ public class PlayerActivity extends Activity {
     private String nextTitle;
     private int introStart, introEnd, credits;          // known, seconds
     private int learnedIntroStart, learnedIntroEnd, learnedCredits;
-    private boolean goNext, nextCancelled, skipping, superseded;
+    private boolean goNext, nextCancelled, skipping, superseded, atEnd;
     private long nextAt;                                // ms, 0: not counting
     private long chainStart = -1, chainEnd;
     private Button skipIntro;
@@ -359,7 +361,10 @@ public class PlayerActivity extends Activity {
 
     private void ended() {
         if (nextTitle != null && !nextCancelled) playNext(false);
-        else finishWithResult();
+        else {
+            atEnd = true;
+            finishWithResult();
+        }
     }
 
     /** Nothing playing: closing the app does not open an empty window. */
@@ -734,6 +739,7 @@ public class PlayerActivity extends Activity {
         if (error != null) out.putExtra(ERROR, error);
         out.putExtra(SUPERSEDED, superseded);
         out.putExtra(NEXT, goNext);
+        out.putExtra(ENDED, atEnd);
         if (learnedIntroEnd > 0) {
             out.putExtra(INTRO_START, learnedIntroStart);
             out.putExtra(INTRO_END, learnedIntroEnd);
