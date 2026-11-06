@@ -317,11 +317,52 @@ func TestLeftoverTSConvertedAtStart(t *testing.T) {
 	var l []struct{ ID int64 }
 	json.Unmarshal(body, &l)
 	_, body = e.do(t, "POST", fmt.Sprintf("/api/v1/recordings/%d/ticket", l[0].ID), nil, true)
-	var tk struct{ URL string }
-	json.Unmarshal(body, &tk)
+	var tk struct {
+		URL string
+		TS  *bool
+	}
+	if json.Unmarshal(body, &tk) != nil || tk.TS == nil || *tk.TS {
+		t.Fatalf("ticket of an MP4: %s", body)
+	}
 	resp, err := http.Get(e.srv.URL + tk.URL)
 	if err != nil || resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "video/mp4" {
 		t.Fatalf("playing the converted recording: %v %v", err, resp)
 	}
 	resp.Body.Close()
+}
+
+// A finished recording left in MPEG-TS: the ticket says so and gives its
+// real length, and the stream reopens it from a second, as for one in
+// progress (players cannot seek far in a TS).
+func TestFinishedTSRecordingFromASecond(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.svc.SetFFmpeg(fakeConverter(t, false, true), "") // stays TS
+	rai := channels(t, e, "?section=tv")[0]
+	now := time.Now().Unix()
+	_, body := e.do(t, "POST", "/api/v1/recordings", map[string]any{"channel_id": rai.ID, "start": now - 3600, "stop": now + 8, "title": "Già in onda"}, true)
+	var rec struct{ ID int64 }
+	json.Unmarshal(body, &rec)
+	time.Sleep(10 * time.Second)
+	_, body = e.do(t, "POST", fmt.Sprintf("/api/v1/recordings/%d/ticket", rec.ID), nil, true)
+	var tk struct {
+		URL      string
+		TS       bool
+		Duration float64
+		Recorded *float64
+	}
+	// Started an hour into its slot: the length is what was recorded.
+	if json.Unmarshal(body, &tk) != nil || !tk.TS || tk.Duration < 6 || tk.Duration > 9 || tk.Recorded != nil {
+		t.Fatalf("ticket: %s", body)
+	}
+	names := recFiles(t, e)
+	fi, _ := os.Stat(filepath.Join(e.recordings, names[0]))
+	resp, err := http.Get(e.srv.URL + tk.URL + "?t=3")
+	if err != nil || resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "video/mp2t" {
+		t.Fatalf("from a second: %v %v", err, resp)
+	}
+	got, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if len(got) == 0 || got[0] != 0x47 || int64(len(got)) > fi.Size()*3/4 || int64(len(got)) < fi.Size()/4 {
+		t.Fatalf("from second 3 of %v: %d bytes of %d", tk.Duration, len(got), fi.Size())
+	}
 }

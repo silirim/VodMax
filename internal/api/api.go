@@ -1207,11 +1207,17 @@ func (a *api) recordingTicket(w http.ResponseWriter, r *http.Request) {
 	if breaks == nil {
 		breaks = []service.Commercial{}
 	}
-	out := map[string]any{"url": "/stream/recording/" + t, "commercials": breaks}
-	// In progress: how much is there, to choose the start and move in it
-	// (the stream then takes ?t=seconds, or t=live).
-	if secs, ok := a.svc.RecordingInProgress(id); ok {
-		out["recorded"] = math.Floor(secs)
+	secs, ts, running, err := a.svc.RecordingLength(r.Context(), id)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	// ts: an MPEG-TS file, finished or in progress, is moved in by
+	// reopening the stream at ?t=seconds (t=live: the end of one in
+	// progress). duration: the real length, not the scheduled slot.
+	out := map[string]any{"url": "/stream/recording/" + t, "commercials": breaks, "ts": ts, "duration": math.Floor(secs)}
+	if running {
+		out["recorded"] = math.Floor(secs) // how much is there, to choose the start
 	}
 	writeJSON(w, http.StatusOK, out)
 }

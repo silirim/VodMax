@@ -78,7 +78,7 @@ guasto; il client la ignora.
 | `GET /api/v1/continue` · `DELETE …/{id}` | Continua a guardare; togliere un film o una serie (id del titolo) finché non lo si riguarda |
 | `POST /api/v1/vod/{movie\|episode}/{id}/session` `{viewer, mode?, force?}` | Sessione di riproduzione: `direct` (MP4, intervalli) o `remux` (ffmpeg, `?t=` secondi). Con la connessione occupata da un altro dispositivo risponde 409 (423 se la tiene una registrazione); `force: true` la prende per l'analisi del file |
 | `GET` · `POST /api/v1/recordings` | Registrazioni; `{channel_id}` registra il programma in onda, oppure `start`/`stop` esatti |
-| `DELETE /api/v1/recordings/{id}` · `POST …/{id}/ticket` | Annulla o elimina; permesso di visione (`recorded`: secondi già registrati, se in corso) |
+| `DELETE /api/v1/recordings/{id}` · `POST …/{id}/ticket` | Annulla o elimina; permesso di visione: `url`, `duration` (secondi reali, non la fascia programmata), `ts` (file MPEG-TS: ci si sposta riaprendo `url?t=secondi`, anche a registrazione finita), `recorded` (secondi già registrati, solo se in corso; `?t=live` dalla fine) |
 | `POST /api/v1/recordings/{id}/stop` | Ferma una registrazione in corso tenendo quanto registrato |
 | `GET /img/logo/{id}?s=firma` | Logo del canale scaricato tramite VPN e in cache (indirizzo firmato, fornito dall'elenco dei canali) |
 | `GET` · `PUT /api/v1/settings/assistant` | Assistente: modo (`local`, `online`, `server`), modello, chiave; stato dell'integrato e dell'indice delle persone |

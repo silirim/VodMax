@@ -390,7 +390,11 @@ func (a *activeRec) recorded() float64 {
 // rate is the average over the time with data: the position is
 // approximate, as with a seek in any constant-rate stream.
 func (a *activeRec) offsetAt(f *os.File, second float64) int64 {
-	size, secs := a.size(), a.recorded()
+	return tsOffset(f, a.size(), a.recorded(), second)
+}
+
+// tsOffset is offsetAt for a TS file of size bytes and secs seconds.
+func tsOffset(f *os.File, size int64, secs, second float64) int64 {
 	if size <= 0 || secs <= 1 {
 		return 0
 	}
@@ -909,21 +913,39 @@ func (s *Service) RecordingTicket(ctx context.Context, id int64) (string, []Comm
 	return t, breaks, nil
 }
 
-// RecordingInProgress says how many seconds a running recording holds;
-// false when it is not running.
-func (s *Service) RecordingInProgress(id int64) (float64, bool) {
+// RecordingLength says how many seconds a recording holds (so far, when
+// running) and whether its file is MPEG-TS: players move in a TS by
+// reopening it at a second (?t=), as in a recording in progress.
+func (s *Service) RecordingLength(ctx context.Context, id int64) (secs float64, ts, running bool, err error) {
 	s.rec.mu.Lock()
 	a := s.rec.running[id]
 	s.rec.mu.Unlock()
-	if a == nil {
-		return 0, false
+	if a != nil {
+		return a.recorded(), true, true, nil
 	}
-	return a.recorded(), true
+	r, err := s.st.Recording(ctx, id)
+	if err != nil {
+		return 0, false, false, err
+	}
+	return finishedLength(r), strings.HasSuffix(r.File, ".ts"), false, nil
+}
+
+// finishedLength estimates how long a finished recording is: from when it
+// started (a recording scheduled for a programme already on air starts
+// when it was asked for) to its real end, which is also the last write of
+// its file.
+func finishedLength(r store.Recording) float64 {
+	start, stop := max(r.Start, r.CreatedAt), r.Stop
+	if fi, err := os.Stat(r.File); err == nil {
+		stop = min(stop, fi.ModTime().Unix())
+	}
+	return float64(max(0, stop-start))
 }
 
 // OpenRecording returns the recording file (finished: seekable) or, if it
 // is still being recorded, a stream that follows it from the given second
-// (negative: from the live edge).
+// (negative: from the live edge). A finished TS asked from a second is a
+// stream from there too.
 func (s *Service) OpenRecording(ctx context.Context, ticket string, from float64) (*os.File, *Stream, store.Recording, error) {
 	s.rec.mu.Lock()
 	tk, ok := s.rec.tickets[ticket]
@@ -955,7 +977,19 @@ func (s *Service) OpenRecording(ctx context.Context, ticket string, from float64
 		return nil, nil, r, ErrNotReady
 	}
 	f, err := os.Open(r.File)
-	return f, nil, r, err
+	if err != nil || from == 0 || !strings.HasSuffix(r.File, ".ts") {
+		return f, nil, r, err
+	}
+	// A finished TS, from a second: players cannot seek far in one.
+	fi, err := f.Stat()
+	if err == nil {
+		_, err = f.Seek(tsOffset(f, fi.Size(), finishedLength(r), from), io.SeekStart)
+	}
+	if err != nil {
+		f.Close()
+		return nil, nil, r, err
+	}
+	return nil, &Stream{ReadCloser: f, ContentType: "video/mp2t", Title: r.Title}, r, nil
 }
 
 // ErrNotReady means the recording has no file yet.
