@@ -1308,6 +1308,7 @@
     const p = state.play;
     if (!p) return 0;
     if (p.growing) return p.growing.recorded + (performance.now() - p.growing.at) / 1000;
+    if (p.reopen) return p.duration; // the video holds only what follows the offset
     return p.sess.mode === "direct" && isFinite(video.duration) ? video.duration : p.duration;
   }
 
@@ -1330,8 +1331,7 @@
   function seek(delta) {
     const p = state.play;
     if (!p) return;
-    if (p.growing) { seekGrowing(position() + delta); return; }
-    if (p.ts) { p.ts.seek(delta); showBar(); return; }
+    if (p.reopen) { seekTS(position() + delta); return; }
     const target = Math.max(0, Math.min(position() + delta, (duration() || Infinity) - 5));
     learnIntro(position(), target);
     if (p.sess.mode === "direct") video.currentTime = target;
@@ -1344,11 +1344,10 @@
     const p = state.play;
     if (!p) return;
     const d = duration();
-    if (p.growing) { seekGrowing(target); return; }
+    if (p.reopen) { seekTS(target); return; }
     target = Math.max(0, Math.min(target, (d || Infinity) - 3));
     learnIntro(position(), target);
-    if (p.ts) p.ts.seek(target - position());
-    else if (p.sess.mode === "direct") video.currentTime = target;
+    if (p.sess.mode === "direct") video.currentTime = target;
     else load(target);
     showBar();
   }
@@ -1658,30 +1657,32 @@
       from = await choose(t("Registrazione in corso"), [[0, t("Dall'inizio"), "undo-2"], ["live", t("In diretta"), "radio"]]);
       if (from === null) return;
     }
-    let url, breaks, recorded;
-    try { ({ url, commercials: breaks, recorded } = await api("POST", "/api/v1/recordings/" + r.id + "/ticket")); } catch (e) { flash(e.message); return; }
+    let url, breaks, recorded, ts, length;
+    try { ({ url, commercials: breaks, recorded, ts, duration: length } = await api("POST", "/api/v1/recordings/" + r.id + "/ticket")); } catch (e) { flash(e.message); return; }
     const growing = typeof recorded === "number";
     if (!growing) from = 0; // finished in the meantime: a normal file
+    // MPEG-TS (in progress, or left so when the conversion to MP4 failed):
+    // players cannot seek far in it, so the server reopens it at the
+    // chosen second (?t=). Finished MP4 files are seekable as they are.
+    const isTS = growing || Boolean(ts);
     const startSec = from === "live" ? Math.max(0, recorded - 4) : 0;
     if (window.VodMax.native) {
       playNative({ media: "recording", id: r.id, title: r.title + " · " + r.channel, startAt: 0, live: growing,
-        sess: { mode: "direct", url: growing ? url + "?t=" + from : url },
-        restart: growing ? { url: url + "?t=", offset: startSec, duration: Math.max(1, recorded), grows: true } : null });
+        sess: { mode: "direct", url: isTS ? url + "?t=" + from : url },
+        restart: isTS ? { url: url + "?t=", offset: startSec, duration: Math.max(1, growing ? recorded : length || 0), grows: growing } : null });
       return;
     }
     stopPlayback(false);
-    state.play = { recording: r, title: r.title, sess: { mode: "direct", url }, offset: 0, duration: r.stop - r.start, breaks: breaks || [] };
+    // The real length from the server: a recording stopped early is
+    // shorter than its scheduled slot.
+    state.play = { recording: r, title: r.title, sess: { mode: "direct", url }, offset: 0, duration: length || r.stop - r.start, breaks: breaks || [] };
     if (growing) state.play.growing = { recorded, at: performance.now() };
     $("player-audio").hidden = $("player-subs").hidden = true;
     $("player-title").textContent = r.title + " · " + r.channel;
     $("player").hidden = false;
-    // Finished recordings are MP4 (seekable); recordings in progress, or
-    // left in MPEG-TS, go through mpegts.js.
-    const isTS = growing || !(await fetch(url, { headers: { Range: "bytes=0-0" } })
-      .then((res) => { res.body && res.body.cancel(); return (res.headers.get("Content-Type") || "").includes("mp4"); }).catch(() => false));
     if (isTS && window.mpegts && mpegts.isSupported()) {
-      if (growing) openGrowing(from);
-      else state.play.ts = window.VodMax.tsPlayer(video, url, { live: false, onError: recordingError });
+      state.play.reopen = true;
+      openTS(from);
       $("player-live").hidden = !growing;
     } else {
       video.src = url;
@@ -1692,28 +1693,29 @@
 
   function recordingError(type, detail) { flash(t("Registrazione non riproducibile ({detail})", { detail })); }
 
-  // Opens the recording in progress at a second (or "live").
-  function openGrowing(from) {
+  // Opens a TS recording at a second (or "live" while it is recorded).
+  // The video's clock starts again at 0: position() adds the offset.
+  function openTS(from) {
     const p = state.play;
-    if (!p || !p.growing) return;
+    if (!p || !p.reopen) return;
     if (p.ts) p.ts.destroy();
     p.offset = from === "live" ? Math.max(0, duration() - 4) : Math.max(0, from);
     p.ts = window.VodMax.tsPlayer(video, p.sess.url + "?t=" + (from === "live" ? "live" : Math.floor(p.offset)), { live: true, onError: recordingError });
     showBar();
   }
 
-  // In a recording in progress: inside what the browser holds, a plain
-  // seek; elsewhere the stream is reopened there.
-  function seekGrowing(target) {
+  // In a TS recording: inside what the browser holds, a plain seek;
+  // elsewhere the stream is reopened there.
+  function seekTS(target) {
     const p = state.play;
     const d = duration();
-    if (target >= d - 8) { openGrowing("live"); return; }
-    target = Math.max(0, target);
+    if (p.growing && target >= d - 8) { openTS("live"); return; }
+    target = Math.max(0, d > 5 ? Math.min(target, d - 5) : target);
     const b = video.buffered, at = target - p.offset;
     for (let i = 0; i < b.length; i++) {
       if (at >= b.start(i) && at <= b.end(i) - 1) { p.ts.seek(target - position()); showBar(); return; }
     }
-    openGrowing(target);
+    openTS(target);
   }
 
   // ---- Remote control navigation ----
@@ -1869,7 +1871,7 @@
       audio: () => openMenu("audio"), subs: () => openMenu("subs"),
       live: () => {
         const p = state.play;
-        if (p && p.growing && duration() - position() > 15) openGrowing("live");
+        if (p && p.growing && duration() - position() > 15) openTS("live");
         else if (p && p.ts) { p.ts.goLive(); showBar(); }
       },
       next: () => playNext(true),
