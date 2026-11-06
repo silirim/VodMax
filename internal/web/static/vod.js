@@ -1286,8 +1286,18 @@
       startSubtitles();
     } else {
       p.offset = 0;
+      // Until the metadata arrives the video's clock says 0: the position
+      // asked for is where the conversion or "take control" start.
+      p.startAt = position;
+      p.loaded = false;
       video.src = p.sess.url + (extra ? "?" + extra : "");
-      if (position > 0) video.addEventListener("loadedmetadata", () => { video.currentTime = position; }, { once: true });
+      // Only for this player: one closed before its metadata arrived must
+      // not move the next video (another film, a recording) to its time.
+      video.addEventListener("loadedmetadata", () => {
+        if (state.play !== p) return;
+        p.loaded = true;
+        if (position > 0) video.currentTime = position;
+      }, { once: true });
     }
     video.play().catch(() => flash(t("Premi OK per avviare")));
     showBar();
@@ -1395,19 +1405,21 @@
     // Find out why: a busy connection answers 409, one held by a recording 423.
     const status = await fetch(p.sess.url + (p.sess.mode === "remux" ? "?t=0" : ""), { headers: { Range: "bytes=0-0" } })
       .then((r) => { r.body && r.body.cancel(); return r.status; }).catch(() => 0);
+    if (state.play !== p) return; // closed meanwhile
+    const at = p.sess.mode === "direct" && !p.loaded ? p.startAt : position();
     if (status === 423) {
       flash(t("Tutte le connessioni dell'abbonamento sono occupate da una registrazione in corso"));
       stopPlayback(true);
       return;
     }
     if (status === 409) {
-      if (confirm(t("La connessione dell'abbonamento è in uso su un altro dispositivo. Prendere il controllo?"))) load(position(), true);
+      if (confirm(t("La connessione dell'abbonamento è in uso su un altro dispositivo. Prendere il controllo?"))) load(at, true);
       else stopPlayback(true);
       return;
     }
     if (p.sess.mode === "direct" && !p.fellBack) {
       flash(t("Formato non leggibile dal browser: conversione sul server…"));
-      play(p.media, p.id, p.title, position(), "remux");
+      play(p.media, p.id, p.title, at, "remux");
       return;
     }
     flash(t("Riproduzione non riuscita"));
