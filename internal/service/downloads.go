@@ -498,8 +498,8 @@ func (s *Service) runDownload(ctx context.Context, d store.Download, a *activeDo
 		s.st.SetDownloadState(context.Background(), d.ID, "failed", d.Bytes, d.Total, err.Error())
 		return
 	}
-	if free, _, ok := diskSpace(dir); ok && free < minFreeToRecord+max(0, d.Total-d.Bytes) {
-		s.st.SetDownloadState(context.Background(), d.ID, "failed", d.Bytes, d.Total, tr("it", "spazio su disco insufficiente"))
+	if !roomFor(dir, d.Total-d.Bytes) {
+		s.st.SetDownloadState(context.Background(), d.ID, "failed", d.Bytes, d.Total, errNoSpace.Error())
 		return
 	}
 	streamCtx, release, err := s.acquireBackground(ctx, d.SubscriptionID, "download:"+strconv.FormatInt(d.ID, 10))
@@ -514,6 +514,9 @@ func (s *Service) runDownload(ctx context.Context, d store.Download, a *activeDo
 	err = s.fetchDownload(streamCtx, d, file, a)
 	bytes, total := s.progress(a)
 	switch {
+	case errors.Is(err, errNoSpace):
+		// What is there stays: "Riprendi" carries on once space is freed.
+		s.st.SetDownloadState(context.Background(), d.ID, "failed", bytes, total, err.Error())
 	case err == nil:
 		s.finishDownload(context.Background(), d, file)
 		s.st.SetDownloadState(context.Background(), d.ID, "done", bytes, total, "")
@@ -587,6 +590,11 @@ func (s *Service) fetchDownload(ctx context.Context, d store.Download, file stri
 		// The provider sent the whole file: start again.
 		have, flags = 0, os.O_CREATE|os.O_WRONLY|os.O_TRUNC
 	}
+	// The size is known only now: a large film must not fill the disk the
+	// recordings and the database need.
+	if !roomFor(filepath.Dir(file), total-have) {
+		return errNoSpace
+	}
 	f, err := os.OpenFile(part, flags, 0o644)
 	if err != nil {
 		return err
@@ -610,6 +618,9 @@ func (s *Service) fetchDownload(ctx context.Context, d store.Download, file stri
 				last = time.Now()
 				b, t := s.progress(a)
 				s.st.SetDownloadState(context.Background(), d.ID, "downloading", b, t, "")
+				if !roomFor(filepath.Dir(file), 0) { // something else filled the disk
+					return errNoSpace
+				}
 			}
 		}
 		if rerr == io.EOF {
@@ -626,6 +637,17 @@ func (s *Service) fetchDownload(ctx context.Context, d store.Download, file stri
 		return err
 	}
 	return os.Rename(part, file)
+}
+
+// errNoSpace stops a download that would leave less than minFreeToRecord
+// on the disk.
+var errNoSpace = errors.New("spazio su disco insufficiente")
+
+// roomFor tells whether n more bytes fit in dir leaving minFreeToRecord
+// free (true when the space cannot be read).
+func roomFor(dir string, n int64) bool {
+	free, _, ok := diskSpace(dir)
+	return !ok || free >= minFreeToRecord+max(0, n)
 }
 
 // finishDownload writes the .nfo and the poster next to the file, as a
