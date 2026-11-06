@@ -592,6 +592,12 @@ func (s *Service) SetCacheDir(dir string) error {
 
 const directProbeLimit = 4 * time.Second
 
+// vodFormats are the containers ffmpeg and ffprobe may read a film as.
+// Without a list they would also accept a playlist (HLS, DASH) and fetch
+// its segments themselves, on the normal network, outside the
+// subscription's VPN.
+const vodFormats = "mov,matroska,mpegts,avi,flv,mpeg,asf,ogg"
+
 type probeResult struct {
 	Duration   float64
 	VideoCodec string
@@ -673,7 +679,7 @@ func (s *Service) probe(ctx context.Context, sess *vodSession, force bool) (*pro
 	ctx, cancel := context.WithTimeout(streamCtx, 45*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, s.ffprobeBin(), "-v", "error", "-print_format", "json", "-show_format", "-show_streams",
-		"http://"+addr+"/internal/"+sess.internal)
+		"-format_whitelist", vodFormats, "http://"+addr+"/internal/"+sess.internal)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -728,6 +734,8 @@ func (s *Service) OpenRemux(ctx context.Context, sessionID string, position floa
 		s.vod.mu.Unlock()
 		skip, position = position-minute.Seconds(), 0
 		args = append(args, "-fflags", "+genpts+discardcorrupt", "-f", "mpegts")
+	} else {
+		args = append(args, "-format_whitelist", vodFormats)
 	}
 	if position > 0 {
 		args = append(args, "-ss", strconv.FormatFloat(position, 'f', 1, 64))
