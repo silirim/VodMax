@@ -239,3 +239,54 @@ func TestRestoreReSealsTheHomeAccountSecret(t *testing.T) {
 		t.Fatalf("new secret after restore: %d %s", code, body)
 	}
 }
+
+// Restoring an older copy on the same server: a device locked to a profile
+// follows that profile (by name and kind) to its restored id, and one whose
+// profile is not in the copy is unpaired, never left free or moved onto
+// another profile that took the same id.
+func TestRestoreKeepsDeviceLocks(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.do(t, "PATCH", "/api/v1/profiles/1", map[string]any{"pin": "9753"}, true)
+	addProfile := func(name, kind string) int64 {
+		code, out := e.do(t, "POST", "/api/v1/profiles", map[string]any{"name": name, "kind": kind}, true)
+		var r struct{ ID int64 }
+		if code != 201 || json.Unmarshal(out, &r) != nil {
+			t.Fatalf("add profile: %d %s", code, out)
+		}
+		return r.ID
+	}
+	papa, bimbi := addProfile("Papà", "standard"), addProfile("Bimbi", "kids")
+	_, file := e.do(t, "POST", "/api/v1/backup", map[string]string{"password": "una password lunga"}, true)
+	for _, id := range []int64{papa, bimbi} {
+		if code, body := e.do(t, "DELETE", "/api/v1/profiles/"+strconv.FormatInt(id, 10), nil, true); code != 204 {
+			t.Fatalf("delete profile: %d %s", code, body)
+		}
+	}
+	// Ids are reused: the new Bimbi takes Papà's old id.
+	newBimbi, nonna := addProfile("Bimbi", "kids"), addProfile("Nonna", "kids")
+	if newBimbi != papa {
+		t.Fatalf("setup: id %d not reused (%d)", newBimbi, papa)
+	}
+	tablet := pair(t, e, "Tablet", &newBimbi)
+	other := pair(t, e, "TV nonna", &nonna)
+
+	if code, body := restore(t, e, file, "una password lunga"); code != 204 {
+		t.Fatalf("restore: %d %s", code, body)
+	}
+	code, me := e.call(t, "GET", "/api/v1/me", nil, tablet, "")
+	var who struct {
+		Device struct {
+			ProfileLock *int64 `json:"profile_lock"`
+		}
+		Profile *struct{ Name, Kind string }
+	}
+	if code != 200 || json.Unmarshal(me, &who) != nil || who.Device.ProfileLock == nil || *who.Device.ProfileLock != bimbi {
+		t.Fatalf("tablet after the restore: %d %s", code, me)
+	}
+	if who.Profile != nil && who.Profile.Kind != "kids" {
+		t.Fatalf("tablet on an adult profile: %s", me)
+	}
+	if code, body := e.call(t, "GET", "/api/v1/me", nil, other, ""); code != 401 {
+		t.Fatalf("device locked to a profile not in the copy still paired: %d %s", code, body)
+	}
+}

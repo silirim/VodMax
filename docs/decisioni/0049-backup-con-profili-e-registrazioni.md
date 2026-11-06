@@ -21,7 +21,11 @@ dopo la nuova sincronizzazione appartengono ad altri film.
   icona) e i titoli tolti da "continua a guardare". Il ripristino
   sostituisce i profili con quelli del backup; il profilo 1 resta sempre.
   Ogni dispositivo sceglie di nuovo chi guarda (un profilo scelto prima
-  del ripristino non vale più).
+  del ripristino non vale più). Un dispositivo bloccato su un profilo (il
+  tablet dei bambini) resta bloccato sul profilo con lo stesso nome e
+  tipo; se la copia non lo ha, il dispositivo va abbinato di nuovo: non
+  resta mai libero né finisce su un altro profilo che ha preso lo stesso
+  numero.
 - Ogni registrazione porta il nome del suo file. Al ripristino una
   registrazione punta solo a un file della cartella delle registrazioni
   di questo server; se il file non c'è, diventa "non riuscita" con la

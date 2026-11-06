@@ -501,7 +501,9 @@ func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub fu
 
 // importProfiles replaces the profiles with the backup's. Profile 1 (the
 // first administrator) always stays. Every profile starts a new PIN epoch,
-// so no device keeps a profile chosen before the restore.
+// so no device keeps a profile chosen before the restore. Devices (not in
+// backups) locked to a profile follow its name and kind; one whose profile
+// is gone is unpaired, never left free or on another profile.
 func importProfiles(ctx context.Context, tx *sql.Tx, profiles []BackupProfile) error {
 	ids, _ := json.Marshal(func() []int64 {
 		var out []int64
@@ -511,6 +513,27 @@ func importProfiles(ctx context.Context, tx *sql.Tx, profiles []BackupProfile) e
 		return out
 	}())
 	epoch := time.Now().UnixNano()
+	locks, err := tx.QueryContext(ctx, `SELECT d.id, p.name, p.kind FROM device d JOIN profile p ON p.id = d.profile_lock`)
+	if err != nil {
+		return err
+	}
+	type lock struct {
+		device     int64
+		name, kind string
+	}
+	var locked []lock
+	for locks.Next() {
+		var l lock
+		if err := locks.Scan(&l.device, &l.name, &l.kind); err != nil {
+			locks.Close()
+			return err
+		}
+		locked = append(locked, l)
+	}
+	locks.Close()
+	if err := locks.Err(); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM profile WHERE id <> 1 AND id NOT IN (SELECT value FROM json_each(?))`, string(ids)); err != nil {
 		return err
 	}
@@ -528,8 +551,19 @@ func importProfiles(ctx context.Context, tx *sql.Tx, profiles []BackupProfile) e
 	}
 	// Profile 1 not in the backup (it never is missing, but a name must
 	// not stay "#1").
-	_, err := tx.ExecContext(ctx, `UPDATE profile SET name = 'Principale', pin_epoch = ? WHERE id = 1 AND name = '#1'`, epoch)
-	return err
+	if _, err := tx.ExecContext(ctx, `UPDATE profile SET name = 'Principale', pin_epoch = ? WHERE id = 1 AND name = '#1'`, epoch); err != nil {
+		return err
+	}
+	for _, l := range locked {
+		if _, err := tx.ExecContext(ctx, `UPDATE device SET profile_lock = (SELECT id FROM profile WHERE name = ? AND kind = ?) WHERE id = ?`,
+			l.name, l.kind, l.device); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM device WHERE id = ? AND profile_lock IS NULL`, l.device); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ApplyPendingRestore attaches restored hidden items and watch progress to
