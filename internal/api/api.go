@@ -1,5 +1,11 @@
 // Package api exposes the administration and catalog HTTP API (/api/v1).
-// Every endpoint except /api/v1/health requires the admin token.
+// /api/v1 endpoints need a bearer token: a paired device's (or the admin
+// token, the master device), plus the chosen profile's token; each route
+// states the profile level it needs. Open without a bearer: /api/v1/health,
+// pairing and home sign-in (/api/v1/pair, /api/v1/sso, /auth/sso), and the
+// capability addresses whose secret is in the path (/stream tickets and
+// sessions, /out keys, /img), since players and other apps cannot send a
+// header.
 package api
 
 import (

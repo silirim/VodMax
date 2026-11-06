@@ -71,7 +71,7 @@ func run(data, listen, recordings, downloads, ffmpeg, ffprobe string, device boo
 	}
 	if host, _, err := net.SplitHostPort(listen); err == nil {
 		if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
-			log.Warn("API raggiungibile dalla rete: l'accesso è protetto solo dal token di amministrazione", "listen", listen)
+			log.Warn("API raggiungibile dalla rete: servono il token di un dispositivo abbinato e il profilo; abbinamento, accesso con account e gli indirizzi con un segreto (/stream, /out, /img) sono aperti", "listen", listen)
 		}
 	}
 	box, err := secret.LoadOrCreate(filepath.Join(data, "secret.key"))
