@@ -86,6 +86,8 @@ type env struct {
 	recordings string
 	stop       func() // stops the server like a restart (see restart)
 	start      func() // starts it again on the same data
+	// prepare, if set, runs on each new service before its recorder starts.
+	prepare func(*service.Service)
 }
 
 func setup(t *testing.T, tunnelComesUp bool) *env {
@@ -108,6 +110,9 @@ func setup(t *testing.T, tunnelComesUp bool) *env {
 		})
 		e.svc = svc
 		svc.SetBackupDir(filepath.Join(dir, "backups"))
+		if e.prepare != nil {
+			e.prepare(svc)
+		}
 		ctx, cancel := context.WithCancel(context.Background())
 		if err := svc.StartRecorder(ctx, e.recordings, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
 			t.Fatal(err)

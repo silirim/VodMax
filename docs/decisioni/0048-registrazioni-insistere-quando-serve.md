@@ -30,7 +30,28 @@ finite solo come righe INFO nel log: nessuno se ne è accorto.
   avvisa per 12 ore "forse un altro dispositivo usa l'abbonamento" e la
   registrazione finita lo dice nella sua nota.
 
+### Conversione in MP4
+
+Una registrazione finita si converte in MP4 (il browser e la TV LG ci si
+spostano dentro). Prima bastava un solo frame audio difettoso, normale nel
+flusso di un provider, per lasciarla in MPEG-TS, e il log indicava la
+causa sbagliata.
+
+- La registrazione si salva come finita prima della conversione: Ferma
+  risponde subito, e un riavvio durante la conversione non la fa
+  ripartire.
+- Se la copia non riesce, si riprova una volta convertendo solo l'audio
+  in AAC (160 kbit/s); il video resta copiato. Nel log va la prima riga
+  di ffmpeg che nomina un errore.
+- Il TS si cancella solo se l'MP4 è plausibile: almeno metà del TS e,
+  quando ffprobe c'è e la durata è nota, almeno l'80% della durata.
+  Altrimenti resta il TS.
+- A ogni avvio le registrazioni finite rimaste in TS (versioni precedenti,
+  conversioni fallite, riavvii) si riconvertono, una alla volta.
+
 ## Non ancora
 
 - Vedere gli altri client dell'account: il provider non lo dice.
 - Avvisare in un altro modo (notifica, e-mail).
+- Ricordare le conversioni non riuscite: una TS che non passa il
+  controllo si riprova a ogni avvio.

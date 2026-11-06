@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/silirim/vodmax/internal/service"
 )
 
 type recRow struct {
@@ -231,4 +234,94 @@ func TestRestartDuringConversionKeepsTheRecordingStopped(t *testing.T) {
 	if l := recRows(t, e); len(l) != 1 || l[0].Status != "completed" || !strings.Contains(l[0].Error, "prima della fine") || l[0].Stop > time.Now().Unix() {
 		t.Fatalf("after the restart: %+v", l)
 	}
+}
+
+// fakeConverter stands in for ffmpeg: the copy of everything fails as with
+// a broken audio frame when copyFails, and the MP4 it writes is the TS
+// (or 10 bytes, when truncates).
+func fakeConverter(t *testing.T, copyFails, truncates bool) string {
+	t.Helper()
+	script := "#!/bin/sh\nprev=; for a; do [ \"$prev\" = -i ] && in=\"$a\"; [ \"$prev\" = -c ] && all=\"$a\"; prev=\"$a\"; last=\"$a\"; done\n"
+	if copyFails {
+		script += "if [ \"$all\" = copy ]; then\n echo '[h264 @ 0x1] non-existing PPS 0 referenced' >&2\n" +
+			" echo '[aac_adtstoasc @ 0x2] Error parsing ADTS frame header!' >&2\n echo 'partial' > \"$last\"\n exit 1\nfi\n"
+	}
+	if truncates {
+		script += "printf 0123456789 > \"$last\"\n"
+	} else {
+		script += "cp \"$in\" \"$last\"\n"
+	}
+	ff := filepath.Join(t.TempDir(), "ffmpeg")
+	if err := os.WriteFile(ff, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return ff
+}
+
+func recordFor(t *testing.T, e *env, secs int64, title string) {
+	t.Helper()
+	rai := channels(t, e, "?section=tv")[0]
+	now := time.Now().Unix()
+	if code, body := e.do(t, "POST", "/api/v1/recordings", map[string]any{"channel_id": rai.ID, "start": now, "stop": now + secs, "title": title}, true); code != 201 {
+		t.Fatalf("schedule: %d %s", code, body)
+	}
+}
+
+// The copy into MP4 fails on a broken audio frame: the conversion is
+// done again converting the audio, and the TS goes only then.
+func TestConversionConvertsTheAudioWhenTheCopyFails(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.svc.SetFFmpeg(fakeConverter(t, true, false), "")
+	recordFor(t, e, 2, "Partita")
+	time.Sleep(4 * time.Second)
+	if names := recFiles(t, e); len(names) != 1 || !strings.HasSuffix(names[0], ".mp4") {
+		t.Fatalf("files: %v", names)
+	}
+}
+
+// ffmpeg ends without an error but writes a fraction of the recording:
+// the TS stays, the MP4 goes.
+func TestTruncatedMP4KeepsTheTS(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.svc.SetFFmpeg(fakeConverter(t, false, true), "")
+	recordFor(t, e, 2, "Partita")
+	time.Sleep(4 * time.Second)
+	if names := recFiles(t, e); len(names) != 1 || !strings.HasSuffix(names[0], ".ts") {
+		t.Fatalf("files: %v", names)
+	}
+	if l := recRows(t, e); len(l) != 1 || l[0].Status != "completed" || l[0].Bytes < 188*10 {
+		t.Fatalf("recording: %+v", l)
+	}
+}
+
+// A recording left in MPEG-TS (an older version, a failed conversion)
+// becomes an MP4 at the next start.
+func TestLeftoverTSConvertedAtStart(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.svc.SetFFmpeg(fakeConverter(t, false, true), "") // fails the check: stays TS
+	recordFor(t, e, 2, "Vecchia")
+	time.Sleep(4 * time.Second)
+	if names := recFiles(t, e); len(names) != 1 || !strings.HasSuffix(names[0], ".ts") {
+		t.Fatalf("before the restart: %v", names)
+	}
+	e.stop()
+	good := fakeConverter(t, false, false)
+	e.prepare = func(s *service.Service) { s.SetFFmpeg(good, "") }
+	e.start()
+	time.Sleep(time.Second)
+	names := recFiles(t, e)
+	if len(names) != 1 || !strings.HasSuffix(names[0], ".mp4") {
+		t.Fatalf("after the restart: %v", names)
+	}
+	_, body := e.do(t, "GET", "/api/v1/recordings", nil, true)
+	var l []struct{ ID int64 }
+	json.Unmarshal(body, &l)
+	_, body = e.do(t, "POST", fmt.Sprintf("/api/v1/recordings/%d/ticket", l[0].ID), nil, true)
+	var tk struct{ URL string }
+	json.Unmarshal(body, &tk)
+	resp, err := http.Get(e.srv.URL + tk.URL)
+	if err != nil || resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "video/mp4" {
+		t.Fatalf("playing the converted recording: %v %v", err, resp)
+	}
+	resp.Body.Close()
 }

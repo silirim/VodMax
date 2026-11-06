@@ -145,6 +145,7 @@ func (s *Service) StartRecorder(ctx context.Context, dir string, log *slog.Logge
 		}
 		s.st.UpdateRecording(ctx, r)
 	}
+	go s.convertLeftovers(ctx)
 	go func() {
 		t := time.NewTicker(schedulerTick)
 		defer t.Stop()
@@ -337,7 +338,7 @@ func (s *Service) convertRecording(r store.Recording, secs float64) {
 		s.rec.mu.Unlock()
 	}()
 	if strings.HasSuffix(r.File, ".ts") {
-		if mp4, err := s.remuxRecording(ctx, r.File); err != nil {
+		if mp4, err := s.remuxRecording(ctx, r.File, secs); err != nil {
 			if s.rec.log != nil && ctx.Err() == nil {
 				s.rec.log.Warn("registrazione lasciata in MPEG-TS", "id", r.ID, "err", err)
 			}
@@ -961,22 +962,130 @@ func (s *Service) OpenRecording(ctx context.Context, ticket string, from float64
 var ErrNotReady = errNotReady
 
 // remuxRecording copies a finished MPEG-TS recording into an MP4 with the
-// index at the start, so browsers can seek in it. Nothing is re-encoded.
-func (s *Service) remuxRecording(ctx context.Context, ts string) (string, error) {
+// index at the start, so browsers can seek in it. The video is never
+// re-encoded. secs is how long the recording is (0: not known).
+func (s *Service) remuxRecording(ctx context.Context, ts string, secs float64) (string, error) {
 	mp4 := strings.TrimSuffix(ts, ".ts") + ".mp4"
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, s.ffmpegBin(), "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-		"-i", ts, "-map", "0:v:0", "-map", "0:a?", "-c", "copy", "-movflags", "+faststart", mp4)
-	var stderr bytes.Buffer
-	cmd.Stderr = &limitedWriter{w: &stderr, n: 4096}
-	if err := cmd.Run(); err != nil {
-		os.Remove(mp4)
-		return "", fmt.Errorf("%s", firstLine(stderr.String(), err))
+	err := s.ffmpegToMP4(ctx, ts, mp4, "-c", "copy")
+	if err != nil && ctx.Err() == nil {
+		// One broken audio frame, normal in a provider's stream, stops the
+		// copy (as at 22:05 of 05/11): the audio is converted instead.
+		if s.rec.log != nil {
+			s.rec.log.Info("conversione in MP4: la copia non è riuscita, riprovo convertendo l'audio", "file", filepath.Base(ts), "err", err)
+		}
+		err = s.ffmpegToMP4(ctx, ts, mp4, "-c:v", "copy", "-c:a", "aac", "-b:a", "160k")
 	}
-	if fi, err := os.Stat(mp4); err != nil || fi.Size() == 0 {
+	if err == nil {
+		err = s.incompleteMP4(ctx, ts, mp4, secs)
+	}
+	if err != nil {
 		os.Remove(mp4)
-		return "", errors.New("file MP4 vuoto")
+		return "", err
 	}
 	return mp4, nil
+}
+
+func (s *Service) ffmpegToMP4(ctx context.Context, ts, mp4 string, codecs ...string) error {
+	args := append([]string{"-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", ts, "-map", "0:v:0", "-map", "0:a?"}, codecs...)
+	cmd := exec.CommandContext(ctx, s.ffmpegBin(), append(args, "-movflags", "+faststart", mp4)...)
+	var e errorLine
+	cmd.Stderr = &e
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s", e.line(err))
+	}
+	return nil
+}
+
+// incompleteMP4 tells whether an MP4 cannot replace its TS: ffmpeg can end
+// without an error after copying only part of a file, and the TS would go
+// with the only complete copy. The MP4 must be at least half the TS and,
+// when ffprobe can tell and the length is known, last at least 80% of it.
+func (s *Service) incompleteMP4(ctx context.Context, ts, mp4 string, secs float64) error {
+	t, err1 := os.Stat(ts)
+	m, err2 := os.Stat(mp4)
+	if err := errors.Join(err1, err2); err != nil {
+		return err
+	}
+	if m.Size() < t.Size()/2 {
+		return fmt.Errorf("file MP4 incompleto: %d MB su %d MB", m.Size()>>20, t.Size()>>20)
+	}
+	if secs <= 0 {
+		return nil
+	}
+	out, err := exec.CommandContext(ctx, s.ffprobeBin(), "-v", "error", "-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1", mp4).Output()
+	if err != nil {
+		return nil // no ffprobe: the size has to do
+	}
+	if d, err := strconv.ParseFloat(strings.TrimSpace(string(out)), 64); err == nil && d < secs*0.8 {
+		return fmt.Errorf("file MP4 incompleto: %.0f s su %.0f s", d, secs)
+	}
+	return nil
+}
+
+// errorLine keeps, of ffmpeg's messages, the first line that names an
+// error ("aac_adtstoasc: Error parsing ADTS frame header!"), otherwise the
+// first one: alone, the first is often a harmless decoder warning.
+type errorLine struct {
+	part        []byte // the line being written
+	first, kept string
+}
+
+func (e *errorLine) Write(p []byte) (int, error) {
+	e.part = append(e.part, p...)
+	for {
+		i := bytes.IndexByte(e.part, '\n')
+		if i < 0 {
+			break
+		}
+		e.add(string(e.part[:i]))
+		e.part = e.part[i+1:]
+	}
+	if len(e.part) > 4096 {
+		e.add(string(e.part))
+		e.part = nil
+	}
+	return len(p), nil
+}
+
+func (e *errorLine) add(line string) {
+	line = strings.TrimSpace(line)
+	if e.first == "" {
+		e.first = line
+	}
+	if e.kept == "" && strings.Contains(line, "Error") {
+		e.kept = line
+	}
+}
+
+func (e *errorLine) line(err error) string {
+	e.add(string(e.part))
+	e.part = nil
+	switch {
+	case e.kept != "":
+		return e.kept
+	case e.first != "":
+		return e.first
+	}
+	return err.Error()
+}
+
+// convertLeftovers converts the finished recordings still in MPEG-TS: left
+// so by an older version, by a failed conversion or by a restart in the
+// middle of one. It runs once at each start.
+func (s *Service) convertLeftovers(ctx context.Context) {
+	list, err := s.st.RecordingsInState(ctx, "completed")
+	if err != nil {
+		return
+	}
+	for _, r := range list {
+		if ctx.Err() != nil {
+			return
+		}
+		if strings.HasSuffix(r.File, ".ts") && fileExists(r.File) {
+			s.convertRecording(r, 0)
+		}
+	}
 }

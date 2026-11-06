@@ -88,3 +88,21 @@ func TestTSPacketsWholeAndInStep(t *testing.T) {
 		t.Fatalf("packets %v, want %v", got, want)
 	}
 }
+
+// Of ffmpeg's messages, the log gets the line naming the error, not the
+// first warning.
+func TestErrorLineKeepsTheError(t *testing.T) {
+	var e errorLine
+	for _, part := range []string{"[h264 @ 0x1] non-existing PPS 0 refer", "enced\n[aac_adtstoasc @ 0x2] Error parsing ADTS frame header!\n",
+		"[out#0/mp4 @ 0x3] Error muxing a packet\nConversion failed!\n"} {
+		e.Write([]byte(part))
+	}
+	if got := e.line(nil); got != "[aac_adtstoasc @ 0x2] Error parsing ADTS frame header!" {
+		t.Fatalf("line: %q", got)
+	}
+	var w errorLine
+	w.Write([]byte("only a warning"))
+	if got := w.line(nil); got != "only a warning" {
+		t.Fatalf("no error line: %q", got)
+	}
+}
