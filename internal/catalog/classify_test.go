@@ -18,6 +18,9 @@ func TestClassifyCategory(t *testing.T) {
 		{"live", "F1 - MotoGP", CategoryInfo{Section: SectionSport}},
 		{"live", "Radio", CategoryInfo{Section: SectionRadio}},
 		{"live", "Ragazzi", CategoryInfo{Section: SectionTV}},
+		{"live", "Live Calcio", CategoryInfo{Section: SectionSport}},
+		{"live", "LIVE EVENTS", CategoryInfo{Section: SectionTV}},
+		{"live", "TV Locali", CategoryInfo{Section: SectionTV}},
 		{"movie", "XXX FULLHD Porn", CategoryInfo{Adult: true}},
 		{"movie", "Commedia Italiana", CategoryInfo{}},
 		{"movie", "Live Aid concerti", CategoryInfo{}}, // "Live" prefix only means a country for channels

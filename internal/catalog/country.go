@@ -197,8 +197,8 @@ var (
 // names none: such categories follow the home country.
 func DetectCountry(kind, name string) string {
 	if kind == "live" {
-		if m := foreignPrefix.FindStringSubmatch(name); m != nil {
-			return CanonicalCountry(m[1])
+		if c, ok := liveCountry(name); ok {
+			return CanonicalCountry(c)
 		}
 	}
 	if m := codePrefix.FindStringSubmatch(name); m != nil {

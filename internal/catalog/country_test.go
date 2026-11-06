@@ -16,6 +16,16 @@ func TestDetectCountry(t *testing.T) {
 		{"live", "Live Ellada", "GR"},
 		{"live", "Live Alearab", "ARABIC"},
 		{"live", "Live Slavic", "Slavic"}, // unknown names stay as written
+		{"live", "Live Francia", "FR"},
+		// Home groups that start with "Live"/"TV".
+		{"live", "Live Calcio", ""},
+		{"live", "Live Serie A", ""},
+		{"live", "Live Sport", ""},
+		{"live", "LIVE EVENTS", ""},
+		{"live", "LIVE | PPV", ""},
+		{"live", "TV Locali", ""},
+		{"live", "TV Regionali", ""},
+		{"live", "Live Radio", ""},
 		{"live", "Italia", "IT"},
 		{"live", "Italia 4K - FHD", "IT"},
 		{"live", "International Sport Channels", "INT"},

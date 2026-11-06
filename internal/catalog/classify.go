@@ -35,14 +35,34 @@ var (
 	lowResWords   = regexp.MustCompile(`(?i)\bSD\b.*(?:lent|slow)|connessioni\s+lente|low\s+bandwidth`)
 	sportWords    = regexp.MustCompile(`(?i)\b(?:sport\w*|calcio|serie\s+[abc]\b|champions|dazn|f1|formula\s*1|motogp|basket|nba|nfl|tennis|volley|pallamano|eurosport|ufc|wwe|boxe|golf|rugby|ciclismo|zona\s+gol)\b`)
 	radioWords    = regexp.MustCompile(`(?i)\bradio\b`)
+	// homeWords are what follows "Live"/"TV" in groups of home channels.
+	homeWords = regexp.MustCompile(`(?i)^(?:events?|eventi|ppv|locali|regionali)\b`)
 )
+
+// liveCountry is the country label of a "Live <X>" / "TV <X>" group. On
+// Italian lists "Live Calcio", "LIVE EVENTS" and "TV Locali" are home
+// groups, so an X that names no known country and reads as sport, radio
+// or local channels is none (ok false). Any other unknown X stays a
+// country as written: a foreign group whose spelling the table lacks must
+// not show up by mistake.
+func liveCountry(name string) (string, bool) {
+	m := foreignPrefix.FindStringSubmatch(name)
+	if m == nil {
+		return "", false
+	}
+	label := strings.TrimSpace(m[1])
+	if CanonicalCountry(label) == label && (sportWords.MatchString(label) || radioWords.MatchString(label) || homeWords.MatchString(label)) {
+		return "", false
+	}
+	return label, true
+}
 
 // ClassifyCategory infers country, adult flag, quality tier and section
 // from a category name.
 func ClassifyCategory(kind, name string) CategoryInfo {
 	info := CategoryInfo{Adult: adultWords.MatchString(name), LowRes: lowResWords.MatchString(name)}
-	if m := foreignPrefix.FindStringSubmatch(name); m != nil && kind == "live" {
-		info.Country = strings.TrimSpace(m[1])
+	if c, ok := liveCountry(name); ok && kind == "live" {
+		info.Country = c
 	} else if international.MatchString(name) {
 		info.Country = "Internazionale"
 	}

@@ -46,3 +46,14 @@ nuovo nel database: le regole aggiungono solo il campo "home".
   dell'audio: conta solo la categoria.
 - Correggere il paese di una categoria dalla pagina Categorie (il server lo
   accetta già).
+
+## Correzione (6 novembre 2026)
+
+Dopo "Live" o "TV" non c'è sempre un paese: "Live Calcio", "Live Serie A",
+"LIVE EVENTS", "LIVE | PPV" e "TV Locali" sono gruppi del tuo paese, e
+venivano esclusi come paesi chiamati "Calcio" o "EVENTS", anche con le
+regole di prima. Ora un nome che VodMax non riconosce come paese e che
+parla di sport, radio, eventi, PPV o canali locali o regionali resta del
+tuo paese. Gli altri nomi sconosciuti restano un paese, come prima, per non
+mostrare per errore un gruppo estero scritto in un modo che la tabella non
+conosce.
