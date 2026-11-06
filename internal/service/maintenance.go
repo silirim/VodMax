@@ -30,6 +30,9 @@ const (
 	// go, and are fetched again when asked.
 	imageCacheAge    = 30 * 24 * time.Hour
 	imageCacheBudget = 256 << 20
+	// Titles gone from their provider this long are deleted (a title
+	// back after a provider's bad week keeps its row).
+	goneItemsAge = 30 * 24 * time.Hour
 )
 
 // VPNHealth is what the watchdog knows about a connection.
@@ -226,6 +229,11 @@ func (s *Service) runScheduled(ctx context.Context, log *slog.Logger, now time.T
 			log.Warn("pulizia della cache delle immagini non riuscita", "err", err)
 		} else if n > 0 {
 			log.Info("cache delle immagini ridotta", "tolte", n)
+		}
+		if n, err := s.st.PurgeGoneItems(ctx, now.Add(-goneItemsAge)); err != nil {
+			log.Warn("pulizia dei titoli tolti dal provider non riuscita", "err", err)
+		} else if n > 0 {
+			log.Info("titoli tolti dal provider da tempo eliminati", "eliminati", n)
 		}
 	}
 	if s.autoBackupDue() {

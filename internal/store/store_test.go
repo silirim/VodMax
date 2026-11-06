@@ -539,3 +539,48 @@ func TestCategoriesOfTwoSubscriptions(t *testing.T) {
 		t.Fatalf("without the subscription (older clients): %d", len(page.Items))
 	}
 }
+
+// Titles gone from the provider for long are deleted, unless something
+// still points to them; a title gone recently stays.
+func TestPurgeGoneItems(t *testing.T) {
+	st, sub := openTest(t)
+	ctx := context.Background()
+	items := movies(7, "Film")
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false); err != nil {
+		t.Fatal(err)
+	}
+	id := func(src string) int64 {
+		var id int64
+		st.r.QueryRowContext(ctx, `SELECT id FROM item WHERE source_id = ?`, src).Scan(&id)
+		return id
+	}
+	if _, err := st.SaveProgress(ctx, 1, "movie", id("1"), 60, 6000); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AddRecording(ctx, Recording{ItemID: id("2"), GroupKey: "x", Title: "R", Start: 1, Stop: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.AddDownload(ctx, Download{Media: "movie", MediaID: id("3"), SubscriptionID: sub, SourceID: "3", Title: "D", Path: "d.mkv"}); err != nil {
+		t.Fatal(err)
+	}
+	st.SetItemHidden(ctx, id("4"), true)
+	plain := id("5")
+	st.PutMeta(ctx, fmt.Sprintf("p:%d", plain), "{}")
+	// Only "6" is still offered; everything else went, "0" just now.
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items[6:], true); err != nil {
+		t.Fatal(err)
+	}
+	month := time.Now().Add(-31 * 24 * time.Hour).UnixNano()
+	st.w.ExecContext(ctx, `UPDATE item SET last_seen_at = ? WHERE source_id <> '0'`, month)
+	n, err := st.PurgeGoneItems(ctx, time.Now().Add(-30*24*time.Hour))
+	if err != nil || n != 1 {
+		t.Fatalf("purged %d: %v", n, err)
+	}
+	var left int
+	var meta int
+	st.r.QueryRowContext(ctx, `SELECT count(*) FROM item`).Scan(&left)
+	st.r.QueryRowContext(ctx, `SELECT count(*) FROM meta_cache WHERE key = ?`, fmt.Sprintf("p:%d", plain)).Scan(&meta)
+	if left != 6 || id("5") != 0 || meta != 0 {
+		t.Fatalf("left %d rows, plain %d, meta %d", left, id("5"), meta)
+	}
+}

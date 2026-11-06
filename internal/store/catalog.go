@@ -62,8 +62,9 @@ const dropMinimum = 50
 
 // ReplaceCatalog makes items the current content of the given kinds of a
 // subscription, in a single write transaction. Existing rows keep their id
-// (and so favourites and progress); missing ones become unavailable, never
-// deleted. Readers keep seeing the previous catalog until commit.
+// (and so favourites and progress); missing ones become unavailable
+// (deleted a month later by PurgeGoneItems). Readers keep seeing the previous
+// catalog until commit.
 func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string, categories []Category, items []Item, allowDrop bool) (ImportResult, error) {
 	res := ImportResult{Total: map[string]int{}}
 	covered := map[string]bool{}
@@ -173,8 +174,9 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 	}
 
 	for _, kind := range kinds {
-		r, err := tx.ExecContext(ctx, `UPDATE item SET available = 0 WHERE subscription_id = ? AND kind = ? AND available = 1
-			AND NOT EXISTS (SELECT 1 FROM temp.seen_item s WHERE s.kind = item.kind AND s.source_id = item.source_id)`, subID, kind)
+		// last_seen_at of a row that goes is when it went (PurgeGoneItems).
+		r, err := tx.ExecContext(ctx, `UPDATE item SET available = 0, last_seen_at = ? WHERE subscription_id = ? AND kind = ? AND available = 1
+			AND NOT EXISTS (SELECT 1 FROM temp.seen_item s WHERE s.kind = item.kind AND s.source_id = item.source_id)`, now, subID, kind)
 		if err != nil {
 			return res, err
 		}
@@ -256,6 +258,55 @@ func carryGroupKeys(ctx context.Context, tx *sql.Tx) error {
 		}
 	}
 	return nil
+}
+
+// PurgeGoneItems deletes the titles and channels that left their
+// provider before gone: providers rotate stream ids, and the rows (with
+// their indexes and the search index) would otherwise pile up for ever.
+// A row something still points to stays: watch progress (of the film or
+// of an episode), a recording, a download, a manual "hide". Favourites,
+// rules and markers hold group keys, not rows, and find the title again
+// if it comes back.
+func (s *Store) PurgeGoneItems(ctx context.Context, gone time.Time) (int64, error) {
+	tx, err := s.w.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	for _, q := range []string{
+		`CREATE TEMP TABLE IF NOT EXISTS purge_item (id INTEGER PRIMARY KEY)`,
+		`DELETE FROM temp.purge_item`,
+	} {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return 0, err
+		}
+	}
+	r, err := tx.ExecContext(ctx, `INSERT INTO temp.purge_item SELECT i.id FROM item i WHERE i.available = 0 AND i.last_seen_at < ?
+		AND NOT EXISTS (SELECT 1 FROM progress p WHERE p.media = 'movie' AND p.media_id = i.id)
+		AND NOT EXISTS (SELECT 1 FROM progress p JOIN episode e ON e.id = p.media_id WHERE p.media = 'episode' AND e.series_item_id = i.id)
+		AND NOT EXISTS (SELECT 1 FROM recording r WHERE r.item_id = i.id)
+		AND NOT EXISTS (SELECT 1 FROM download d WHERE d.media = 'movie' AND d.media_id = i.id)
+		AND NOT EXISTS (SELECT 1 FROM download d JOIN episode e ON e.id = d.media_id WHERE d.media = 'episode' AND e.series_item_id = i.id)
+		AND NOT EXISTS (SELECT 1 FROM item_override o WHERE o.item_id = i.id)`, gone.UnixNano())
+	if err != nil {
+		return 0, err
+	}
+	n, _ := r.RowsAffected()
+	if n == 0 {
+		return 0, nil
+	}
+	// Episodes, people and series fetch times go with their row
+	// (ON DELETE CASCADE); the provider details cache is keyed by id.
+	for _, q := range []string{
+		`DELETE FROM meta_cache WHERE key IN (SELECT 'p:' || id FROM temp.purge_item)`,
+		`DELETE FROM item WHERE id IN (SELECT id FROM temp.purge_item)`,
+		`INSERT INTO item_search(item_search) VALUES ('rebuild')`,
+	} {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return 0, err
+		}
+	}
+	return n, tx.Commit()
 }
 
 func zeroNull(n int) any {
