@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/silirim/vodmax/internal/provider"
@@ -257,3 +258,50 @@ func (b *releasingBody) Close() error {
 }
 
 var errNotReady = errors.New("non pronto")
+
+// stallGuard closes a provider body when no byte has arrived for a while:
+// a provider can keep the connection open and send nothing, and a read
+// with no deadline would hold the reader, and the account's connection,
+// for good.
+type stallGuard struct {
+	io.ReadCloser
+	last    atomic.Int64
+	stalled atomic.Bool
+	stop    chan struct{}
+	once    sync.Once
+}
+
+func guardStall(r io.ReadCloser, after time.Duration) *stallGuard {
+	g := &stallGuard{ReadCloser: r, stop: make(chan struct{})}
+	g.last.Store(time.Now().UnixNano())
+	go func() {
+		t := time.NewTicker(after / 10)
+		defer t.Stop()
+		for {
+			select {
+			case <-g.stop:
+				return
+			case <-t.C:
+				if time.Since(time.Unix(0, g.last.Load())) > after {
+					g.stalled.Store(true)
+					g.ReadCloser.Close() // unblocks the read in progress
+					return
+				}
+			}
+		}
+	}()
+	return g
+}
+
+func (g *stallGuard) Read(p []byte) (int, error) {
+	n, err := g.ReadCloser.Read(p)
+	if n > 0 {
+		g.last.Store(time.Now().UnixNano())
+	}
+	return n, err
+}
+
+func (g *stallGuard) Close() error {
+	g.once.Do(func() { close(g.stop) })
+	return g.ReadCloser.Close()
+}

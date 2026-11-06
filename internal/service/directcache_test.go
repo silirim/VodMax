@@ -126,3 +126,48 @@ func TestForceOnEveryRangeKeepsTheCache(t *testing.T) {
 		t.Fatalf("first range: %v", err)
 	}
 }
+
+// A provider that stops sending mid-film with the connection open: the
+// fetcher reopens and the film goes on; closing the session frees the
+// connection even while a read is stuck.
+func TestDirectFilmProviderStalls(t *testing.T) {
+	s, sub := oneConnectionService(t)
+	const size = 8 << 20
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var from int64
+		fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-", &from)
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", from, size-1, size))
+		w.WriteHeader(http.StatusPartialContent)
+		w.Write(make([]byte, min(3<<19, size-from)))
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	}))
+	defer func() { srv.CloseClientConnections(); srv.Close() }()
+	sess := &vodSession{id: "sesscccc", viewer: "film-viewer-1", subID: sub, url: srv.URL, mode: "direct", expires: time.Now().Add(time.Hour)}
+	cache, err := s.directCache(sess, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache.stall = 300 * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := cache.WriteRange(ctx, io.Discard, 0, 3<<20); err != nil {
+		t.Fatalf("film stuck after the provider stalled: %v", err)
+	}
+	// The player is reading far ahead when the session goes.
+	go cache.WriteRange(context.Background(), io.Discard, 6<<20, size-1)
+	time.Sleep(100 * time.Millisecond)
+	cache.Close()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		_, release, err := s.acquire(context.Background(), sub, "tv-viewer-02", false, false)
+		if err == nil {
+			release()
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("connection still held after the cache closed: %v", err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}

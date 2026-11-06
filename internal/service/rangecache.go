@@ -27,6 +27,7 @@ const (
 	cacheBatch       = 8         // chunks read before jumping to another region
 	cacheBudget      = 512 << 20 // disk per session
 	cacheIdleRelease = 20 * time.Second
+	cacheStall       = 30 * time.Second // no byte from the provider: reopen
 	reopenPause      = 150 * time.Millisecond
 )
 
@@ -36,6 +37,7 @@ type rangeCache struct {
 	ahead   int64
 	batch   int
 	budget  int64
+	stall   time.Duration
 	acquire func() (context.Context, func(), error) // the provider connection slot
 	open    func(ctx context.Context, from int64) (io.ReadCloser, int64, error)
 
@@ -49,12 +51,13 @@ type rangeCache struct {
 	err      error
 	closed   bool
 	running  bool
-	fetchPos int64 // chunk the open upstream is at, -1 if none
+	fetchPos int64  // chunk the open upstream is at, -1 if none
+	stopSlot func() // ends the fetcher's connection slot, so Close frees it at once
 }
 
 func newRangeCache(dir string, acquire func() (context.Context, func(), error),
 	open func(ctx context.Context, from int64) (io.ReadCloser, int64, error)) *rangeCache {
-	return &rangeCache{dir: dir, chunk: cacheChunk, ahead: cacheAhead, batch: cacheBatch, budget: cacheBudget,
+	return &rangeCache{dir: dir, chunk: cacheChunk, ahead: cacheAhead, batch: cacheBatch, budget: cacheBudget, stall: cacheStall,
 		acquire: acquire, open: open, size: -1, have: map[int64]time.Time{}, readers: map[int]int64{},
 		waiting: map[int64]int{}, changed: make(chan struct{}), fetchPos: -1}
 }
@@ -76,12 +79,16 @@ func (c *rangeCache) lastChunk() int64 {
 	return (c.size - 1) / c.chunk
 }
 
-// Close stops the fetcher and removes the chunks.
+// Close stops the fetcher, even one stuck reading, and removes the chunks.
 func (c *rangeCache) Close() {
 	c.mu.Lock()
 	c.closed = true
+	stop := c.stopSlot
 	c.broadcast()
 	c.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
 	os.RemoveAll(c.dir)
 }
 
@@ -317,12 +324,20 @@ func (c *rangeCache) fetch() {
 			if closed { // a replaced session must not take the connection back
 				return
 			}
-			var err error
-			if slotCtx, release, err = c.acquire(); err != nil {
-				slotCtx, release = nil, nil
+			acquired, rel, err := c.acquire()
+			if err != nil {
 				c.fail(err)
 				return
 			}
+			var stop context.CancelFunc
+			slotCtx, stop = context.WithCancel(acquired)
+			release = func() { stop(); rel() }
+			c.mu.Lock()
+			c.stopSlot = stop
+			if c.closed {
+				stop()
+			}
+			c.mu.Unlock()
 		}
 		if up == nil || pos != k {
 			if up != nil {
@@ -344,7 +359,7 @@ func (c *rangeCache) fetch() {
 				time.Sleep(time.Duration(failures) * 500 * time.Millisecond)
 				continue
 			}
-			up, pos, sinceJump = r, k, 0
+			up, pos, sinceJump = guardStall(r, c.stall), k, 0
 			c.mu.Lock()
 			if c.size < 0 && size > 0 {
 				c.size = size
