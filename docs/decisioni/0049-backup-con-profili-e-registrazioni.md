@@ -34,6 +34,9 @@ dopo la nuova sincronizzazione appartengono ad altri film.
   nella cartella restano nella lista. Una registrazione in corso quando è
   stata fatta la copia, e finita dopo sullo stesso server, resta finita
   con il suo file (l'MP4 della conversione o il TS) e i dati di adesso.
+  Una registrazione già finita in MPEG-TS quando è stata fatta la copia,
+  e convertita in MP4 dopo sullo stesso server, resta finita con lo
+  stesso numero e punta all'MP4.
 - I download restano e ritrovano il loro titolo dopo la sincronizzazione
   (per abbonamento e codice del provider).
 - I backup fatti prima restano ripristinabili: i profili restano quelli

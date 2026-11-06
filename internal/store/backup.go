@@ -419,6 +419,10 @@ func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub fu
 			// server and its file (MP4 after the conversion, or the TS) is
 			// here: the row of now is the truth.
 			r, status, name = c, c.Status, filepath.Base(c.File)
+		} else if same && status == "completed" && recFile(name) == "" && recFile(filepath.Base(c.File)) != "" {
+			// Finished in MPEG-TS when the copy was made, converted to
+			// MP4 since: same recording, its file renamed.
+			name, r.Bytes = filepath.Base(c.File), c.Bytes
 		} else if same && b.RecordingFiles == nil {
 			name = filepath.Base(c.File) // an older backup, on the same server
 		}
