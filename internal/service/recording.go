@@ -62,7 +62,8 @@ type recTicket struct {
 	expires time.Time
 }
 
-// SetRecordStall changes how long a recording waits for data (tests).
+// SetRecordStall changes how long a recording, or a live buffer, waits
+// for data (tests).
 func (s *Service) SetRecordStall(d time.Duration) { s.rec.stall = d }
 
 // StartRecorder runs the scheduler until ctx ends. Recordings left

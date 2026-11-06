@@ -190,17 +190,29 @@ func (s *Service) StartTimeshift(ctx context.Context, itemID int64, viewer strin
 	s.ts.sessions[sess.id] = sess
 	s.ts.mu.Unlock()
 
-	// Feed ffmpeg; when the provider stream drops, open it again.
+	// Feed ffmpeg; when the provider stream drops or stops sending, open
+	// it again.
+	stall := s.rec.stall
+	if stall <= 0 {
+		stall = recordStall
+	}
 	go func() {
 		stream := first
 		for attempt := 0; runCtx.Err() == nil; attempt++ {
-			_, err := io.Copy(stdin, stream)
-			stream.Close()
+			began := time.Now()
+			guarded := guardStall(stream, stall)
+			_, err := io.Copy(stdin, guarded)
+			guarded.Close()
 			// The viewer tuned something else: reopening would take the
 			// connection back from it.
 			if stream.replaced() {
 				sess.fail(ErrReplaced)
 				break
+			}
+			// Only drops close together end the buffer: one an hour
+			// after a good stretch starts the count again.
+			if time.Since(began) > time.Minute {
+				attempt = 0
 			}
 			if runCtx.Err() != nil || attempt >= 5 {
 				if runCtx.Err() == nil && log != nil {

@@ -206,3 +206,46 @@ func TestTimeshiftFastZap(t *testing.T) {
 		t.Fatalf("HD version demoted after a fast zap: %s", again)
 	}
 }
+
+// A provider that keeps the live connection open and sends nothing: the
+// buffer reconnects, like a recording, instead of holding the only
+// connection with a frozen picture until the viewer zaps.
+func TestTimeshiftReconnectsWhenStalled(t *testing.T) {
+	e, p := tvSetup(t)
+	ff := filepath.Join(t.TempDir(), "ffmpeg")
+	os.WriteFile(ff, []byte(`#!/bin/sh
+for a; do last="$a"; done
+dir=$(dirname "$last")
+head -c 1000 > "$dir/seg000000.ts"
+printf '#EXTM3U\n#EXT-X-TARGETDURATION:2\n#EXTINF:2.0,\nseg000000.ts\n' > "$dir/index.m3u8"
+cat > /dev/null
+`), 0o700)
+	e.svc.SetFFmpeg(ff, "")
+	e.svc.SetRecordStall(300 * time.Millisecond)
+	if err := e.svc.SetTimeshiftDir(filepath.Join(t.TempDir(), "ts"), nil); err != nil {
+		t.Fatal(err)
+	}
+	p.mu.Lock()
+	p.stalls = map[string]bool{"101.ts": true}
+	p.mu.Unlock()
+	rai := channels(t, e, "?section=tv")[0]
+	code, body := e.do(t, "POST", "/api/v1/live/"+strconv.FormatInt(rai.ID, 10)+"/timeshift", map[string]any{"viewer": "salotto-tv-01"}, true)
+	var sess struct{ Stop string }
+	if code != 200 || json.Unmarshal(body, &sess) != nil {
+		t.Fatalf("start: %d %s", code, body)
+	}
+	defer e.post(t, sess.Stop)
+	deadline := time.Now().Add(6 * time.Second)
+	for {
+		p.mu.Lock()
+		opened := strings.Count(strings.Join(p.opened, ","), "101.ts")
+		p.mu.Unlock()
+		if opened >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("stalled live stream never reopened (opened %d times)", opened)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
