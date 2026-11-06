@@ -405,11 +405,17 @@ func (s *Service) DeleteDownload(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	os.Remove(file + ".part")
-	os.Remove(file)
-	base := strings.TrimSuffix(file, filepath.Ext(file))
-	for _, x := range []string{".nfo", "-thumb.jpg", "-thumb.png", "-thumb.webp", "-thumb.gif"} {
-		os.Remove(base + x)
+	shared, err := s.st.DownloadFileShared(ctx, id, d.Path)
+	if err != nil {
+		return err
+	}
+	if !shared {
+		os.Remove(file + ".part")
+		os.Remove(file)
+		base := strings.TrimSuffix(file, filepath.Ext(file))
+		for _, x := range []string{".nfo", "-thumb.jpg", "-thumb.png", "-thumb.webp", "-thumb.gif"} {
+			os.Remove(base + x)
+		}
 	}
 	// Empty folders go too (the film's, a season's, a series').
 	for p := filepath.Dir(file); p != dir && strings.HasPrefix(p, dir); p = filepath.Dir(p) {

@@ -185,3 +185,41 @@ func TestDownloadsCollectionFromAnotherFolder(t *testing.T) {
 		}
 	}
 }
+
+// The same film in two qualities ("1408 (2007)" and "1408 (2007) 4K")
+// downloads to two files, and deleting one keeps the other.
+func TestTwoVersionsOfAFilmDownloadApart(t *testing.T) {
+	e, _ := tvSetup(t)
+	dir := t.TempDir()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	if err := e.svc.StartDownloads(ctx, dir, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
+		t.Fatal(err)
+	}
+	_, body := e.do(t, "GET", "/api/v1/items/"+strconv.FormatInt(findItem(t, e, "movie", "1408"), 10)+"/variants", nil, true)
+	var variants []struct{ ID int64 }
+	json.Unmarshal(body, &variants)
+	var ids []int64
+	for _, v := range variants {
+		ids = append(ids, v.ID)
+	}
+	if len(ids) != 2 {
+		t.Fatalf("versions of 1408: %v", ids)
+	}
+	for _, id := range ids {
+		e.do(t, "POST", "/api/v1/downloads", map[string]any{"media": "movie", "id": id}, true)
+	}
+	list := waitDownloads(t, e, 2)
+	if list[0].Path == list[1].Path {
+		t.Fatalf("same file for both: %s", list[0].Path)
+	}
+	for _, d := range list {
+		if got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(d.Path))); err != nil || !bytes.Equal(got, fakeFilm) {
+			t.Fatalf("%s: %v, %d bytes", d.Path, err, len(got))
+		}
+	}
+	e.do(t, "DELETE", "/api/v1/downloads/"+strconv.FormatInt(list[0].ID, 10), nil, true)
+	if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(list[1].Path))); err != nil {
+		t.Fatalf("the other version went too: %v", err)
+	}
+}

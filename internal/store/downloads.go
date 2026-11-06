@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"path"
+	"strings"
 	"time"
 )
 
@@ -39,6 +42,19 @@ func scanDownload(row interface{ Scan(...any) error }) (Download, error) {
 // already in the list.
 func (s *Store) AddDownload(ctx context.Context, d Download) (int64, bool, error) {
 	now := time.Now().Unix()
+	// Two titles with the same name and year (two qualities, the same film
+	// in two subscriptions) must not share a file: one would overwrite or
+	// resume the other's. The second gets its id in the name, which Jellyfin
+	// and Kodi show as another version ("1408 (2007) - 557.mp4").
+	var taken bool
+	if err := s.r.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM download WHERE path = ? AND NOT (media = ? AND media_id = ?))`,
+		d.Path, d.Media, d.MediaID).Scan(&taken); err != nil {
+		return 0, false, err
+	}
+	if taken {
+		ext := path.Ext(d.Path)
+		d.Path = fmt.Sprintf("%s - %d%s", strings.TrimSuffix(d.Path, ext), d.MediaID, ext)
+	}
 	res, err := s.w.ExecContext(ctx, `INSERT INTO download (media, media_id, subscription_id, source_id, extension, title, path, meta, status, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?) ON CONFLICT (media, media_id) DO NOTHING`,
 		d.Media, d.MediaID, d.SubscriptionID, d.SourceID, d.Extension, d.Title, d.Path, d.Meta, now, now)
@@ -111,6 +127,14 @@ func (s *Store) SetDownloadState(ctx context.Context, id int64, status string, b
 func (s *Store) RequeueInterrupted(ctx context.Context) error {
 	_, err := s.w.ExecContext(ctx, `UPDATE download SET status = 'queued' WHERE status = 'downloading'`)
 	return err
+}
+
+// DownloadFileShared tells whether another download uses the same file
+// (two lists made before names were kept apart).
+func (s *Store) DownloadFileShared(ctx context.Context, id int64, path string) (bool, error) {
+	var shared bool
+	err := s.r.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM download WHERE path = ? AND id <> ?)`, path, id).Scan(&shared)
+	return shared, err
 }
 
 func (s *Store) DeleteDownload(ctx context.Context, id int64) error {
