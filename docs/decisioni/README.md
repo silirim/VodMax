@@ -49,6 +49,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0041](0041-vpn-scelta-alla-prima-playlist.md) | La VPN si sceglie alla prima playlist | **Approvata** |
 | [0042](0042-il-tuo-paese.md) | Il tuo paese, scelto da te | **Approvata** |
 | [0043](0043-paese-al-primo-avvio.md) | Il paese al primo avvio, con le bandiere | **Approvata** |
+| [0047](0047-lettore-android-a-schermo-intero.md) | Il lettore dell'app Android a schermo intero, anche per le registrazioni | **Proposta** |
 
 ## Ordine consigliato per decidere
 

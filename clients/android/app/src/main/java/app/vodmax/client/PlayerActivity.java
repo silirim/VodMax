@@ -3,6 +3,7 @@ package app.vodmax.client;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -35,10 +36,13 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.Timeline;
 import androidx.media3.common.util.UnstableApi;
+import androidx.media3.common.util.Util;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
+import androidx.media3.exoplayer.source.ForwardingTimeline;
 import androidx.media3.ui.DefaultTimeBar;
 import androidx.media3.ui.PlayerView;
 
@@ -81,7 +85,9 @@ public class PlayerActivity extends Activity {
     private String progressUrl, progressToken, progressProfile;
     private long lastSaved;
     // A converted stream (no byte ranges) cannot seek: it is reopened from
-    // the new time; positions are then offset by where it starts.
+    // the new time; positions are then offset by where it starts. The same
+    // for recordings in MPEG-TS, finished too: their clock restarts at each
+    // reconnection, so Media3's own seek in the file lands in the wrong place.
     private String restartUrl;
     private long offsetMs, firstOffsetMs, knownDurationMs;
     // A recording in progress: its length grows with the clock.
@@ -225,6 +231,24 @@ public class PlayerActivity extends Activity {
                 return getDuration();
             }
 
+            // The controls take the length from the timeline, where a
+            // reopened stream has none (an empty, dead time bar): the
+            // title's length goes there.
+            @Override
+            public Timeline getCurrentTimeline() {
+                Timeline t = super.getCurrentTimeline();
+                if (!restarts || knownDurationMs <= 0 || t.isEmpty()) return t;
+                return new ForwardingTimeline(t) {
+                    @Override
+                    public Window getWindow(int index, Window window, long projectionUs) {
+                        super.getWindow(index, window, projectionUs);
+                        window.durationUs = Util.msToUs(knownDuration());
+                        window.isSeekable = true;
+                        return window;
+                    }
+                };
+            }
+
             @Override
             public void seekTo(int mediaItemIndex, long positionMs) {
                 if (restarts) reopenAt(positionMs);
@@ -257,6 +281,14 @@ public class PlayerActivity extends Activity {
         view.setControllerAnimationEnabled(false);
         view.setKeepScreenOn(true);
         view.setControllerShowTimeoutMs(4000);
+        // Phones: the picture fills the screen sideways, as in other video
+        // apps; the full-screen button gives back the phone's own rotation.
+        if (!tv(this)) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+            view.setFullscreenButtonState(true);
+            view.setFullscreenButtonClickListener(full -> setRequestedOrientation(full
+                ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
+        }
         DefaultTimeBar bar = view.findViewById(androidx.media3.ui.R.id.exo_progress);
         if (bar != null) {
             bar.setPlayedColor(ACCENT);
@@ -269,7 +301,7 @@ public class PlayerActivity extends Activity {
         root.addView(view, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         if (episode) buildEpisodeExtras(root);
         setContentView(root);
-        hideSystemBars();
+        immersive(this, true);
 
         MediaItem item = new MediaItem.Builder()
             .setUri(Uri.parse(in.getStringExtra(URL)))
@@ -362,7 +394,7 @@ public class PlayerActivity extends Activity {
             finishWithResult();
             return;
         }
-        hideSystemBars();
+        immersive(this, true);
         view.requestFocus();
         if (player != null && player.getPlaybackState() == Player.STATE_ENDED) ended();
     }
@@ -378,7 +410,7 @@ public class PlayerActivity extends Activity {
         p.finishWithResult();
     }
 
-    /** A converted stream reopened at positionMs (from its own start). */
+    /** A converted stream or TS recording reopened at positionMs (from its own start). */
     private void reopenAt(long positionMs) {
         if (player == null) return;
         long max = knownDurationMs > 0 ? knownDuration() - 5_000 : Long.MAX_VALUE;
@@ -605,18 +637,27 @@ public class PlayerActivity extends Activity {
         finishWithResult();
     }
 
-    private void hideSystemBars() {
-        View d = getWindow().getDecorView();
+    /** The system bars hidden (a swipe shows them for a moment), or back. */
+    static void immersive(Activity a, boolean on) {
+        View d = a.getWindow().getDecorView();
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             WindowInsetsController c = d.getWindowInsetsController();
-            if (c != null) {
-                c.hide(WindowInsets.Type.systemBars());
-                c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            if (c == null) return;
+            if (!on) {
+                c.show(WindowInsets.Type.systemBars());
+                return;
             }
+            c.hide(WindowInsets.Type.systemBars());
+            c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
         } else {
-            d.setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            d.setSystemUiVisibility(on ? View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY : 0);
         }
+    }
+
+    /** A TV (Android TV, Google TV, Fire TV): always landscape, no rotation to offer. */
+    static boolean tv(Activity a) {
+        return (a.getResources().getConfiguration().uiMode & Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION;
     }
 
     // Remote: OK and the arrows show the controls (Media3 handles seeking

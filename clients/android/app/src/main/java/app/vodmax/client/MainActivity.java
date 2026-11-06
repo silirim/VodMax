@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -67,6 +68,10 @@ public class MainActivity extends Activity {
     private boolean pipAvailable, pipPlaying;
     private int pipWidth, pipHeight;
     private BroadcastReceiver pipToggle;
+    // The page's video in full screen (live TV, the browser player): the
+    // WebView hands over a view to lay over everything.
+    private View fullView;
+    private WebChromeClient.CustomViewCallback fullDone;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -86,10 +91,7 @@ public class MainActivity extends Activity {
     // ---- First run: the server address ----
 
     private void showSetup(String message) {
-        if (web != null) {
-            web.destroy();
-            web = null;
-        }
+        dropWeb();
         View setup = getLayoutInflater().inflate(R.layout.setup, null);
         setContentView(insetted(setup));
         EditText field = findViewById(R.id.server);
@@ -158,10 +160,7 @@ public class MainActivity extends Activity {
     // ---- This device alone: the server inside the app ----
 
     private void openLocal() {
-        if (web != null) {
-            web.destroy();
-            web = null;
-        }
+        dropWeb();
         TextView wait = new TextView(this);
         wait.setText(R.string.local_starting);
         wait.setTextColor(0xFFA9ABB5);
@@ -219,6 +218,27 @@ public class MainActivity extends Activity {
                     return true;
                 }
                 return true;
+            }
+
+            // Without these the page's full-screen button does nothing in the app.
+            @Override
+            public void onShowCustomView(View v, CustomViewCallback done) {
+                if (fullView != null) {
+                    done.onCustomViewHidden();
+                    return;
+                }
+                fullView = v;
+                fullDone = done;
+                ((FrameLayout) getWindow().getDecorView()).addView(v, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+                PlayerActivity.immersive(MainActivity.this, true);
+                if (!PlayerActivity.tv(MainActivity.this)) setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                v.requestFocus();
+            }
+
+            @Override
+            public void onHideCustomView() {
+                leaveFullScreen();
             }
         });
         web.setWebViewClient(new WebViewClient() {
@@ -290,6 +310,24 @@ public class MainActivity extends Activity {
         });
         root.setFitsSystemWindows(false);
         return root;
+    }
+
+    private void leaveFullScreen() {
+        if (fullView == null) return;
+        ((FrameLayout) getWindow().getDecorView()).removeView(fullView);
+        fullView = null;
+        fullDone = null;
+        PlayerActivity.immersive(this, false);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        if (web != null) web.requestFocus();
+    }
+
+    private void dropWeb() {
+        leaveFullScreen();
+        if (web != null) {
+            web.destroy();
+            web = null;
+        }
     }
 
     private void showOffline() {
@@ -489,6 +527,13 @@ public class MainActivity extends Activity {
     // to close, the app goes to the background.
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Back leaves full screen first, as in a browser.
+        if (keyCode == KeyEvent.KEYCODE_BACK && fullDone != null) {
+            WebChromeClient.CustomViewCallback done = fullDone;
+            leaveFullScreen();
+            done.onCustomViewHidden();
+            return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && web != null && signingIn) {
             // Back on the account's site: the sign-in is given up. On the
             // login of a proxy, the server is out of reach without it: back

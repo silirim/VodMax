@@ -9,8 +9,12 @@ usa: [docs/installazione.md](../docs/installazione.md).
 
 Un solo APK. L'interfaccia è in una WebView; film, episodi, registrazioni
 e catch-up sono riprodotti dal player nativo Media3 (MKV, AC-3/E-AC-3,
-HEVC senza conversione sul server, tracce audio e sottotitoli). Il tasto
-Indietro passa dalla pagina; il banner compare nel launcher di Android TV.
+HEVC senza conversione sul server, tracce audio e sottotitoli). Sul
+telefono il lettore si apre in orizzontale; il pulsante schermo intero torna
+alla rotazione del telefono (decisione 0047). Le registrazioni in MPEG-TS si
+spostano riaprendo il file dal secondo scelto. Il tasto Indietro passa dalla
+pagina (prima esce dallo schermo intero della TV in diretta); il banner
+compare nel launcher di Android TV.
 
 ```sh
 cd clients/android
