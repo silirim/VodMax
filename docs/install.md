@@ -55,6 +55,11 @@ vodmax-server -version
   count the address the tunnel forwards (`CF-Connecting-IP`,
   `X-Forwarded-For`) only when the tunnel runs on the same host; a proxy
   on another machine makes everyone behind it one address.
+  The assistant with a model on a processor can take a few minutes to
+  answer (VodMax waits up to 6 minutes, 2 for an online service): raise
+  the proxy's read timeout (nginx `proxy_read_timeout 400s`), or the page
+  shows a 504 while the answer is still on its way. Cloudflare's tunnel
+  waits 100 seconds at most.
 - **Data**: everything is in `/var/lib/vodmax` (database, encryption key,
   admin token, recordings, downloads, backups). Downloads can go to another
   disk with `-downloads /path` in `vodmax.service` (the folder must be

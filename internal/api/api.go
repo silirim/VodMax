@@ -326,7 +326,7 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusBadGateway
 	case errors.As(err, new(*service.UpstreamError)):
 		status = http.StatusBadGateway
-	case errors.Is(err, context.DeadlineExceeded):
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, service.ErrAssistantSlow):
 		status = http.StatusGatewayTimeout
 	case errors.As(err, new(*service.ProviderError)):
 		status = http.StatusBadGateway

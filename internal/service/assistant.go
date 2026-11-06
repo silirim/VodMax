@@ -40,9 +40,40 @@ const (
 )
 
 var (
-	ErrAssistantOff = errors.New("l'assistente non è configurato: Impostazioni → Assistente")
-	ErrAssistant    = errors.New("l'assistente ha dato una risposta che VodMax non sa usare: riprova o cambia modello")
+	ErrAssistantOff  = errors.New("l'assistente non è configurato: Impostazioni → Assistente")
+	ErrAssistant     = errors.New("l'assistente ha dato una risposta che VodMax non sa usare: riprova o cambia modello")
+	ErrAssistantSlow = errors.New("l'assistente non ha risposto in tempo: riprova o scegli un modello più veloce")
 )
+
+// Time limits (decision 0050). A whole question (a rule, tonight) gets
+// one: every call to the model, the engine starting, the detail pages.
+// An online service answers in seconds, so a call that hangs is not
+// waited for; a model in the house on a processor needs minutes. A proxy
+// in front of VodMax may wait less (docs/install.md). Variables for tests.
+var (
+	onlineLimit       = 2 * time.Minute
+	homeLimit         = 6 * time.Minute
+	onlineCallTimeout = time.Minute
+)
+
+func assistantLimit(a AssistantSettings) time.Duration {
+	if a.Mode == "online" {
+		return onlineLimit
+	}
+	return homeLimit
+}
+
+// withLimit bounds a question or a call; done, deferred, turns the error
+// of anything the limit cut into ErrAssistantSlow.
+func withLimit(ctx context.Context, limit time.Duration, err *error) (context.Context, func()) {
+	ctx, cancel := context.WithTimeoutCause(ctx, limit, ErrAssistantSlow)
+	return ctx, func() {
+		if *err != nil && errors.Is(context.Cause(ctx), ErrAssistantSlow) {
+			*err = ErrAssistantSlow
+		}
+		cancel()
+	}
+}
 
 // AssistantUpstream is a failure of the model's service: unreachable,
 // credit run out, overloaded, a key refused. Not a fault of VodMax: the
@@ -229,7 +260,12 @@ type chatMessage struct {
 // chat sends the conversation and returns the model's answer. With asJSON
 // the model is asked for a JSON object (servers that do not know the
 // option are asked again without it).
-func (s *Service) chat(ctx context.Context, a AssistantSettings, messages []chatMessage, asJSON bool) (string, error) {
+func (s *Service) chat(ctx context.Context, a AssistantSettings, messages []chatMessage, asJSON bool) (_ string, err error) {
+	if a.Mode == "online" {
+		var done func()
+		ctx, done = withLimit(ctx, onlineCallTimeout, &err)
+		defer done()
+	}
 	base, model, key := a.URL, a.Model, ""
 	switch a.Mode {
 	case "local":
@@ -240,7 +276,6 @@ func (s *Service) chat(ctx context.Context, a AssistantSettings, messages []chat
 		defer release()
 		base, model = b, m
 	default:
-		var err error
 		if key, err = s.assistantSecret(ctx, a); err != nil {
 			return "", err
 		}
@@ -454,8 +489,7 @@ Answer with only a JSON object with exactly these fields.
 Channels: %s`
 
 // AssistantRule proposes a rule for a sentence; nothing is saved.
-func (s *Service) AssistantRule(ctx context.Context, text string) (RuleProposal, error) {
-	var p RuleProposal
+func (s *Service) AssistantRule(ctx context.Context, text string) (p RuleProposal, err error) {
 	text = strings.TrimSpace(text)
 	if text == "" || len(text) > 500 {
 		return p, invalid("scrivi cosa registrare (max 500 caratteri)")
@@ -464,6 +498,8 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (RuleProposal,
 	if err != nil {
 		return p, err
 	}
+	ctx, done := withLimit(ctx, assistantLimit(a), &err)
+	defer done()
 	v := viewerOf(ctx)
 	channels, err := s.st.TVChannels(ctx, v.ProfileID, v.Kids, "", false, time.Now())
 	if err != nil {
@@ -970,8 +1006,7 @@ func (r request) answers(p Pick) bool {
 
 // AssistantTonight asks the model for tonight's picks among the viewer's
 // programmes and titles; wish is what the person feels like, if anything.
-func (s *Service) AssistantTonight(ctx context.Context, wish string) (Tonight, error) {
-	var out Tonight
+func (s *Service) AssistantTonight(ctx context.Context, wish string) (out Tonight, err error) {
 	wish = strings.TrimSpace(wish)
 	if len(wish) > 200 {
 		return out, invalid("richiesta troppo lunga (max 200 caratteri)")
@@ -980,6 +1015,8 @@ func (s *Service) AssistantTonight(ctx context.Context, wish string) (Tonight, e
 	if err != nil {
 		return out, err
 	}
+	ctx, done := withLimit(ctx, assistantLimit(a), &err)
+	defer done()
 	v := viewerOf(ctx)
 	cacheKey := strconv.FormatInt(v.ProfileID, 10) + "\x00" + LangOf(ctx) + "\x00" + fold(wish)
 	s.asst.mu.Lock()

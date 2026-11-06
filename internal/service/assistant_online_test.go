@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 )
 
 // toServer sends every request to srv, whatever the host.
@@ -181,5 +182,40 @@ func TestAssistantCutByThinking(t *testing.T) {
 	empty, bodies = true, nil
 	if _, _, err := s.TestAssistant(ctx); !errors.Is(err, ErrAssistant) || len(bodies) != 2 {
 		t.Fatalf("empty answer: %v, %d requests", err, len(bodies))
+	}
+}
+
+// A service that hangs is not waited for: a call online and a whole
+// question each have a limit, and the person reads that the assistant did
+// not answer in time.
+func TestAssistantTimeLimits(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.Copy(io.Discard, r.Body) // the server notices a client gone only after the body
+		select {
+		case <-r.Context().Done():
+		case <-time.After(10 * time.Second):
+		}
+	}))
+	defer srv.Close()
+	oldCall, oldHome := onlineCallTimeout, homeLimit
+	t.Cleanup(func() { onlineCallTimeout, homeLimit = oldCall, oldHome })
+	onlineCallTimeout, homeLimit = 200*time.Millisecond, 200*time.Millisecond
+	s, _ := localTestService(t)
+	s.SetAssistantClient(&http.Client{Transport: toServer{srv}})
+	ctx := context.Background()
+	k := "sk-test"
+	if err := s.SetAssistant(ctx, AssistantInput{Enabled: true, Mode: "online", Provider: "openai", Model: "gpt-x", Key: &k}); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	if _, _, err := s.TestAssistant(ctx); !errors.Is(err, ErrAssistantSlow) || time.Since(start) > 5*time.Second {
+		t.Fatalf("online call: %v after %s", err, time.Since(start))
+	}
+	if err := s.SetAssistant(ctx, AssistantInput{Enabled: true, Mode: "server", URL: srv.URL + "/v1", Model: "m"}); err != nil {
+		t.Fatal(err)
+	}
+	start = time.Now()
+	if _, err := s.AssistantRule(ctx, "registra la juve"); !errors.Is(err, ErrAssistantSlow) || time.Since(start) > 5*time.Second {
+		t.Fatalf("a whole question: %v after %s", err, time.Since(start))
 	}
 }
