@@ -1,10 +1,14 @@
 package service
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/silirim/vodmax/internal/store"
 )
@@ -41,4 +45,45 @@ func TestPINLimitHoldsUnderParallelAttempts(t *testing.T) {
 	if err := s.tryPIN(8, p, "2468"); err != nil {
 		t.Fatalf("another device: %v", err)
 	}
+}
+
+// A paired device's request does not wait for the database writer (held
+// for seconds by a catalog or guide import) to record its activity.
+func TestAuthenticateDoesNotWaitForWriter(t *testing.T) {
+	s, dir := localTestService(t)
+	ctx := context.Background()
+	id, err := s.st.AddDevice(ctx, "TV", hashToken("device-token"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := sql.Open("sqlite", "file:"+filepath.Join(filepath.Dir(dir), "vodmax.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	tx, err := other.BeginTx(ctx, nil)
+	if err == nil {
+		_, err = tx.Exec(`UPDATE device SET name = name`) // takes the write lock
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	got, err := s.Authenticate(ctx, "device-token", "", "master")
+	if err != nil || got.DeviceID != id {
+		t.Fatal(got, err)
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Fatalf("request waited %v for the writer", d)
+	}
+	if err := tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	for range 100 {
+		if d, _ := s.st.DeviceByToken(ctx, hashToken("device-token")); d.LastSeen > 0 {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatal("activity never recorded")
 }

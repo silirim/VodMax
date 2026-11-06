@@ -80,6 +80,7 @@ type authState struct {
 	mu      sync.Mutex
 	pinFail map[string]*pinFails // device:profile
 	pairing map[string]*pairing  // by poll secret
+	touched map[int64]time.Time  // last activity write per device
 }
 
 type pinFails struct {
@@ -116,7 +117,7 @@ func (s *Service) Authenticate(ctx context.Context, token, profileToken, master 
 		if err != nil {
 			return id, err
 		}
-		s.st.TouchDevice(context.WithoutCancel(ctx), d.ID, time.Now())
+		s.touchDevice(d)
 		id.DeviceID, id.Device, id.Lock = d.ID, d.Name, d.ProfileLock
 	}
 	p, err := s.resolveProfile(ctx, id, profileToken)
@@ -130,6 +131,28 @@ func (s *Service) Authenticate(ctx context.Context, token, profileToken, master 
 		}
 	}
 	return id, nil
+}
+
+// touchDevice records activity without making the request wait: the write
+// queues behind the single writer, which a catalog or guide import holds
+// for many seconds. At most one write a minute per device is started.
+func (s *Service) touchDevice(d store.Device) {
+	now := time.Now()
+	if now.Unix()-d.LastSeen < 60 {
+		return
+	}
+	s.auth.mu.Lock()
+	due := now.Sub(s.auth.touched[d.ID]) >= time.Minute
+	if due {
+		if s.auth.touched == nil {
+			s.auth.touched = map[int64]time.Time{}
+		}
+		s.auth.touched[d.ID] = now
+	}
+	s.auth.mu.Unlock()
+	if due {
+		go s.st.TouchDevice(context.Background(), d.ID, now)
+	}
 }
 
 // resolveProfile: the signed profile token if valid; otherwise, when the
