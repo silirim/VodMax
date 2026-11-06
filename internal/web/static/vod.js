@@ -1707,10 +1707,19 @@
       const along = horizontal ? Math.abs(dx) : Math.abs(dy);
       const across = horizontal ? Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom))
         : Math.max(0, Math.max(a.left, b.left) - Math.min(a.right, b.right));
+      // Left and Right stay on the line: in a row of wide episode cards the
+      // season tab above is nearer than the next card, and at the end of a
+      // row the nearest thing to the right is a card rows below.
+      if (horizontal && across > 0) continue;
       const score = along + across * 3;
       if (score < bestScore) { bestScore = score; best = e; }
     }
-    if (best) best.focus();
+    if (!best) return;
+    // Scrolled by the least that shows it whole (scroll-margin keeps the
+    // focus ring in view): focus() alone centres a card that is off screen,
+    // so quick presses made a row jump back and forth.
+    best.focus({ preventScroll: true });
+    best.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   document.addEventListener("keydown", (e) => {
