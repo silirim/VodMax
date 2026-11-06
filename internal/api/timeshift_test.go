@@ -143,3 +143,66 @@ func httpPost(url string) (postResult, error) {
 	b, _ := io.ReadAll(resp.Body)
 	return postResult{resp.StatusCode, b}, nil
 }
+
+// Fast zapping in timeshift mode: CH+ twice while the provider is still
+// answering. The first open is replaced by the second (same player): it
+// must end as stale (410), without marking the channel's HD version
+// broken or opening its SD version, which would take the connection back
+// from the channel the viewer wants.
+func TestTimeshiftFastZap(t *testing.T) {
+	p := newTVProvider()
+	inner := p.Server.Config.Handler
+	p.Server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/101.ts") {
+			select { // a provider that takes a moment to answer
+			case <-time.After(400 * time.Millisecond):
+			case <-r.Context().Done():
+				return
+			}
+		}
+		inner.ServeHTTP(w, r)
+	})
+	e, _ := tvSetupWith(t, p, `{"name":"Rai 1 SD","stream_id":103,"category_id":"1","epg_channel_id":"Rai1.it"}`)
+	e.svc.SetFFmpeg(fakeFFmpeg(t), "")
+	if err := e.svc.SetTimeshiftDir(filepath.Join(t.TempDir(), "ts"), nil); err != nil {
+		t.Fatal(err)
+	}
+	tv := channels(t, e, "?section=tv")
+	rai, cielo := tv[0], tv[2]
+	start := func(ch int64) (int, []byte) {
+		return e.do(t, "POST", "/api/v1/live/"+strconv.FormatInt(ch, 10)+"/timeshift", map[string]any{"viewer": "salotto-tv-01"}, true)
+	}
+	type answer struct {
+		code int
+		body []byte
+	}
+	stale := make(chan answer, 1)
+	go func() { c, b := start(rai.ID); stale <- answer{c, b} }()
+	time.Sleep(100 * time.Millisecond)
+	if code, body := start(cielo.ID); code != 200 {
+		t.Fatalf("the channel zapped to did not start: %d %s", code, body)
+	}
+	if a := <-stale; a.code != http.StatusGone {
+		t.Fatalf("replaced start: %d %s", a.code, a.body)
+	}
+	p.mu.Lock()
+	opened := strings.Join(p.opened, ",")
+	p.opened = nil
+	p.mu.Unlock()
+	if strings.Contains(opened, "103.ts") {
+		t.Fatalf("the replaced open counted as broken, SD opened: %s", opened)
+	}
+	// Tuning Rai 1 again: the HD version still comes first.
+	code, body := start(rai.ID)
+	var sess struct{ Stop string }
+	if code != 200 || json.Unmarshal(body, &sess) != nil {
+		t.Fatalf("retune: %d %s", code, body)
+	}
+	defer e.post(t, sess.Stop) // the provider test server waits for open streams
+	p.mu.Lock()
+	again := strings.Join(p.opened, ",")
+	p.mu.Unlock()
+	if !strings.HasPrefix(again, "101.ts") {
+		t.Fatalf("HD version demoted after a fast zap: %s", again)
+	}
+}

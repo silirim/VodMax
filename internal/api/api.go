@@ -301,6 +301,9 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusForbidden
 	case errors.Is(err, service.ErrNoTimeshift):
 		status = http.StatusServiceUnavailable
+	case errors.Is(err, service.ErrReplaced):
+		// The same player asked for something newer: this answer is stale.
+		status = http.StatusGone
 	case errors.Is(err, service.ErrPIN), errors.Is(err, service.ErrCurrentPIN), errors.Is(err, service.ErrForbidden):
 		status = http.StatusForbidden
 	case errors.Is(err, service.ErrAdminPIN):

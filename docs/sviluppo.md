@@ -44,7 +44,10 @@ La tabella elenca le chiamate principali; l'elenco completo, con il livello
 di accesso di ognuna, è in `internal/api/api.go`. Gli errori sono
 `{"error": "…"}` nella lingua della richiesta; il testo di un errore
 inatteso (500) arriva solo a un profilo amministratore, gli altri leggono
-un messaggio generico e il dettaglio resta nel log del server.
+un messaggio generico e il dettaglio resta nel log del server. Una
+richiesta di visione superata da una più recente dello stesso player
+(stesso `viewer`: zapping veloce) risponde 410 e non segna il canale come
+guasto; il client la ignora.
 
 | Metodo e percorso | Scopo |
 |---|---|

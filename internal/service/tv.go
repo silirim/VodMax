@@ -263,6 +263,11 @@ func (s *Service) OpenLive(ctx context.Context, t string, force bool) (*Stream, 
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
+		// The viewer tuned something else meanwhile: that request owns the
+		// connection now, and this version is not broken.
+		if errors.Is(err, ErrReplaced) {
+			return nil, err
+		}
 		// Busy is not broken: another subscription may have a free
 		// connection, but this version stays where it is.
 		var busy ConnectionBusy
@@ -319,18 +324,20 @@ func (s *Service) openLiveItem(ctx context.Context, it store.PlaybackItem, viewe
 		return nil, err
 	}
 	link, err := s.liveURL(streamCtx, it)
-	if err != nil {
-		release()
-		return nil, err
+	if err == nil {
+		var resp *http.Response
+		if resp, err = s.upstream(streamCtx, it.SubscriptionID, link, ""); err == nil {
+			ctype := resp.Header.Get("Content-Type")
+			if ctype == "" || ctype == "application/octet-stream" {
+				ctype = "video/mp2t"
+			}
+			return &Stream{ReadCloser: &releasingBody{ReadCloser: resp.Body, release: release}, ContentType: ctype, Title: it.Title,
+				conn: streamCtx}, nil
+		}
 	}
-	resp, err := s.upstream(streamCtx, it.SubscriptionID, link, "")
-	if err != nil {
-		release()
-		return nil, err
+	release()
+	if replacedBy(streamCtx) {
+		return nil, ErrReplaced
 	}
-	ctype := resp.Header.Get("Content-Type")
-	if ctype == "" || ctype == "application/octet-stream" {
-		ctype = "video/mp2t"
-	}
-	return &Stream{ReadCloser: &releasingBody{ReadCloser: resp.Body, release: release}, ContentType: ctype, Title: it.Title}, nil
+	return nil, err
 }

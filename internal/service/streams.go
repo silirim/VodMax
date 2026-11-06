@@ -28,10 +28,19 @@ type conn struct {
 	viewer     string
 	recording  bool
 	background bool
-	cancel     context.CancelFunc
+	cancel     context.CancelCauseFunc
 	done       chan struct{}
 	once       sync.Once
 }
+
+// ErrReplaced ends a stream whose viewer opened another one (zapping,
+// a film after a channel). The newer request owns the connection: the
+// replaced one must neither count as a broken channel nor reopen.
+var ErrReplaced = errors.New("sostituita da una richiesta più recente dello stesso dispositivo")
+
+// replacedBy tells whether a stream context ended because its viewer
+// opened something else.
+func replacedBy(ctx context.Context) bool { return errors.Is(context.Cause(ctx), ErrReplaced) }
 
 func (c *conn) finish() { c.once.Do(func() { close(c.done) }) }
 
@@ -89,7 +98,7 @@ func (s *Service) acquireConn(ctx context.Context, subID int64, viewer string, f
 	if err != nil {
 		return nil, nil, err
 	}
-	streamCtx, cancel := context.WithCancel(ctx)
+	streamCtx, cancel := context.WithCancelCause(ctx)
 	c := &conn{viewer: viewer, recording: recording, background: background, cancel: cancel, done: make(chan struct{})}
 	var stop []*conn
 	m := &s.conns
@@ -127,7 +136,7 @@ func (s *Service) acquireConn(ctx context.Context, subID int64, viewer string, f
 				onlyRecordings = onlyRecordings && other.recording
 			}
 			m.mu.Unlock()
-			cancel()
+			cancel(nil)
 			return nil, nil, ConnectionBusy{Max: max, Recording: onlyRecordings}
 		}
 		stop = append(stop, kept[victim])
@@ -138,14 +147,18 @@ func (s *Service) acquireConn(ctx context.Context, subID int64, viewer string, f
 
 	// Wait for replaced streams to release their provider connection.
 	for _, old := range stop {
-		old.cancel()
+		var cause error // nil: taken over by someone else
+		if old.viewer == viewer {
+			cause = ErrReplaced
+		}
+		old.cancel(cause)
 		select {
 		case <-old.done:
 		case <-time.After(2 * time.Second):
 		}
 	}
 	release := func() {
-		c.cancel()
+		c.cancel(nil)
 		m.mu.Lock()
 		list := m.bySub[subID]
 		for i, other := range list {
@@ -224,7 +237,12 @@ type Stream struct {
 	Status        int
 	ContentLength int64
 	ContentRange  string
+	conn          context.Context // the provider connection's, when it has one
 }
+
+// replaced tells whether the stream ended because its viewer opened
+// another one.
+func (st *Stream) replaced() bool { return st.conn != nil && replacedBy(st.conn) }
 
 type releasingBody struct {
 	io.ReadCloser

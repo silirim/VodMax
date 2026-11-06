@@ -68,7 +68,16 @@ type tsSession struct {
 
 	mu       sync.Mutex
 	lastSeen time.Time
-	err      string
+	err      error // why the buffer ended before its first segment
+}
+
+// fail records why the buffer ends; the first reason wins.
+func (t *tsSession) fail(err error) {
+	t.mu.Lock()
+	if t.err == nil {
+		t.err = err
+	}
+	t.mu.Unlock()
 }
 
 func (t *tsSession) touch() {
@@ -183,10 +192,16 @@ func (s *Service) StartTimeshift(ctx context.Context, itemID int64, viewer strin
 
 	// Feed ffmpeg; when the provider stream drops, open it again.
 	go func() {
-		stream := io.ReadCloser(first)
+		stream := first
 		for attempt := 0; runCtx.Err() == nil; attempt++ {
 			_, err := io.Copy(stdin, stream)
 			stream.Close()
+			// The viewer tuned something else: reopening would take the
+			// connection back from it.
+			if stream.replaced() {
+				sess.fail(ErrReplaced)
+				break
+			}
 			if runCtx.Err() != nil || attempt >= 5 {
 				if runCtx.Err() == nil && log != nil {
 					log.Warn("diretta con pausa: flusso perso", "err", err)
@@ -203,9 +218,7 @@ func (s *Service) StartTimeshift(ctx context.Context, itemID int64, viewer strin
 			}
 			next, err := s.OpenLive(runCtx, t, false)
 			if err != nil {
-				sess.mu.Lock()
-				sess.err = err.Error()
-				sess.mu.Unlock()
+				sess.fail(err)
 				break
 			}
 			stream = next
@@ -248,7 +261,7 @@ func (s *Service) StartTimeshift(ctx context.Context, itemID int64, viewer strin
 		cancel()
 		<-sess.done
 		msg := strings.TrimSpace(stderr.String())
-		if msg != "" {
+		if msg != "" && !errors.Is(err, ErrReplaced) {
 			return TimeshiftSession{}, fmt.Errorf("diretta con pausa non avviata: %s", firstLine(msg, err))
 		}
 		return TimeshiftSession{}, err
@@ -281,8 +294,8 @@ func waitFirstSegment(ctx context.Context, sess *tsSession) error {
 		case <-sess.done:
 			sess.mu.Lock()
 			defer sess.mu.Unlock()
-			if sess.err != "" {
-				return errors.New(sess.err)
+			if sess.err != nil {
+				return sess.err
 			}
 			return errors.New("il canale non trasmette")
 		case <-ctx.Done():
@@ -309,6 +322,7 @@ func (s *Service) stopViewerTimeshift(viewer string) {
 	}
 	s.ts.mu.Unlock()
 	for _, t := range old {
+		t.fail(ErrReplaced) // a start still waiting for its first segment is answered as replaced
 		t.cancel()
 		<-t.done
 	}
