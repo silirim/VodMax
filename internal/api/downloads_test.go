@@ -223,3 +223,30 @@ func TestTwoVersionsOfAFilmDownloadApart(t *testing.T) {
 		t.Fatalf("the other version went too: %v", err)
 	}
 }
+
+// A partial file longer than the provider's (the provider replaced the
+// film): instead of asking for an impossible range for ever, the download
+// starts again and ends with the provider's file.
+func TestDownloadStartsAgainWhenThePartIsTooLong(t *testing.T) {
+	e, p := tvSetup(t)
+	dir := t.TempDir()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	if err := e.svc.StartDownloads(ctx, dir, slog.New(slog.NewTextHandler(io.Discard, nil))); err != nil {
+		t.Fatal(err)
+	}
+	movie := filepath.Join(dir, "Movies", "1408 (2007)", "1408 (2007).mp4")
+	os.MkdirAll(filepath.Dir(movie), 0o755)
+	os.WriteFile(movie+".part", append(append([]byte{}, fakeFilm...), make([]byte, 100)...), 0o644)
+	e.do(t, "POST", "/api/v1/downloads", map[string]any{"media": "movie", "id": findItem(t, e, "movie", "1408")}, true)
+	waitDownloads(t, e, 1)
+	if got, err := os.ReadFile(movie); err != nil || !bytes.Equal(got, fakeFilm) {
+		t.Fatalf("film file: %v (%d bytes)", err, len(got))
+	}
+	p.mu.Lock()
+	ranges := strings.Join(p.ranges, ",")
+	p.mu.Unlock()
+	if !strings.Contains(ranges, "bytes=1048676-") {
+		t.Fatalf("requests: %s", ranges)
+	}
+}

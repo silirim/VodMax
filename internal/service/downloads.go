@@ -34,6 +34,10 @@ const (
 	downloadTick     = 15 * time.Second
 	downloadSettings = "downloads"
 	downloadRetry    = 5 * time.Minute // after a network error
+	// downloadAttempts failed in a row without getting anything (a
+	// subscription expired, a provider refusing): the download stops
+	// instead of asking the provider every 5 minutes for ever.
+	downloadAttempts = 5
 	moviesDir        = "Movies"
 	showsDir         = "TV Shows"
 )
@@ -54,6 +58,7 @@ type downloadState struct {
 	wake   chan struct{}
 	active *activeDownload
 	wait   map[int64]time.Time // not before (after an error)
+	fails  map[int64]int       // attempts failed in a row
 }
 
 type activeDownload struct {
@@ -85,7 +90,7 @@ func (s *Service) StartDownloads(ctx context.Context, dir string, log *slog.Logg
 		return err
 	}
 	s.dl.mu.Lock()
-	s.dl.dir, s.dl.log, s.dl.wake, s.dl.wait = dir, log, make(chan struct{}, 1), map[int64]time.Time{}
+	s.dl.dir, s.dl.log, s.dl.wake, s.dl.wait, s.dl.fails = dir, log, make(chan struct{}, 1), map[int64]time.Time{}, map[int64]int{}
 	s.dl.mu.Unlock()
 	go func() {
 		t := time.NewTicker(downloadTick)
@@ -382,6 +387,7 @@ func (s *Service) ResumeDownload(ctx context.Context, id int64) error {
 	}
 	s.dl.mu.Lock()
 	delete(s.dl.wait, id)
+	delete(s.dl.fails, id)
 	s.dl.mu.Unlock()
 	if err := s.st.SetDownloadState(ctx, id, "queued", d.Bytes, d.Total, ""); err != nil {
 		return err
@@ -518,6 +524,9 @@ func (s *Service) runDownload(ctx context.Context, d store.Download, a *activeDo
 		// What is there stays: "Riprendi" carries on once space is freed.
 		s.st.SetDownloadState(context.Background(), d.ID, "failed", bytes, total, err.Error())
 	case err == nil:
+		s.dl.mu.Lock()
+		delete(s.dl.fails, d.ID)
+		s.dl.mu.Unlock()
 		s.finishDownload(context.Background(), d, file)
 		s.st.SetDownloadState(context.Background(), d.ID, "done", bytes, total, "")
 		log.Info("download completato", "titolo", d.Title)
@@ -529,8 +538,22 @@ func (s *Service) runDownload(ctx context.Context, d store.Download, a *activeDo
 		s.delay(d.ID, time.Minute)
 	default:
 		var up *UpstreamError
-		if errors.As(err, &up) && up.Status == http.StatusNotFound {
+		s.dl.mu.Lock()
+		if bytes > d.Bytes {
+			s.dl.fails[d.ID] = 0 // it moved on: a new series of attempts
+		}
+		s.dl.fails[d.ID]++
+		// 403 is not final at once: some providers answer it for a busy
+		// connection.
+		final := s.dl.fails[d.ID] >= downloadAttempts ||
+			(errors.As(err, &up) && (up.Status == http.StatusNotFound || up.Status == http.StatusUnauthorized))
+		if final {
+			delete(s.dl.fails, d.ID)
+		}
+		s.dl.mu.Unlock()
+		if final {
 			s.st.SetDownloadState(context.Background(), d.ID, "failed", bytes, total, err.Error())
+			log.Warn("download non riuscito", "titolo", d.Title, "err", err)
 			return
 		}
 		s.st.SetDownloadState(context.Background(), d.ID, "queued", bytes, total, err.Error())
@@ -572,6 +595,20 @@ func (s *Service) fetchDownload(ctx context.Context, d store.Download, file stri
 		rangeHeader = fmt.Sprintf("bytes=%d-", have)
 	}
 	resp, err := s.upstream(ctx, d.SubscriptionID, url, rangeHeader)
+	if up := (*UpstreamError)(nil); errors.As(err, &up) && up.Status == http.StatusRequestedRangeNotSatisfiable && have > 0 {
+		if have == d.Total {
+			// All there: only the rename was missed (a restart).
+			s.dl.mu.Lock()
+			a.bytes, a.total = have, have
+			s.dl.mu.Unlock()
+			return os.Rename(part, file)
+		}
+		// The provider's file is shorter than what is here: another file
+		// now. Start again from the beginning.
+		os.Remove(part)
+		have = 0
+		resp, err = s.upstream(ctx, d.SubscriptionID, url, "")
+	}
 	if err != nil {
 		return err
 	}
@@ -579,12 +616,15 @@ func (s *Service) fetchDownload(ctx context.Context, d store.Download, file stri
 	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND
 	total := resp.ContentLength
 	if resp.StatusCode == http.StatusPartialContent {
-		if cr := resp.Header.Get("Content-Range"); cr != "" {
-			if i := strings.LastIndex(cr, "/"); i >= 0 {
-				if n, err := strconv.ParseInt(cr[i+1:], 10, 64); err == nil {
-					total = n
-				}
-			}
+		var from, n int64
+		if _, err := fmt.Sscanf(resp.Header.Get("Content-Range"), "bytes %d-%d/%d", &from, new(int64), &n); err == nil {
+			total = n
+		}
+		if from != have {
+			// The rest of another file, or from another point: gluing it
+			// would make a broken film. Start again.
+			os.Remove(part)
+			return fmt.Errorf("il provider riprende il file da un altro punto (%d invece di %d): si ricomincia", from, have)
 		}
 	} else {
 		// The provider sent the whole file: start again.
