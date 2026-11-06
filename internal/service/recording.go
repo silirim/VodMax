@@ -1176,6 +1176,9 @@ func (s *Service) convertLeftovers(ctx context.Context) {
 		}
 		if strings.HasSuffix(r.File, ".ts") && fileExists(r.File) && !strings.Contains(r.Error, noConversion) {
 			s.convertRecording(r, finishedLength(r))
+			if now, err := s.st.Recording(ctx, r.ID); err == nil && strings.HasSuffix(now.File, ".mp4") && s.rec.log != nil {
+				s.rec.log.Info("registrazione convertita in MP4", "id", r.ID, "byte", now.Bytes)
+			}
 		}
 	}
 }
