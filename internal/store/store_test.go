@@ -305,3 +305,55 @@ func TestRecordingCoversItsProgrammeAfterAnEarlyStop(t *testing.T) {
 		t.Fatalf("the next programme: %q", got)
 	}
 }
+
+// A backup made by an older version (no profiles, no recording files)
+// still restores, leaving the profiles as they are. A download queued
+// before the restore finds its film again after the catalog is back, not
+// whatever title gets its old id.
+func TestImportBackupFromAnOlderVersion(t *testing.T) {
+	st, sub := openTest(t)
+	ctx := context.Background()
+	if _, err := st.AddProfile(ctx, Profile{Name: "Bimbi", Kind: "kids"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(3, "Film"), false); err != nil {
+		t.Fatal(err)
+	}
+	filmID := func() (id int64) {
+		st.r.QueryRowContext(ctx, `SELECT id FROM item WHERE kind = 'movie' AND title = 'Film 00002'`).Scan(&id)
+		return id
+	}
+	if _, _, err := st.AddDownload(ctx, Download{Media: "movie", MediaID: filmID(), SubscriptionID: sub, SourceID: "2",
+		Title: "Film 00002", Path: "Movies/Film/Film.mp4", Meta: "{}"}); err != nil {
+		t.Fatal(err)
+	}
+	old := `{"version":1,"created_at":"2026-10-01T00:00:00Z","vpns":[{"id":1,"name":"test","config":"[Interface]"}],
+		"subscriptions":[{"id":1,"name":"B","kind":"xtream","vpn_id":1,"settings":{},"rules":{},"secret":{}}],
+		"recordings":[{"id":7,"channel":"Rai 1","title":"TG1","start":100,"stop":200,"status":"completed","bytes":10,"created_at":90}],
+		"recording_groups":{"7":"g"},"settings":{"schedule":"{}"}}`
+	var b Backup
+	if err := json.Unmarshal([]byte(old), &b); err != nil {
+		t.Fatal(err)
+	}
+	seal := func(int64, []byte) []byte { return []byte("sealed") }
+	if err := st.ImportBackup(ctx, &b, seal, seal, func(string) string { return "" }); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := st.Profiles(ctx); len(p) != 2 || p[1].Name != "Bimbi" || p[1].Kind != "kids" {
+		t.Fatalf("profiles: %+v", p)
+	}
+	if r, err := st.Recording(ctx, 7); err != nil || r.Status != "failed" || r.File != "" {
+		t.Fatalf("recording without its file: %+v %v", r, err)
+	}
+	// The catalog comes back in another order: the old id is another film.
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, append(movies(3, "Altro")[:2], movies(3, "Film")[2]), false); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ApplyPendingRestore(ctx); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := st.Downloads(ctx)
+	if len(list) != 1 || list[0].MediaID != filmID() {
+		t.Fatalf("download points at %d, the film is %d", list[0].MediaID, filmID())
+	}
+}

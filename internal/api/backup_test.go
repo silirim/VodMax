@@ -2,6 +2,8 @@ package api
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -122,4 +124,90 @@ func restore(t *testing.T, e *env, file []byte, password string) (int, []byte) {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	return resp.StatusCode, body
+}
+
+// A backup restored on a new installation brings back the profiles, with
+// their PINs and the kids profile, and what each took off "continue
+// watching".
+func TestBackupKeepsProfiles(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.do(t, "PATCH", "/api/v1/profiles/1", map[string]any{"pin": "9753"}, true)
+	if code, body := e.do(t, "POST", "/api/v1/profiles", map[string]any{"name": "Bimbi", "kind": "kids"}, true); code != 201 {
+		t.Fatalf("kids profile: %d %s", code, body)
+	}
+	e.do(t, "POST", "/api/v1/profiles", map[string]any{"name": "Marco", "kind": "standard", "pin": "2468"}, true)
+	film := strconv.FormatInt(findItem(t, e, "movie", "1408"), 10)
+	e.do(t, "PUT", "/api/v1/progress/movie/"+film, map[string]int{"position": 600, "duration": 6000}, true)
+	time.Sleep(1100 * time.Millisecond)
+	if code, _ := e.do(t, "DELETE", "/api/v1/continue/"+film, nil, true); code != 204 {
+		t.Fatal("hide from continue")
+	}
+	_, file := e.do(t, "POST", "/api/v1/backup", map[string]string{"password": "una password lunga"}, true)
+
+	n, _ := tvSetup(t)
+	if code, body := restore(t, n, file, "una password lunga"); code != 204 {
+		t.Fatalf("restore: %d %s", code, body)
+	}
+	_, body := n.do(t, "GET", "/api/v1/profiles", nil, true)
+	var profiles []struct {
+		ID     int64
+		Name   string
+		Kind   string
+		HasPIN bool `json:"has_pin"`
+	}
+	json.Unmarshal(body, &profiles)
+	got := fmt.Sprint(profiles)
+	if len(profiles) != 3 || got != "[{1 Principale admin true} {2 Bimbi kids false} {3 Marco standard true}]" {
+		t.Fatalf("profiles after restore: %s", got)
+	}
+	device := pair(t, n, "Salotto", nil)
+	if code, _ := selectProfile(t, n, device, 3, "1111"); code == 200 {
+		t.Fatal("wrong PIN accepted after restore")
+	}
+	if code, _ := selectProfile(t, n, device, 3, "2468"); code != 200 {
+		t.Fatalf("PIN of the backup: %d", code)
+	}
+	// The film stays off "continue watching" once the catalog is back.
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		_, body = n.do(t, "GET", "/api/v1/progress/movie/"+strconv.FormatInt(findItem(t, n, "movie", "1408"), 10), nil, true)
+		if strings.Contains(string(body), `"position":600`) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("progress not restored: %s", body)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if _, body := n.do(t, "GET", "/api/v1/continue", nil, true); strings.Contains(string(body), "1408") {
+		t.Fatalf("hidden title back in continue: %s", body)
+	}
+}
+
+// Restoring yesterday's copy keeps the recordings made since then (their
+// files are still there), and the restored ones still play.
+func TestRestoreKeepsLaterRecordings(t *testing.T) {
+	e, _ := tvSetup(t)
+	recordFor(t, e, 2, "Prima")
+	time.Sleep(3500 * time.Millisecond)
+	_, file := e.do(t, "POST", "/api/v1/backup", map[string]string{"password": "una password lunga"}, true)
+	recordFor(t, e, 2, "Dopo")
+	time.Sleep(3500 * time.Millisecond)
+	if code, body := restore(t, e, file, "una password lunga"); code != 204 {
+		t.Fatalf("restore: %d %s", code, body)
+	}
+	l := recRows(t, e)
+	if len(l) != 2 || len(recFiles(t, e)) != 2 {
+		t.Fatalf("after the restore: %+v, files %v", l, recFiles(t, e))
+	}
+	for _, r := range l {
+		_, body := e.do(t, "POST", fmt.Sprintf("/api/v1/recordings/%d/ticket", r.ID), nil, true)
+		var tk struct{ URL string }
+		json.Unmarshal(body, &tk)
+		resp, err := http.Get(e.srv.URL + tk.URL)
+		if err != nil || resp.StatusCode != 200 || r.Status != "completed" {
+			t.Fatalf("%s after the restore: %v %v %+v", r.Title, err, resp, r)
+		}
+		resp.Body.Close()
+	}
 }

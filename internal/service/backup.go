@@ -210,7 +210,8 @@ func (s *Service) RestoreBackup(ctx context.Context, data []byte, password strin
 	}
 	err = s.st.ImportBackup(ctx, b,
 		func(id int64, plain []byte) []byte { return s.box.Seal(plain, vpnOwner(id)) },
-		func(id int64, plain []byte) []byte { return s.box.Seal(plain, subOwner(id)) })
+		func(id int64, plain []byte) []byte { return s.box.Seal(plain, subOwner(id)) },
+		s.recordingFile)
 	if err != nil {
 		return err
 	}
@@ -232,6 +233,23 @@ func (s *Service) RestoreBackup(ctx context.Context, data []byte, password strin
 		}
 	}()
 	return nil
+}
+
+// recordingFile is the path of a file of the recordings folder, by name;
+// "" if it is not there. A name from a backup cannot point elsewhere.
+func (s *Service) recordingFile(name string) string {
+	s.rec.mu.Lock()
+	dir := s.rec.dir
+	s.rec.mu.Unlock()
+	name = filepath.Base(name)
+	if dir == "" || name == "." || name == string(filepath.Separator) {
+		return ""
+	}
+	p := filepath.Join(dir, name)
+	if fi, err := os.Stat(p); err != nil || !fi.Mode().IsRegular() {
+		return ""
+	}
+	return p
 }
 
 var errNoBackupDir = errors.New("cartella dei backup non impostata")

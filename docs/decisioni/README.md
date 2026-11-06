@@ -53,6 +53,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0045](0045-accesso-con-account-da-indirizzi-noti.md) | Accesso con account solo dagli indirizzi di VodMax elencati | Proposta |
 | [0046](0046-spazio-prima-le-registrazioni.md) | Disco quasi pieno: prima le registrazioni, poi la pausa della diretta | Proposta |
 | [0048](0048-registrazioni-insistere-quando-serve.md) | Registrazioni: insistere quando serve, non quando è inutile | Proposta |
+| [0049](0049-backup-con-profili-e-registrazioni.md) | Backup: profili compresi, registrazioni recenti tenute | Proposta |
 
 ## Ordine consigliato per decidere
 

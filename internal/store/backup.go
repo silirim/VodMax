@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"time"
 )
 
@@ -28,6 +29,29 @@ type Backup struct {
 	GuideSources  []GuideSource       `json:"guide_sources,omitempty"`
 	Rules         []RecordingRule     `json:"recording_rules,omitempty"`
 	Extra         map[string][]string `json:"extra,omitempty"` // reserved for later tables
+	// Missing in backups made before 0.6.7: profiles are then left as
+	// they are, and recordings keep no file.
+	Profiles       []BackupProfile  `json:"profiles,omitempty"`
+	ContinueHidden []BackupHidden   `json:"continue_hidden,omitempty"`
+	RecordingFiles map[int64]string `json:"recording_files,omitempty"` // recording id → file name in the recordings folder
+}
+
+// BackupProfile is a profile with its PIN (hashed) and kind (kids).
+type BackupProfile struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Kind      string `json:"kind"`
+	PINHash   string `json:"pin_hash,omitempty"`
+	Color     string `json:"color,omitempty"`
+	Avatar    string `json:"avatar,omitempty"`
+	CreatedAt int64  `json:"created_at"`
+}
+
+// BackupHidden is a title a profile took off "continue watching".
+type BackupHidden struct {
+	ProfileID int64  `json:"profile_id"`
+	TitleKey  string `json:"title_key"`
+	HiddenAt  int64  `json:"hidden_at"`
 }
 
 const BackupVersion = 1
@@ -102,7 +126,8 @@ func (s *Store) ExportBackup(ctx context.Context, openVPN, openSub func(id int64
 		return nil, err
 	}
 	defer tx.Rollback()
-	b := &Backup{Version: BackupVersion, CreatedAt: time.Now().UTC(), Settings: map[string]string{}, RecordingKeys: map[int64]string{}}
+	b := &Backup{Version: BackupVersion, CreatedAt: time.Now().UTC(), Settings: map[string]string{}, RecordingKeys: map[int64]string{},
+		RecordingFiles: map[int64]string{}}
 
 	err = eachRow(ctx, tx, `SELECT id, name, kind, config FROM vpn ORDER BY id`, func(rows *sql.Rows) error {
 		var v BackupVPN
@@ -217,6 +242,31 @@ func (s *Store) ExportBackup(ctx context.Context, openVPN, openSub func(id int64
 		}
 		b.Recordings = append(b.Recordings, r)
 		b.RecordingKeys[r.ID] = r.GroupKey
+		if r.File != "" {
+			b.RecordingFiles[r.ID] = filepath.Base(r.File)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = eachRow(ctx, tx, `SELECT id, name, kind, pin_hash, color, avatar, created_at FROM profile ORDER BY id`, func(rows *sql.Rows) error {
+		var p BackupProfile
+		if err := rows.Scan(&p.ID, &p.Name, &p.Kind, &p.PINHash, &p.Color, &p.Avatar, &p.CreatedAt); err != nil {
+			return err
+		}
+		b.Profiles = append(b.Profiles, p)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = eachRow(ctx, tx, `SELECT profile_id, title_key, hidden_at FROM continue_hidden`, func(rows *sql.Rows) error {
+		var h BackupHidden
+		if err := rows.Scan(&h.ProfileID, &h.TitleKey, &h.HiddenAt); err != nil {
+			return err
+		}
+		b.ContinueHidden = append(b.ContinueHidden, h)
 		return nil
 	})
 	if err != nil {
@@ -283,8 +333,12 @@ type pendingRestore struct {
 
 // ImportBackup replaces the user's data with the backup's; the catalog is
 // emptied and must be synchronised again. seal encrypts the secrets for
-// this server.
-func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub func(id int64, plain []byte) []byte) error {
+// this server. recFile returns the path of a file of the recordings
+// folder by its name, "" if it is not there: a restored recording points
+// only there, and the recordings made after the backup whose file is
+// still there are kept.
+func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub func(id int64, plain []byte) []byte,
+	recFile func(name string) string) error {
 	if b.Version < 1 || b.Version > BackupVersion {
 		return fmt.Errorf("backup in un formato non supportato (versione %d)", b.Version)
 	}
@@ -293,6 +347,20 @@ func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub fu
 		return err
 	}
 	defer tx.Rollback()
+	var current []Recording
+	err = eachRow(ctx, tx, `SELECT `+recordingColumns+` FROM recording WHERE status = 'completed' AND file <> ''`, func(rows *sql.Rows) error {
+		r, err := scanRecording(rows)
+		current = append(current, r)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	// Downloads stay, but the catalog ids they point to are about to be
+	// reused by other titles: they are found again after the next sync.
+	if _, err := tx.ExecContext(ctx, `UPDATE download SET media_id = -id WHERE media_id > 0`); err != nil {
+		return err
+	}
 	for _, q := range []string{
 		`DELETE FROM progress`, `DELETE FROM continue_hidden`, `DELETE FROM favorite`, `DELETE FROM recording`, `DELETE FROM setting`,
 		`DELETE FROM epg_programme`, `DELETE FROM epg_channel`, `DELETE FROM guide_source`, `DELETE FROM recording_rule`,
@@ -336,10 +404,27 @@ func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub fu
 			return err
 		}
 	}
+	restored := map[string]bool{}
+	byID := map[int64]Recording{}
+	for _, r := range current {
+		byID[r.ID] = r
+	}
 	for _, r := range b.Recordings {
 		status := r.Status
 		if status == "recording" {
 			status, r.Error = "failed", "interrotta (ripristino da backup)"
+		}
+		name := filepath.Base(b.RecordingFiles[r.ID])
+		if c, ok := byID[r.ID]; ok && b.RecordingFiles == nil && c.Start == r.Start && c.GroupKey == b.RecordingKeys[r.ID] {
+			name = filepath.Base(c.File) // an older backup, on the same server
+		}
+		r.File = ""
+		if name != "." {
+			r.File = recFile(name)
+			restored[name] = true
+		}
+		if status == "completed" && r.File == "" {
+			status, r.Error = "failed", "file della registrazione non trovato dopo il ripristino"
 		}
 		var rule any
 		if r.RuleID != 0 {
@@ -348,6 +433,37 @@ func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub fu
 		if _, err := tx.ExecContext(ctx, `INSERT INTO recording (id, item_id, group_key, channel, title, start, stop, status, file, bytes, error, created_at, rule_id, protected)
 			VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.ID, b.RecordingKeys[r.ID], r.Channel, r.Title, r.Start, r.Stop,
 			status, r.File, r.Bytes, r.Error, r.CreatedAt, rule, r.Protected); err != nil {
+			return err
+		}
+	}
+	// Recordings made after the backup: their files are still here.
+	ruleIDs := map[int64]bool{}
+	for _, r := range b.Rules {
+		ruleIDs[r.ID] = true
+	}
+	for _, r := range current {
+		name := filepath.Base(r.File)
+		if restored[name] || recFile(name) == "" {
+			continue
+		}
+		var rule any
+		if ruleIDs[r.RuleID] {
+			rule = r.RuleID
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO recording (id, item_id, group_key, channel, title, start, stop, status, file, bytes, error, created_at, rule_id, protected)
+			VALUES ((SELECT CASE WHEN EXISTS (SELECT 1 FROM recording WHERE id = ?) THEN NULL ELSE ? END), 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			r.ID, r.ID, r.GroupKey, r.Channel, r.Title, r.Start, r.Stop, r.Status, recFile(name), r.Bytes, r.Error, r.CreatedAt, rule, r.Protected); err != nil {
+			return err
+		}
+	}
+	if len(b.Profiles) > 0 {
+		if err := importProfiles(ctx, tx, b.Profiles); err != nil {
+			return err
+		}
+	}
+	for _, h := range b.ContinueHidden {
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO continue_hidden (profile_id, title_key, hidden_at) VALUES (?, ?, ?)`,
+			h.ProfileID, h.TitleKey, h.HiddenAt); err != nil {
 			return err
 		}
 	}
@@ -383,10 +499,50 @@ func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub fu
 	return err
 }
 
+// importProfiles replaces the profiles with the backup's. Profile 1 (the
+// first administrator) always stays. Every profile starts a new PIN epoch,
+// so no device keeps a profile chosen before the restore.
+func importProfiles(ctx context.Context, tx *sql.Tx, profiles []BackupProfile) error {
+	ids, _ := json.Marshal(func() []int64 {
+		var out []int64
+		for _, p := range profiles {
+			out = append(out, p.ID)
+		}
+		return out
+	}())
+	epoch := time.Now().UnixNano()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM profile WHERE id <> 1 AND id NOT IN (SELECT value FROM json_each(?))`, string(ids)); err != nil {
+		return err
+	}
+	// Names are unique and may move from one id to another.
+	if _, err := tx.ExecContext(ctx, `UPDATE profile SET name = '#' || id`); err != nil {
+		return err
+	}
+	for _, p := range profiles {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO profile (id, name, kind, pin_hash, pin_epoch, color, avatar, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind,
+			pin_hash = excluded.pin_hash, pin_epoch = excluded.pin_epoch, color = excluded.color, avatar = excluded.avatar,
+			created_at = excluded.created_at`, p.ID, p.Name, p.Kind, p.PINHash, epoch, p.Color, p.Avatar, p.CreatedAt); err != nil {
+			return fmt.Errorf("profilo %q: %w", p.Name, err)
+		}
+	}
+	// Profile 1 not in the backup (it never is missing, but a name must
+	// not stay "#1").
+	_, err := tx.ExecContext(ctx, `UPDATE profile SET name = 'Principale', pin_epoch = ? WHERE id = 1 AND name = '#1'`, epoch)
+	return err
+}
+
 // ApplyPendingRestore attaches restored hidden items and watch progress to
 // the items now in the catalog; what is still missing (a subscription not
-// yet synchronised) stays pending.
+// yet synchronised) stays pending. Downloads kept by a restore find their
+// title again.
 func (s *Store) ApplyPendingRestore(ctx context.Context) error {
+	if _, err := s.w.ExecContext(ctx, `UPDATE OR IGNORE download SET media_id = coalesce(CASE media
+		WHEN 'movie' THEN (SELECT i.id FROM item i WHERE i.subscription_id = download.subscription_id AND i.kind = 'movie' AND i.source_id = download.source_id)
+		ELSE (SELECT e.id FROM episode e JOIN item i ON i.id = e.series_item_id WHERE i.subscription_id = download.subscription_id AND e.source_id = download.source_id)
+		END, media_id) WHERE media_id < 0`); err != nil {
+		return err
+	}
 	var p pendingRestore
 	if err := s.Setting(ctx, pendingKey, &p); err != nil || (len(p.Hidden) == 0 && len(p.Progress) == 0) {
 		return err
