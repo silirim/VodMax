@@ -82,10 +82,10 @@ func (s *Service) claudeChat(ctx context.Context, key, model string, messages []
 		resp, err = client.Messages.New(ctx, params)
 	}
 	if err != nil {
-		return "", claudeError(err)
+		return "", AssistantUpstream{claudeError(err)}
 	}
 	if resp.StopReason == anthropic.StopReasonRefusal {
-		return "", errors.New("Claude non ha voluto rispondere a questa richiesta: riformulala")
+		return "", AssistantUpstream{errors.New("Claude non ha voluto rispondere a questa richiesta: riformulala")}
 	}
 	var b strings.Builder
 	for _, block := range resp.Content {

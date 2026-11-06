@@ -104,6 +104,7 @@
   "il servizio \"assistant\" non risponde: avvialo con  docker compose --profile assistant up -d": "il servizio \"assistant\" non risponde: avvialo con  docker compose --profile assistant up -d",
   "il servizio assistant ha risposto %d": "il servizio assistant ha risposto %d",
   "il servizio ha rifiutato la chiave API": "il servizio ha rifiutato la chiave API",
+  "il servizio ha ricevuto troppe richieste o il credito è finito: riprova più tardi": "il servizio ha ricevuto troppe richieste o il credito è finito: riprova più tardi",
   "il servizio ha risposto %d": "il servizio ha risposto %d",
   "il titolo dice “%s”": "il titolo dice “%s”",
   "il titolo parla del %d": "il titolo parla del %d",

@@ -318,7 +318,7 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusNotFound
 	case errors.Is(err, service.ErrAssistantOff):
 		status = http.StatusConflict
-	case errors.Is(err, service.ErrAssistant):
+	case errors.Is(err, service.ErrAssistant), errors.As(err, new(service.AssistantUpstream)):
 		status = http.StatusBadGateway
 	case errors.Is(err, service.ErrNoImage), errors.Is(err, service.ErrNotReady):
 		status = http.StatusNotFound

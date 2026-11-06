@@ -44,6 +44,14 @@ var (
 	ErrAssistant    = errors.New("l'assistente ha dato una risposta che VodMax non sa usare: riprova o cambia modello")
 )
 
+// AssistantUpstream is a failure of the model's service: unreachable,
+// credit run out, overloaded, a key refused. Not a fault of VodMax: the
+// API answers 502 and the log has no error for every question asked.
+type AssistantUpstream struct{ Err error }
+
+func (e AssistantUpstream) Error() string { return e.Err.Error() }
+func (e AssistantUpstream) Unwrap() error { return e.Err }
+
 // AssistantSettings: Mode is "local" (built in: Model is one of
 // localModels), "online" (Provider, Model) or "server" (URL, the base of
 // the API, for example http://ollama:11434/v1, and Model; also the empty
@@ -267,7 +275,7 @@ func (s *Service) chat(ctx context.Context, a AssistantSettings, messages []chat
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			return "", fmt.Errorf("assistente non raggiungibile: %w", redactURL(err))
+			return "", AssistantUpstream{fmt.Errorf("assistente non raggiungibile: %w", redactURL(err))}
 		}
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 		resp.Body.Close()
@@ -281,14 +289,21 @@ func (s *Service) chat(ctx context.Context, a AssistantSettings, messages []chat
 			}
 			continue
 		}
-		if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case http.StatusOK:
+		case http.StatusUnauthorized, http.StatusForbidden:
+			// Not the service's own text: it can quote part of the key.
+			return "", AssistantUpstream{errors.New("il servizio ha rifiutato la chiave API")}
+		case http.StatusTooManyRequests:
+			return "", AssistantUpstream{errors.New("il servizio ha ricevuto troppe richieste o il credito è finito: riprova più tardi")}
+		default:
 			var e struct {
 				Error struct {
 					Message string `json:"message"`
 				} `json:"error"`
 			}
 			json.Unmarshal(data, &e)
-			return "", fmt.Errorf("l'assistente ha risposto %d %s", resp.StatusCode, firstLine(e.Error.Message, errors.New("")))
+			return "", AssistantUpstream{fmt.Errorf("l'assistente ha risposto %d %s", resp.StatusCode, firstLine(e.Error.Message, errors.New("")))}
 		}
 		var out struct {
 			Choices []struct {

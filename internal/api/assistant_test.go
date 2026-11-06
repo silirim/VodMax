@@ -389,6 +389,45 @@ func TestAssistantRequestUnreadable(t *testing.T) {
 	}
 }
 
+// The model's service out of credit or refusing the key is not a failure
+// of VodMax: 502 with a text for people, nothing in the log as an error,
+// and never the service's own text about the key.
+func TestAssistantServiceRefuses(t *testing.T) {
+	e, _ := tvSetup(t)
+	var mu sync.Mutex
+	status, text := 429, `{"error":{"message":"You exceeded your current quota"}}`
+	m := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		w.WriteHeader(status)
+		w.Write([]byte(text))
+	}))
+	defer m.Close()
+	cfg := map[string]any{"enabled": true, "url": m.URL + "/v1", "model": "llama3", "key": "sk-test"}
+	if code, body := e.do(t, "PUT", "/api/v1/settings/assistant", cfg, true); code != 200 {
+		t.Fatalf("settings: %d %s", code, body)
+	}
+	set := func(code int, body string) {
+		mu.Lock()
+		status, text = code, body
+		mu.Unlock()
+	}
+	code, body := e.do(t, "POST", "/api/v1/assistant/rule", map[string]string{"text": "registra la juve"}, true)
+	if code != 502 || !strings.Contains(string(body), "credito") {
+		t.Fatalf("no credit: %d %s", code, body)
+	}
+	set(401, `{"error":{"message":"Incorrect API key provided: sk-proj-****abcd"}}`)
+	code, body = e.do(t, "POST", "/api/v1/assistant/tonight", map[string]string{"wish": ""}, true)
+	if code != 502 || strings.Contains(string(body), "abcd") || !strings.Contains(string(body), "chiave API") {
+		t.Fatalf("key refused: %d %s", code, body)
+	}
+	set(500, `{"error":{"message":"overloaded"}}`)
+	code, body = e.do(t, "POST", "/api/v1/assistant/rule", map[string]string{"text": "registra la juve"}, true)
+	if code != 502 || !strings.Contains(string(body), "500 overloaded") {
+		t.Fatalf("overloaded: %d %s", code, body)
+	}
+}
+
 // The people index (decision 0036): opened pages and the night fill it;
 // the assistant finds every title of a person in it.
 // A detail page that cannot be read is noted without people and the
