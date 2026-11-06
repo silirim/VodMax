@@ -705,9 +705,18 @@ func (s *Service) requestFor(ctx context.Context, a AssistantSettings, wish stri
 	req.person = truncate(strings.TrimSpace(raw.Person), 80)
 	req.precise = raw.About == "person" || raw.About == "title" || req.person != ""
 	year := 0
-	if m := yearRE.FindString(wish); m != "" {
+	// A number that is part of a title the model named ("2001 odissea
+	// nello spazio", "Blade Runner 2049") is no year to filter by.
+years:
+	for _, m := range yearRE.FindAllString(wish, -1) {
+		for _, t := range raw.Titles {
+			if strings.Contains(fold(t.Title), m) {
+				continue years
+			}
+		}
 		year, _ = strconv.Atoi(m)
 		req.precise = true
+		break
 	}
 	seen := map[int64]bool{}
 	add := func(it store.CatalogItem) {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -138,20 +140,6 @@ func TestOnceEvening(t *testing.T) {
 // what comes next, two per channel. A favourite comes first.
 func TestTonightManyChannels(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
-	box, _ := secret.LoadOrCreate(filepath.Join(dir, "secret.key"))
-	st, err := store.Open(filepath.Join(dir, "vodmax.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
-	svc := New(st, box, nil)
-	seal := func(int64) []byte { return []byte("x") }
-	vpnID, _ := st.AddVPN(ctx, "v", "system", seal)
-	sub, err := st.AddSubscription(ctx, store.Subscription{Name: "B", Kind: "xtream", VPNID: vpnID, Settings: json.RawMessage(`{}`)}, seal)
-	if err != nil {
-		t.Fatal(err)
-	}
 	now := time.Now()
 	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	at := func(h, m int) int64 { return day.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute).Unix() }
@@ -169,15 +157,7 @@ func TestTonightManyChannels(t *testing.T) {
 			store.GuideProgramme{Channel: id, Start: at(21, 30), Stop: at(23, 30), Title: "Film " + name},
 			store.GuideProgramme{Channel: id, Start: at(23, 30), Stop: at(24, 30), Title: "Notte"})
 	}
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live"}, []store.Category{{Kind: "live", SourceID: "1", Name: "Italia", Country: "IT"}}, items, false); err != nil {
-		t.Fatal(err)
-	}
-	if err := svc.SetHomeCountry(ctx, "IT"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := svc.ApplySelection(ctx); err != nil {
-		t.Fatal(err)
-	}
+	svc, st := catalogService(t, "live", items)
 	if err := st.ReplaceGuide(ctx, "ext:1", guide, progs); err != nil {
 		t.Fatal(err)
 	}
@@ -214,5 +194,84 @@ func TestTonightManyChannels(t *testing.T) {
 	}
 	if !has(list, "Film "+last.Name) {
 		t.Fatal("evening: the favourite channel left out")
+	}
+}
+
+// catalogService is a service whose catalog has items of one kind, all in
+// one Italian category and shown.
+func catalogService(t *testing.T, kind string, items []store.Item) (*Service, *store.Store) {
+	t.Helper()
+	ctx := context.Background()
+	dir := t.TempDir()
+	box, _ := secret.LoadOrCreate(filepath.Join(dir, "secret.key"))
+	st, err := store.Open(filepath.Join(dir, "vodmax.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	svc := New(st, box, nil)
+	seal := func(int64) []byte { return []byte("x") }
+	vpnID, _ := st.AddVPN(ctx, "v", "system", seal)
+	sub, err := st.AddSubscription(ctx, store.Subscription{Name: "B", Kind: "xtream", VPNID: vpnID, Settings: json.RawMessage(`{}`)}, seal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range items {
+		items[i].CategoryID = "1"
+	}
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{kind}, []store.Category{{Kind: kind, SourceID: "1", Name: "Italia", Country: "IT"}}, items, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.SetHomeCountry(ctx, "IT"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ApplySelection(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return svc, st
+}
+
+// fakeModelFor points svc at an OpenAI-compatible server that answers
+// with answer(system prompt).
+func fakeModelFor(t *testing.T, svc *Service, answer func(system string) string) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Messages []chatMessage }
+		json.NewDecoder(r.Body).Decode(&req)
+		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": chatMessage{Role: "assistant", Content: answer(req.Messages[0].Content)}}}})
+	}))
+	t.Cleanup(srv.Close)
+	if err := svc.SetAssistant(context.Background(), AssistantInput{Enabled: true, Mode: "server", URL: srv.URL + "/v1", Model: "m"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A year-like number that belongs to a title the model named is part of
+// the title, not a year to filter by: "2001 odissea nello spazio" is the
+// 1968 film.
+func TestRequestYearInTitle(t *testing.T) {
+	items := []store.Item{
+		{Kind: "movie", SourceID: "1", Title: "2001: Odissea nello spazio", DisplayTitle: "2001: Odissea nello spazio", Year: 1968},
+		{Kind: "movie", SourceID: "2", Title: "Blade Runner 2049", DisplayTitle: "Blade Runner 2049", Year: 2017},
+	}
+	svc, _ := catalogService(t, "movie", items)
+	titles := ""
+	fakeModelFor(t, svc, func(string) string { return titles })
+	ctx := context.Background()
+	a, err := svc.assistantOn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		wish, titles, want string
+	}{
+		{"2001 odissea nello spazio", `{"about":"title","titles":[{"title":"2001: Odissea nello spazio","year":1968}]}`, "2001: Odissea nello spazio"},
+		{"blade runner 2049", `{"about":"title","titles":[{"title":"Blade Runner 2049","year":2017}]}`, "Blade Runner 2049"},
+	} {
+		titles = c.titles
+		req, err := svc.requestFor(ctx, a, c.wish)
+		if err != nil || !req.precise || len(req.found) != 1 || req.found[0].Title != c.want {
+			t.Errorf("%q: %+v %v", c.wish, req, err)
+		}
 	}
 }
