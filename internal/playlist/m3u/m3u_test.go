@@ -56,6 +56,11 @@ func TestLimits(t *testing.T) {
 	if _, err := Parse(strings.NewReader(long), Limits{MaxEntries: 10, MaxLineLength: 1024}); err == nil {
 		t.Fatal("expected error for overlong line")
 	}
+	// A logo inline as a data: URI fits the default limits.
+	inline := "#EXTM3U\n#EXTINF:-1 tvg-logo=\"data:image/png;base64," + strings.Repeat("A", 70<<10) + "\",Rai 1\nhttp://a/1.ts\n"
+	if p, err := Parse(strings.NewReader(inline), Limits{}); err != nil || len(p.Entries) != 1 {
+		t.Fatalf("inline logo: %v", err)
+	}
 }
 
 // A web page (a provider's error or login page) is not a playlist, and

@@ -39,7 +39,9 @@ type Limits struct {
 }
 
 // DefaultLimits fit the largest real provider lists seen (~250k entries).
-var DefaultLimits = Limits{MaxEntries: 2_000_000, MaxLineLength: 64 * 1024}
+// A line can carry a logo inline (a data: URI of tens of KB): a longer
+// line fails the whole playlist, so the bound is generous.
+var DefaultLimits = Limits{MaxEntries: 2_000_000, MaxLineLength: 1 << 20}
 
 // ErrNotPlaylist means the answer is a web page or another document.
 var ErrNotPlaylist = errors.New("la risposta non è una playlist M3U (sembra una pagina web o un altro documento)")
