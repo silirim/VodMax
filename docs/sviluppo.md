@@ -76,6 +76,7 @@ di accesso di ognuna, è in `internal/api/api.go`.
 | `POST /api/v1/settings/assistant/local` `{model}` · `…/local/cancel` · `DELETE …/local` | Installa, annulla o rimuove l'assistente integrato |
 | `POST /api/v1/settings/assistant/models` · `…/test` | Modelli offerti da un servizio; prova dell'assistente |
 | `POST /api/v1/assistant/rule` `{text}` · `POST /api/v1/assistant/tonight` `{wish}` | Una regola da una frase (non salvata); proposte per stasera |
+| `POST /api/v1/debug/player` `{event, detail}` | Un errore del player del browser, scritto nel log del server; tutti gli eventi solo da un browser con `localStorage` `vodmax.playerDebug` = `true` |
 
 ## Test
 

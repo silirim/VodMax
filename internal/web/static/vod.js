@@ -1574,7 +1574,12 @@
   $("next-now").onclick = () => playNext(true);
   $("next-cancel").onclick = () => { if (state.play) state.play.nextCancelled = true; conceal($("next-card")); };
 
-  // ---- Diagnostics: what the player does, sent to the server log ----
+  // ---- Diagnostics: player errors, sent to the server log ----
+  // Only errors: every event plus a tick every 10 s wrote up to 300 lines
+  // per film in the server log and hid real problems. localStorage
+  // "vodmax.playerDebug" = true sends them all again from one browser, to
+  // chase a playback problem on a device.
+  const diagAll = store.get("playerDebug", false);
   let diagCount = 0;
   function diag(event, extra) {
     const p = state.play;
@@ -1587,10 +1592,10 @@
       net: video.networkState, paused: video.paused, buffered: ranges.join(" "),
       error: video.error ? video.error.code + " " + (video.error.message || "") : "", ...extra } }).catch(() => {});
   }
-  for (const ev of ["loadstart", "loadedmetadata", "canplay", "playing", "waiting", "stalled", "pause", "play", "seeking", "seeked", "error", "emptied", "abort"]) {
+  for (const ev of diagAll ? ["loadstart", "loadedmetadata", "canplay", "playing", "waiting", "stalled", "pause", "play", "seeking", "seeked", "error", "emptied", "abort"] : ["error"]) {
     video.addEventListener(ev, () => diag(ev));
   }
-  setInterval(() => { if (state.play && !video.paused) diag("tick"); }, 10000);
+  if (diagAll) setInterval(() => { if (state.play && !video.paused) diag("tick"); }, 10000);
 
   function saveProgress() {
     const p = state.play;
