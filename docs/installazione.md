@@ -59,7 +59,7 @@ vodmax-server -version
   `X-Forwarded-For`) solo se il tunnel gira sullo stesso host; con un proxy
   su un'altra macchina chi passa da lì conta come un solo indirizzo.
   L'assistente con un modello sul processore può metterci qualche minuto
-  a rispondere (VodMax aspetta fino a 6 minuti, 2 per un servizio
+  a rispondere (VodMax aspetta fino a 6 minuti, 3 per un servizio
   online): alza il tempo di lettura del proxy (nginx `proxy_read_timeout
   400s`), altrimenti la pagina mostra un 504 mentre la risposta arriva.
   Il tunnel di Cloudflare aspetta al massimo 100 secondi.

@@ -51,7 +51,7 @@ var (
 // waited for; a model in the house on a processor needs minutes. A proxy
 // in front of VodMax may wait less (docs/install.md). Variables for tests.
 var (
-	onlineLimit       = 2 * time.Minute
+	onlineLimit       = 3 * time.Minute
 	homeLimit         = 6 * time.Minute
 	onlineCallTimeout = time.Minute
 )
@@ -261,11 +261,6 @@ type chatMessage struct {
 // the model is asked for a JSON object (servers that do not know the
 // option are asked again without it).
 func (s *Service) chat(ctx context.Context, a AssistantSettings, messages []chatMessage, asJSON bool) (_ string, err error) {
-	if a.Mode == "online" {
-		var done func()
-		ctx, done = withLimit(ctx, onlineCallTimeout, &err)
-		defer done()
-	}
 	base, model, key := a.URL, a.Model, ""
 	switch a.Mode {
 	case "local":
@@ -285,6 +280,8 @@ func (s *Service) chat(ctx context.Context, a AssistantSettings, messages []chat
 				return "", ErrAssistantOff
 			}
 			if p.native {
+				ctx, done := withLimit(ctx, onlineCallTimeout, &err)
+				defer done()
 				return s.claudeChat(ctx, key, a.Model, messages)
 			}
 			base = p.Base
@@ -298,22 +295,40 @@ func (s *Service) chat(ctx context.Context, a AssistantSettings, messages []chat
 	if asJSON {
 		body["response_format"] = map[string]string{"type": "json_object"}
 	}
-	for attempt := 0; ; attempt++ {
+	// Each attempt of an online call has its own minute: the retry of a
+	// thinking model cut by max_tokens must not inherit what the first
+	// attempt used.
+	post := func() (resp *http.Response, data []byte, err error) {
+		cctx := ctx
+		if a.Mode == "online" {
+			var done func()
+			cctx, done = withLimit(ctx, onlineCallTimeout, &err)
+			defer done()
+		}
 		raw, _ := json.Marshal(body)
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/chat/completions", bytes.NewReader(raw))
+		req, err := http.NewRequestWithContext(cctx, http.MethodPost, base+"/chat/completions", bytes.NewReader(raw))
 		if err != nil {
-			return "", err
+			return nil, nil, err
 		}
 		req.Header.Set("Content-Type", "application/json")
 		if key != "" {
 			req.Header.Set("Authorization", "Bearer "+key)
 		}
-		resp, err := client.Do(req)
-		if err != nil {
-			return "", AssistantUpstream{fmt.Errorf("assistente non raggiungibile: %w", redactURL(err))}
+		if resp, err = client.Do(req); err != nil {
+			return nil, nil, AssistantUpstream{fmt.Errorf("assistente non raggiungibile: %w", redactURL(err))}
 		}
-		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+		data, err = io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 		resp.Body.Close()
+		if err != nil && cctx.Err() != nil {
+			return nil, nil, err // cut by the limit: done says so
+		}
+		return resp, data, nil
+	}
+	for attempt := 0; ; attempt++ {
+		resp, data, err := post()
+		if err != nil {
+			return "", err
+		}
 		if resp.StatusCode == http.StatusBadRequest && attempt < 2 {
 			if _, ok := body["response_format"]; ok && attempt == 0 {
 				delete(body, "response_format")
@@ -1293,8 +1308,15 @@ func (s *Service) tonightLibrary(ctx context.Context) []candidate {
 	if mine, err := s.MyList(ctx); err == nil {
 		add(mine, "(in their list)")
 	}
-	if trend, err := s.Trending(ctx); err == nil {
-		add(trend, "(trending)")
+	// Only a ranking at hand: fetching it (two TMDB calls, up to 20 s
+	// each, not bound to the question) would eat the question's time. It
+	// is fetched meanwhile for the next one.
+	if s.trendingAtHand() {
+		if trend, err := s.Trending(ctx); err == nil {
+			add(trend, "(trending)")
+		}
+	} else {
+		go s.Trending(context.WithoutCancel(ctx))
 	}
 	return out
 }

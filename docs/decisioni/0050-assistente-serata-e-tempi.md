@@ -28,9 +28,14 @@ scegliendo…" per più di dieci minuti.
   nell'elenco dei canali. Restano al massimo 60 programmi, per i modelli
   piccoli.
 - Una domanda (una regola, "stasera") ha un tempo massimo per intero:
-  2 minuti con un servizio online, 6 con un modello in casa (integrato o
-  server proprio), che sul processore legge lentamente. Una singola
-  chiamata a un servizio online si ferma dopo 1 minuto. Allo scadere la
+  3 minuti con un servizio online, 6 con un modello in casa (integrato o
+  server proprio), che sul processore legge lentamente: con un servizio
+  online una richiesta con le sue verifiche fa due chiamate più i
+  controlli delle pagine dei titoli (25 s). Una singola chiamata a un
+  servizio online si ferma dopo 1 minuto; il secondo tentativo di un
+  modello che "pensa" (risposta tagliata da max_tokens) ha il suo minuto.
+  "Di tendenza" entra nella serata solo se la classifica di TMDB è già
+  pronta: prenderla ora toglierebbe tempo alla domanda. Allo scadere la
   persona legge "l'assistente non ha risposto in tempo: riprova o scegli
   un modello più veloce".
 - Dietro un reverse proxy il tempo di lettura del proxy va alzato

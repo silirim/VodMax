@@ -337,6 +337,13 @@ type trendingCache struct {
 	fetching bool
 }
 
+// trendingAtHand reports whether Trending answers without asking TMDB.
+func (s *Service) trendingAtHand() bool {
+	s.trend.mu.Lock()
+	defer s.trend.mu.Unlock()
+	return time.Since(s.trend.at) <= trendingFor || s.trend.fetching
+}
+
 // Trending lists the titles of the catalog in TMDB's weekly ranking,
 // films and series alternating, at most 24. Without a TMDB key: none.
 func (s *Service) Trending(ctx context.Context) ([]store.CatalogItem, error) {

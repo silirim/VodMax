@@ -219,3 +219,32 @@ func TestAssistantTimeLimits(t *testing.T) {
 		t.Fatalf("a whole question: %v after %s", err, time.Since(start))
 	}
 }
+
+// The retry of a thinking model cut by max_tokens has a call limit of its
+// own: a slow first attempt does not leave it without time.
+func TestAssistantRetryHasItsOwnCallLimit(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		time.Sleep(300 * time.Millisecond)
+		if _, capped := body["max_tokens"]; capped {
+			fmt.Fprint(w, `{"choices":[{"message":{"role":"assistant","content":""},"finish_reason":"length"}]}`)
+			return
+		}
+		fmt.Fprint(w, `{"choices":[{"message":{"role":"assistant","content":"Pensato."},"finish_reason":"stop"}]}`)
+	}))
+	defer srv.Close()
+	old := onlineCallTimeout
+	t.Cleanup(func() { onlineCallTimeout = old })
+	onlineCallTimeout = 500 * time.Millisecond
+	s, _ := localTestService(t)
+	s.SetAssistantClient(&http.Client{Transport: toServer{srv}})
+	ctx := context.Background()
+	k := "sk-test"
+	if err := s.SetAssistant(ctx, AssistantInput{Enabled: true, Mode: "online", Provider: "openai", Model: "gpt-x", Key: &k}); err != nil {
+		t.Fatal(err)
+	}
+	if answer, _, err := s.TestAssistant(ctx); err != nil || answer != "Pensato." {
+		t.Fatalf("answer %q, %v", answer, err)
+	}
+}
