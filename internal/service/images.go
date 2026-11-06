@@ -207,9 +207,15 @@ func (s *Service) fetchImage(ctx context.Context, subID int64, src string) (stor
 		return store.CachedImage{}, ErrNoImage
 	}
 	req.Header.Set("User-Agent", "VodMax")
+	if _, ok := tun.(systemNetwork); ok {
+		tun = imageNetwork{}
+	}
 	client := provider.NewHTTPClient(tun, 0)
 	defer client.CloseIdleConnections() // single use: no idle connection left for 90 s
 	resp, err := client.Do(req)
+	if errors.Is(err, errLocalAddress) {
+		return store.CachedImage{}, ErrNoImage // remembered like a broken image
+	}
 	if err != nil {
 		return store.CachedImage{}, fmt.Errorf("immagine: %w", provider.Redact(err))
 	}

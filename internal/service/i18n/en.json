@@ -270,5 +270,6 @@
   "da questo indirizzo di VodMax non si entra con l'account: chi gestisce il server può aggiungerlo in Impostazioni → Dispositivi": "signing in with an account is not allowed from this VodMax address: whoever runs the server can add it in Settings → Devices",
   "indirizzo di VodMax non valido: %s (per esempio https://vodmax.example.org)": "invalid VodMax address: %s (for example https://vodmax.example.org)",
   "aggiungi almeno un indirizzo da cui si apre VodMax": "add at least one address VodMax is opened from",
-  "sostituita da una richiesta più recente dello stesso dispositivo": "replaced by a newer request from the same device"
+  "sostituita da una richiesta più recente dello stesso dispositivo": "replaced by a newer request from the same device",
+  "indirizzo locale non permesso per le immagini": "local address not allowed for images"
 }

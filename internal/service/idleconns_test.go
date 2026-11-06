@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -31,6 +32,15 @@ func TestProviderRequestsLeaveNoIdleConnections(t *testing.T) {
 	defer srv.Close()
 	s, sub := oneConnectionService(t)
 	s.imageKey() // sets up the fetch slots, as cachedImage does
+	// A tunnel that reaches the test server on loopback, which the normal
+	// network refuses for images.
+	info, err := s.st.Subscription(context.Background(), sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	s.tunnels[info.VPNID] = loopbackNet{}
+	s.mu.Unlock()
 	for i := 0; i < 10; i++ {
 		if _, err := s.fetchImage(context.Background(), sub, srv.URL+fmt.Sprintf("/logo/%d.png", i)); err != nil {
 			t.Fatal(err)
@@ -48,5 +58,23 @@ func TestProviderRequestsLeaveNoIdleConnections(t *testing.T) {
 			t.Fatalf("%d idle provider connections left open", open.Load())
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+type loopbackNet struct{ systemNetwork }
+
+// A playlist's logo on this machine's loopback (or a redirect to it) is
+// not fetched over the normal network, and is remembered as no image.
+func TestImagesRefuseLoopback(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { hits.Add(1) }))
+	defer srv.Close()
+	s, sub := oneConnectionService(t)
+	s.imageKey()
+	if _, err := s.fetchImage(context.Background(), sub, srv.URL+"/admin/snapshot.jpg"); !errors.Is(err, ErrNoImage) {
+		t.Fatalf("loopback image: %v", err)
+	}
+	if hits.Load() != 0 {
+		t.Fatal("loopback reached")
 	}
 }
