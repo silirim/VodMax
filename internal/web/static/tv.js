@@ -37,6 +37,7 @@
     digits: "",
     timers: {},
     retries: {},           // network retries per channel
+    endedAt: {},           // when the server last dropped a channel's buffer
     tuneGen: 0,            // bumped by every tune: older answers are ignored
   };
 
@@ -187,8 +188,19 @@
         if (state.player !== player) return;
         if (type === "ended") {
           // The server dropped the buffer (another device took the
-          // connection, or a recording): open the channel again.
+          // connection, or a recording): open the channel again. Not from
+          // a tab in the background (a film in another tab of this browser
+          // took the connection: it would take it back), and not again
+          // within 30 s, or two tabs would keep taking it from each other.
           stopPlayer();
+          const last = state.endedAt[channel.id] || 0;
+          state.endedAt[channel.id] = Date.now();
+          if (document.hidden) {
+            flash(t("La diretta si è interrotta"));
+            addEventListener("visibilitychange", () => { if (gen === state.tuneGen && !document.hidden) tune(state.current); }, { once: true });
+            return;
+          }
+          if (Date.now() - last < 30000) { flash(t("La diretta si è interrotta")); return; }
           flash(t("Diretta interrotta: riapro il canale…"));
           retune(gen, 2000);
           return;
