@@ -386,16 +386,19 @@ func (s *Service) recordOnce(ctx context.Context, a *activeRec, it store.Playbac
 		}
 	}()
 	buf := make([]byte, 188*512)
+	var pk tsPackets // per connection: a packet cut by its end is dropped
 	for {
 		n, err := resp.Body.Read(buf)
 		if n > 0 {
 			last.Store(time.Now().UnixNano())
-			if _, werr := f.Write(buf[:n]); werr != nil {
-				return werr
+			if whole := pk.take(buf[:n]); len(whole) > 0 {
+				if _, werr := f.Write(whole); werr != nil {
+					return werr
+				}
+				a.mu.Lock()
+				a.bytes += int64(len(whole))
+				a.mu.Unlock()
 			}
-			a.mu.Lock()
-			a.bytes += int64(n)
-			a.mu.Unlock()
 		}
 		if err != nil {
 			if stalled.Load() && ctx.Err() == nil {
@@ -407,6 +410,45 @@ func (s *Service) recordOnce(ctx context.Context, a *activeRec, it store.Playbac
 			return err
 		}
 	}
+}
+
+// tsPackets passes on only whole 188-byte TS packets, in step with the
+// sync byte. A read can end inside a packet, and a connection can end or
+// start in the middle of one: written as they came, those pieces put the
+// file out of step at every reconnection, and players (mpegts.js) stop
+// there.
+type tsPackets struct {
+	pend   []byte // the start of a packet, until the next read
+	synced bool
+}
+
+// take returns the whole packets of what was kept plus p.
+func (k *tsPackets) take(p []byte) []byte {
+	b := append(k.pend, p...)
+	out := make([]byte, 0, len(b))
+	i := 0
+	for len(b)-i >= 188 {
+		if b[i] != 0x47 {
+			k.synced, i = false, i+1
+			continue
+		}
+		if !k.synced {
+			// A 0x47 can be inside a packet too: a new start counts only
+			// when the next packet starts where it should.
+			if len(b)-i < 376 {
+				break
+			}
+			if b[i+188] != 0x47 {
+				i++
+				continue
+			}
+		}
+		k.synced = true
+		out = append(out, b[i:i+188]...)
+		i += 188
+	}
+	k.pend = append([]byte(nil), b[i:]...)
+	return out
 }
 
 // ---- Scheduling ----
@@ -605,7 +647,8 @@ func (s *Service) followRecording(ctx context.Context, a *activeRec) (*Stream, e
 	}
 	const back = 188 * 10000 // ~2 MB before the live edge
 	if size := a.size(); size > back {
-		f.Seek((size-back)/188*188, io.SeekStart)
+		// In step even in a file written before whole packets were kept.
+		f.Seek(tsSync(f, (size-back)/188*188), io.SeekStart)
 	}
 	return &Stream{ReadCloser: &follower{f: f, ctx: ctx, a: a}, ContentType: "video/mp2t", Title: a.rec.Channel}, nil
 }
