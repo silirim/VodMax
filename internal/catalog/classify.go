@@ -37,6 +37,7 @@ var (
 	radioWords    = regexp.MustCompile(`(?i)\bradio\b`)
 	// homeWords are what follows "Live"/"TV" in groups of home channels.
 	homeWords = regexp.MustCompile(`(?i)^(?:events?|eventi|ppv|locali|regionali)\b`)
+	homeAny   = regexp.MustCompile(`(?i)\b(?:events?|eventi|ppv|locali|regionali)\b`)
 )
 
 // liveCountry is the country label of a "Live <X>" / "TV <X>" group. On
@@ -52,6 +53,11 @@ func liveCountry(name string) (string, bool) {
 	}
 	label := strings.TrimSpace(m[1])
 	if CanonicalCountry(label) == label && (sportWords.MatchString(label) || radioWords.MatchString(label) || homeWords.MatchString(label)) {
+		// "Live Sport UK", "LIVE EVENTS DE": what is left names a country.
+		rest := strings.TrimSpace(homeAny.ReplaceAllString(radioWords.ReplaceAllString(sportWords.ReplaceAllString(label, " "), " "), " "))
+		if rest != "" && (CanonicalCountry(rest) != rest || countryAliases[fold(rest)] != "") {
+			return rest, true
+		}
 		return "", false
 	}
 	return label, true
