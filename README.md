@@ -51,7 +51,7 @@ decoder with the remote.
 | 📺 **Live TV** | Remote-friendly zapping (numbers, P+/P−, favourites only), channel list, now/next, official channel numbering, sport and radio sections, **multiview** (2 or 4 channels at once) |
 | 🗓️ **TV guide** | Programme grid from XMLTV (playlist guide and external sources), record or replay from the guide |
 | ⏸️ **Timeshift & catch-up** | Pause and rewind live TV, start the programme from the beginning, replay from the playlist's archive |
-| ⏺️ **Recordings (DVR)** | Record what is on, from the guide or by rule ("every match", "the news", live only), with disk and connection checks; "skip ad" with Comskip |
+| ⏺️ **Recordings (DVR)** | Record what is on, from the guide or by rule ("every match", "the news", live only), with disk and connection checks; "skip ad" with Comskip (optional, installed separately: not in the Docker image) |
 | 🎬 **Movies & series** | Posters, plots and cast, continue watching, my list, next episode, skip intro, audio and subtitle languages, MKV/AVI/HEVC converted on the fly (also with the graphics card: VAAPI, Quick Sync, NVENC) |
 | ⬇️ **Downloads** | Copy movies, episodes, seasons or whole series to the server's disk, to watch them without the playlist; one at a time, only on a free connection (whoever watches comes first), optionally at night |
 | 📁 **Local collections** | Folders of movies or series named like Jellyfin/Kodi/Plex libraries, `.nfo` files and artwork next to the videos |

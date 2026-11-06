@@ -42,6 +42,10 @@ vodmax-server -version
   Without it VodMax works, but there is no pause of live TV, no recordings
   and MKV/AVI files do not play in the browser (the Android app plays them
   anyway).
+- **Comskip** (optional): marks the ads in recordings, for "skip ad". It is
+  not in Debian's packages nor in the Docker image: build it from
+  its sources and put `comskip` in `/usr/local/bin`. Without it everything
+  else works.
 - **Port**: the interface is on `http://<server>:8095`. Change it in
   `vodmax.service` (`-listen`). Keep it inside your home network; from
   outside use your own VPN (WireGuard, Tailscale...) rather than opening the
