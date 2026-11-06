@@ -292,13 +292,27 @@ func (s *Service) chat(ctx context.Context, a AssistantSettings, messages []chat
 		}
 		var out struct {
 			Choices []struct {
-				Message chatMessage `json:"message"`
+				Message      chatMessage `json:"message"`
+				FinishReason string      `json:"finish_reason"`
 			} `json:"choices"`
 		}
 		if err := json.Unmarshal(data, &out); err != nil || len(out.Choices) == 0 {
 			return "", ErrAssistant
 		}
-		return out.Choices[0].Message.Content, nil
+		c := out.Choices[0]
+		// Thinking models (recent Gemini, reasoning models on OpenRouter or
+		// Ollama) count their hidden reasoning against max_tokens and stop
+		// with no answer or half of one: once more, with room for both. The
+		// built-in models do not think; a cut there is a model rambling.
+		if _, capped := body["max_tokens"]; capped && c.FinishReason == "length" && a.Mode != "local" {
+			delete(body, "max_tokens")
+			body["max_completion_tokens"] = 4000
+			continue
+		}
+		if strings.TrimSpace(c.Message.Content) == "" {
+			return "", ErrAssistant
+		}
+		return c.Message.Content, nil
 	}
 }
 

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -148,5 +149,37 @@ func TestAssistantKeyStaysWithItsService(t *testing.T) {
 	s.TestAssistant(ctx)
 	if len(auth) == 0 || auth[len(auth)-1] != "Bearer sk-server" {
 		t.Fatalf("older key lost: %q", auth)
+	}
+}
+
+// A thinking model spends max_tokens on its hidden reasoning and stops
+// with no answer: VodMax asks once more with room for it. An empty answer
+// is not a success.
+func TestAssistantCutByThinking(t *testing.T) {
+	var bodies []map[string]any
+	empty := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		bodies = append(bodies, body)
+		if _, capped := body["max_tokens"]; capped || empty {
+			fmt.Fprint(w, `{"choices":[{"message":{"role":"assistant","content":""},"finish_reason":"length"}]}`)
+			return
+		}
+		fmt.Fprint(w, `{"choices":[{"message":{"role":"assistant","content":"Sono un modello che pensa."},"finish_reason":"stop"}]}`)
+	}))
+	defer srv.Close()
+	s, _ := localTestService(t)
+	ctx := context.Background()
+	if err := s.SetAssistant(ctx, AssistantInput{Enabled: true, Mode: "server", URL: srv.URL + "/v1", Model: "qwen3"}); err != nil {
+		t.Fatal(err)
+	}
+	answer, _, err := s.TestAssistant(ctx)
+	if err != nil || answer != "Sono un modello che pensa." || len(bodies) != 2 || bodies[1]["max_completion_tokens"] != float64(4000) {
+		t.Fatalf("answer %q, %v, requests %v", answer, err, bodies)
+	}
+	empty, bodies = true, nil
+	if _, _, err := s.TestAssistant(ctx); !errors.Is(err, ErrAssistant) || len(bodies) != 2 {
+		t.Fatalf("empty answer: %v, %d requests", err, len(bodies))
 	}
 }
