@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -125,5 +128,91 @@ func TestOnceEvening(t *testing.T) {
 	}
 	if !filmRE.MatchString(fold("Film TV")) || filmRE.MatchString(fold("filmati")) {
 		t.Fatal("film")
+	}
+}
+
+// A lineup of 100 channels with a guide, each with the news at 19:55, a
+// quiz at 20:30, the film at 21:30 and something late at 23:30: the
+// evening list keeps every channel's film (the programme starting nearest
+// prime time), not 60 quizzes, and later in the evening what is on and
+// what comes next, two per channel. A favourite comes first.
+func TestTonightManyChannels(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	box, _ := secret.LoadOrCreate(filepath.Join(dir, "secret.key"))
+	st, err := store.Open(filepath.Join(dir, "vodmax.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	svc := New(st, box, nil)
+	seal := func(int64) []byte { return []byte("x") }
+	vpnID, _ := st.AddVPN(ctx, "v", "system", seal)
+	sub, err := st.AddSubscription(ctx, store.Subscription{Name: "B", Kind: "xtream", VPNID: vpnID, Settings: json.RawMessage(`{}`)}, seal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	at := func(h, m int) int64 { return day.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute).Unix() }
+	var items []store.Item
+	var guide []store.GuideChannel
+	var progs []store.GuideProgramme
+	for i := range 100 {
+		id, name := fmt.Sprintf("ch%03d.it", i), fmt.Sprintf("Canale %03d", i)
+		items = append(items, store.Item{Kind: "live", SourceID: fmt.Sprint(i), Title: name, DisplayTitle: name, CategoryID: "1",
+			EPGID: id, GroupKey: "live:" + id, NameKey: id})
+		guide = append(guide, store.GuideChannel{ID: id, NameKey: id})
+		progs = append(progs,
+			store.GuideProgramme{Channel: id, Start: at(19, 55), Stop: at(20, 30), Title: "TG"},
+			store.GuideProgramme{Channel: id, Start: at(20, 30), Stop: at(21, 30), Title: "Quiz"},
+			store.GuideProgramme{Channel: id, Start: at(21, 30), Stop: at(23, 30), Title: "Film " + name},
+			store.GuideProgramme{Channel: id, Start: at(23, 30), Stop: at(24, 30), Title: "Notte"})
+	}
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live"}, []store.Category{{Kind: "live", SourceID: "1", Name: "Italia", Country: "IT"}}, items, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.SetHomeCountry(ctx, "IT"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ApplySelection(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ReplaceGuide(ctx, "ext:1", guide, progs); err != nil {
+		t.Fatal(err)
+	}
+	channels, err := st.TVChannels(ctx, 0, false, "", false, now)
+	if err != nil || len(channels) != 100 {
+		t.Fatalf("channels: %d %v", len(channels), err)
+	}
+	last := channels[len(channels)-1]
+	if err := st.SetFavorite(ctx, 0, last.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	count := func(list []candidate) map[string]int {
+		n := map[string]int{}
+		for _, c := range list {
+			n[strings.Fields(c.Title)[0]]++
+		}
+		return n
+	}
+	has := func(list []candidate, title string) bool {
+		return slices.ContainsFunc(list, func(c candidate) bool { return c.Title == title })
+	}
+	// In the afternoon: the evening ahead, every channel's film.
+	list, err := svc.tonightProgrammes(ctx, Viewer{}, time.Unix(at(15, 0), 0))
+	if n := count(list); err != nil || len(list) != 60 || n["Film"] != 60 {
+		t.Fatalf("afternoon: %d candidates %v %v", len(list), n, err)
+	}
+	if !has(list, "Film "+last.Name) {
+		t.Fatal("afternoon: the favourite channel left out")
+	}
+	// At 21:40: the film on now and what follows, two per channel.
+	list, err = svc.tonightProgrammes(ctx, Viewer{}, time.Unix(at(21, 40), 0))
+	if n := count(list); err != nil || len(list) != 60 || n["Film"] != 30 || n["Notte"] != 30 {
+		t.Fatalf("evening: %d candidates %v %v", len(list), n, err)
+	}
+	if !has(list, "Film "+last.Name) {
+		t.Fatal("evening: the favourite channel left out")
 	}
 }

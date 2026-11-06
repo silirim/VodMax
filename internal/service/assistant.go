@@ -912,7 +912,7 @@ func (s *Service) AssistantTonight(ctx context.Context, wish string) (Tonight, e
 	}
 	s.asst.mu.Unlock()
 
-	tv, err := s.tonightProgrammes(ctx, v)
+	tv, err := s.tonightProgrammes(ctx, v, time.Now())
 	if err != nil {
 		return out, err
 	}
@@ -1051,18 +1051,22 @@ func tonightWindow(now time.Time) (from, to time.Time) {
 }
 
 // tonightProgrammes: the programmes of tonightWindow on the viewer's
-// channels; at most 60, those on air now and those
-// of prime time first. With the library the list stays near 2000 tokens:
-// within what small local models read by default (Ollama cuts the rest
-// without a word), and about 40 seconds of reading on a processor.
-func (s *Service) tonightProgrammes(ctx context.Context, v Viewer) ([]candidate, error) {
-	now := time.Now()
+// channels, at most 60. Each channel brings two at most: what is on now
+// (from 18:00, when the window starts now) and its main programme, the
+// one starting nearest the start of prime time (21:15, or now when later):
+// the 21:30 film, not the 20:30 quiz. Favourites first, then the official
+// numbers: a lineup of hundreds of channels cannot crowd out the evening.
+// With the library the list stays near 2000 tokens: within what small
+// local models read by default (Ollama cuts the rest without a word), and
+// about 40 seconds of reading on a processor.
+func (s *Service) tonightProgrammes(ctx context.Context, v Viewer, now time.Time) ([]candidate, error) {
 	from, to := tonightWindow(now)
 	channels, err := s.st.TVChannels(ctx, v.ProfileID, v.Kids, "", false, now)
 	if err != nil {
 		return nil, err
 	}
 	s.withLogos(channels)
+	sort.SliceStable(channels, func(i, j int) bool { return channels[i].Favorite && !channels[j].Favorite })
 	byGuide := map[string]store.TVChannel{}
 	var guides []string
 	for _, c := range channels {
@@ -1078,11 +1082,35 @@ func (s *Service) tonightProgrammes(ctx context.Context, v Viewer) ([]candidate,
 	if err != nil {
 		return nil, err
 	}
+	y, m, d := now.Date()
+	if now.Hour() < 4 { // after midnight: the evening that began yesterday
+		d--
+	}
+	prime := max(time.Date(y, m, d, 21, 15, 0, 0, now.Location()).Unix(), now.Unix())
 	var out []candidate
-	for g, list := range progs {
+	for _, g := range guides {
+		if len(out) >= 60 {
+			break
+		}
 		c := byGuide[g]
-		for _, p := range list {
+		list := progs[g]
+		var onAir, main *store.Programme
+		for i, p := range list {
 			if p.Stop <= from.Unix() || p.Start >= to.Unix() || p.Stop-p.Start < 15*60 {
+				continue
+			}
+			if p.Start <= now.Unix() {
+				if !from.After(now) && onAir == nil {
+					onAir = &list[i]
+				}
+				continue
+			}
+			if main == nil || abs64(p.Start-prime) < abs64(main.Start-prime) {
+				main = &list[i]
+			}
+		}
+		for _, p := range []*store.Programme{onAir, main} {
+			if p == nil || len(out) >= 60 {
 				continue
 			}
 			extra := p.Category
@@ -1094,20 +1122,6 @@ func (s *Service) tonightProgrammes(ctx context.Context, v Viewer) ([]candidate,
 			}
 			out = append(out, candidate{Pick: Pick{Kind: "tv", Title: p.Title, ChannelID: c.ID, Channel: c.Name, Start: p.Start, Stop: p.Stop, Image: c.Logo}, extra: extra})
 		}
-	}
-	prime := func(c candidate) bool {
-		t := time.Unix(c.Start, 0)
-		h := t.Hour()*60 + t.Minute()
-		return c.Start <= now.Unix() || (h >= 20*60 && h <= 23*60+30)
-	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if pi, pj := prime(out[i]), prime(out[j]); pi != pj {
-			return pi
-		}
-		return out[i].Start < out[j].Start
-	})
-	if len(out) > 60 {
-		out = out[:60]
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Start != out[j].Start {

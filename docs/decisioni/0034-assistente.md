@@ -52,3 +52,11 @@ del provider che portano quel nome (una parola intera: "Thriller",
 "Horror"), alcuni da ognuna, diversi ogni sera. Se il provider non ha
 categorie per genere restano i titoli che il modello nomina e che il
 catalogo ha. I generi delle schede TMDB non sono ancora usati.
+
+## Aggiornamento del 6 novembre 2026: quali 60 programmi
+
+Con più di 60 canali con guida la scelta "prima quelli in onda e di
+prima serata" dava solo quiz e telegiornali delle 20:30. Ora ogni canale
+porta al massimo il programma in onda e quello che comincia più vicino
+alle 21:15, preferiti prima: [0050](0050-assistente-serata-e-tempi.md)
+(proposta).

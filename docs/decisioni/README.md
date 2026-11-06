@@ -54,6 +54,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0046](0046-spazio-prima-le-registrazioni.md) | Disco quasi pieno: prima le registrazioni, poi la pausa della diretta | Proposta |
 | [0048](0048-registrazioni-insistere-quando-serve.md) | Registrazioni: insistere quando serve, non quando è inutile | Proposta |
 | [0049](0049-backup-con-profili-e-registrazioni.md) | Backup: profili compresi, registrazioni recenti tenute | Proposta |
+| [0050](0050-assistente-serata-e-tempi.md) | Assistente: tutta la serata, e risposte che si possono usare | Proposta |
 
 ## Ordine consigliato per decidere
 
