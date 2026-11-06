@@ -184,6 +184,11 @@ video {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  /* Never wider than the window: the buttons wrap to a second row. */
+  flex-wrap: wrap;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100vw - 1rem);
   gap: 0.5rem;
   padding: 0.7rem;
   background: rgba(19, 21, 27, 0.92);
@@ -191,8 +196,9 @@ video {
   border-radius: 16px;
   font-size: clamp(0.9rem, 1.2vw, 1.2rem);
 }
-/* Rarely used: only the icon, unless there is room. */
-@media (max-width: 1500px) { .controls button.icon-only .txt { display: none; } }
+/* Rarely used: only the icon (the name is the tooltip). The bar grows with
+   the screen, so there is never room for these names. */
+.controls button.icon-only .txt { display: none; }
 /* Pills like the player of films and the small buttons of every page. */
 .controls button {
   display: inline-flex;
@@ -274,7 +280,7 @@ body.controls-on .banner { display: none; }
    the middle, the other actions along the bottom. */
 @media (pointer: coarse), (max-width: 800px) {
   .controls:not([hidden]) {
-    top: 0; right: 0; bottom: 0; left: 0; transform: none;
+    top: 0; right: 0; bottom: 0; left: 0; transform: none; width: auto; max-width: none;
     display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: auto 1fr auto; align-items: center;
     gap: 0; padding: calc(12px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));
     font-size: 0.85rem;
