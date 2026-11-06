@@ -41,7 +41,9 @@ Fire OS (non sulla Fire TV Stick 4K Select, che usa Vega OS).
 ## LG webOS — `webos/`
 
 Un avvio leggero: chiede l'indirizzo del server, controlla che risponda e
-apre l'interfaccia (player del browser della TV). Pacchetto con gli
+apre l'interfaccia (player del browser della TV). All'avvio con l'indirizzo
+salvato aspetta un secondo e mezzo: OK o Indietro tornano al modulo per
+cambiare server; Indietro sul modulo chiude l'app. Pacchetto con gli
 strumenti LG:
 
 ```sh

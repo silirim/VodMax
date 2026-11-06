@@ -18,7 +18,8 @@
     "Collegamento a {base}…": "Connecting to {base}…",
     "Il server non risponde a {base}: controlla che sia acceso e nella stessa rete.":
       "The server isn't responding at {base}: make sure it's on and on the same network.",
-    "Inserisci l'indirizzo del server.": "Enter the server address."
+    "Inserisci l'indirizzo del server.": "Enter the server address.",
+    "OK o Indietro: cambia server": "OK or Back: change server"
   };
   function t(text, base) {
     var s = (!italian && EN[text]) || text;
@@ -52,19 +53,34 @@
     x.send();
   }
 
-  function open(base) {
+  // The address being checked; null once OK or Back stopped it.
+  var checking = null;
+  var hintText = document.querySelector(".hint").textContent;
+
+  // pause: at start-up with the saved address the redirect waits a
+  // moment, the only chance to choose another server (the launcher's
+  // storage cannot be reached from the server's pages).
+  function open(base, pause) {
+    var since = Date.now();
+    checking = base;
     $("message").textContent = t("Collegamento a {base}…", base);
     $("message").className = "";
+    if (pause) document.querySelector(".hint").textContent = t("OK o Indietro: cambia server");
     check(base, function (ok) {
-      if (ok) {
-        window.location.replace(base + "/");
+      if (checking !== base) return;
+      if (!ok) {
+        checking = null;
+        showForm(base, t("Il server non risponde a {base}: controlla che sia acceso e nella stessa rete.", base));
         return;
       }
-      showForm(base, t("Il server non risponde a {base}: controlla che sia acceso e nella stessa rete.", base));
+      setTimeout(function () {
+        if (checking === base) window.location.replace(base + "/");
+      }, pause ? Math.max(0, 1500 - (Date.now() - since)) : 0);
     });
   }
 
   function showForm(value, error) {
+    document.querySelector(".hint").textContent = hintText;
     $("form").hidden = false;
     $("retry").hidden = !value;
     $("server").value = value || "";
@@ -88,8 +104,17 @@
   });
 
   // Remote: Up/Down between the field and the buttons, Left/Right between
-  // the buttons.
+  // the buttons. OK or Back while connecting: the form, to change server.
+  // Back on the form leaves the app (webOS sends it to the page, 461).
   document.addEventListener("keydown", function (e) {
+    if (checking && (e.keyCode === 13 || e.keyCode === 461)) {
+      var base = checking;
+      checking = null;
+      e.preventDefault();
+      showForm(base, null);
+      return;
+    }
+    if (e.keyCode === 461 && !$("form").hidden) { window.close(); return; }
     var order = [$("server"), $("connect"), $("retry")].filter(function (el) { return !el.hidden; });
     var i = order.indexOf(document.activeElement);
     var onButton = document.activeElement !== $("server");
@@ -99,6 +124,6 @@
 
   var saved = null;
   try { saved = localStorage.getItem(KEY); } catch (err) { /* nothing saved */ }
-  if (saved) open(saved);
+  if (saved) open(saved, true);
   else showForm("", null);
 })();

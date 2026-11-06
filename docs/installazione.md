@@ -260,7 +260,8 @@ sviluppatore**. Se è troppo complicato, usa il browser della TV (sopra).
 
    (`tv_webos` è il file della chiave che `--getkey` salva in `~/.ssh`.)
 4. Apri VodMax sulla TV, scrivi l'indirizzo del server e approva il codice di
-   abbinamento.
+   abbinamento. Per cambiare server in seguito, premi OK o Indietro mentre
+   all'avvio l'app mostra "Collegamento a…".
 
 La Modalità sviluppatore dura **50 ore**: prima che scada apri l'app
 Developer Mode e premi *Extend*, altrimenti le app installate così non si

@@ -258,7 +258,8 @@ If that is too much, use the TV browser instead (above).
 
    (`tv_webos` is the key file `--getkey` saves in `~/.ssh`.)
 4. Open VodMax on the TV, enter the server address and approve the pairing
-   code.
+   code. To change server later, press OK or Back while the app shows
+   "Connecting to…" at start-up.
 
 Developer Mode lasts **50 hours**: open the Developer Mode app and press
 *Extend* before it expires, otherwise apps installed this way stop opening
