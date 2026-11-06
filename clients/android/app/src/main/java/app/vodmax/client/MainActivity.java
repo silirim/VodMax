@@ -213,6 +213,9 @@ public class MainActivity extends Activity {
 
     @SuppressLint("SetJavaScriptEnabled")
     private void open(String path) {
+        // Two reopenings at once (the local server's exit and a page error)
+        // must not leave the first WebView running off screen.
+        dropWeb();
         web = new WebView(this);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
