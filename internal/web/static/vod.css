@@ -68,6 +68,9 @@
 /* The arrows scroll a card into view with room for its focus ring and
    zoom (the row clips them otherwise, and the screen's edge cuts them). */
 .card, .card-x, .episodes .ep-card { scroll-margin: 1rem; }
+/* The sticky .top header: scrollIntoView("nearest") must not park the
+   focus under it (about 4.8rem at every size: rem follows the width). */
+html { scroll-padding-top: 6.5rem; }
 
 /* Recordings */
 .recs { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
