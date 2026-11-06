@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -147,7 +148,8 @@ func TestInstallAndRunLocalAssistant(t *testing.T) {
 	t.Cleanup(func() { localEngines, localModels, engineLibraries = oldEngines, oldModels, oldLibs })
 	engineLibraries = map[string]string{}
 	localEngines = map[string]struct{ URL, SHA256 string }{runtime.GOARCH: {srv.URL + "/engine.tar.gz", digest(engine)}}
-	localModels = []LocalModel{{ID: "balanced", Name: "Bilanciato", Size: int64(len(model)), url: srv.URL + "/m.gguf", sha256: digest(model)}}
+	localModels = []LocalModel{{ID: "balanced", Name: "Bilanciato", Size: int64(len(model)), url: srv.URL + "/m.gguf", sha256: digest(model)},
+		{ID: "fast", Name: "Veloce", Size: int64(len(model)), url: srv.URL + "/m.gguf", sha256: digest(model)}}
 
 	if err := s.SetAssistant(ctx, AssistantInput{Enabled: true, Mode: "local", Model: "balanced"}); err == nil {
 		t.Fatal("turned on before the model was installed")
@@ -180,6 +182,30 @@ func TestInstallAndRunLocalAssistant(t *testing.T) {
 	if v := s.LocalAssistant(ctx); v.Running != "balanced" || !v.Models[0].Installed || !v.Installed {
 		t.Fatalf("view: %+v", v)
 	}
+	// Another model asked for while an answer runs on the engine: that
+	// answer keeps it; the model changes once nothing runs.
+	os.WriteFile(filepath.Join(dir, "models", "fast.gguf"), model, 0o600)
+	running := func() *exec.Cmd {
+		s.asst.local.mu.Lock()
+		defer s.asst.local.mu.Unlock()
+		return s.asst.local.cmd
+	}
+	_, _, answering, err := s.localEndpoint(ctx, "balanced")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := running()
+	_, _, other, err := s.localEndpoint(ctx, "fast")
+	if err != nil || running() != first {
+		t.Fatalf("engine stopped under a running answer: %v", err)
+	}
+	other()
+	answering()
+	_, _, release, err := s.localEndpoint(ctx, "fast")
+	if err != nil || running() == first || s.LocalAssistant(ctx).Running != "fast" {
+		t.Fatalf("model not changed when idle: %v", err)
+	}
+	release()
 	if err := s.RemoveLocalAssistant(ctx); err != nil {
 		t.Fatal(err)
 	}

@@ -620,9 +620,12 @@ func (s *Service) localEndpoint(ctx context.Context, id string) (base, model str
 		l.mu.Unlock()
 		return l.ollama + "/v1", m.ollama, func() {}, nil
 	}
-	if l.running != id && l.cmd != nil {
+	// Another model: the engine changes once no answer runs on it. Until
+	// then the old model answers, rather than an answer being cut.
+	if l.running != id && l.cmd != nil && l.busy == 0 {
+		cmd, exited := l.takeEngine()
 		l.mu.Unlock()
-		s.stopLocal()
+		stopEngine(cmd, exited)
 		l.mu.Lock()
 	}
 	if l.cmd == nil {
@@ -701,23 +704,40 @@ func (s *Service) idleStop(cmd *exec.Cmd, exited chan struct{}) {
 			return
 		case <-t.C:
 			l.mu.Lock()
+			// Checked and taken in one go: a request arriving now finds no
+			// engine and starts one, instead of losing this one mid-answer.
 			idle := l.cmd == cmd && l.busy == 0 && time.Since(l.last) > localIdle
+			if idle {
+				l.takeEngine()
+			}
 			l.mu.Unlock()
 			if idle {
 				l.log.Info("assistente integrato fermato: nessuna richiesta da 10 minuti")
-				s.stopLocal()
+				stopEngine(cmd, exited)
 				return
 			}
 		}
 	}
 }
 
+// stopLocal stops the engine whatever it is doing: the admin changed the
+// mode or removed the assistant, or VodMax is shutting down.
 func (s *Service) stopLocal() {
 	l := &s.asst.local
 	l.mu.Lock()
+	cmd, exited := l.takeEngine()
+	l.mu.Unlock()
+	stopEngine(cmd, exited)
+}
+
+// takeEngine detaches the running engine, for stopEngine; l.mu is held.
+func (l *localState) takeEngine() (*exec.Cmd, chan struct{}) {
 	cmd, exited := l.cmd, l.exited
 	l.cmd, l.running = nil, ""
-	l.mu.Unlock()
+	return cmd, exited
+}
+
+func stopEngine(cmd *exec.Cmd, exited chan struct{}) {
 	if cmd == nil || cmd.Process == nil {
 		return
 	}
