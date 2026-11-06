@@ -90,4 +90,10 @@ func TestFailQuietForImages(t *testing.T) {
 	if w.Code != 502 || logged.Len() != 0 {
 		t.Fatalf("unreachable: %d, log %q", w.Code, logged.String())
 	}
+	// An empty guide is the provider's answer, kept out (the old one stays).
+	w = httptest.NewRecorder()
+	a.fail(w, httptest.NewRequest("POST", "/api/v1/guide/sources/1/sync", nil), store.ErrGuideEmpty)
+	if w.Code != 502 || logged.Len() != 0 {
+		t.Fatalf("empty guide: %d, log %q", w.Code, logged.String())
+	}
 }

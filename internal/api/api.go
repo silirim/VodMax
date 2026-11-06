@@ -328,7 +328,8 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusBadGateway
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, service.ErrAssistantSlow):
 		status = http.StatusGatewayTimeout
-	case errors.As(err, new(*service.ProviderError)):
+	case errors.As(err, new(*service.ProviderError)), errors.Is(err, store.ErrGuideEmpty):
+		// The provider answered nothing usable (the old guide stays).
 		status = http.StatusBadGateway
 	}
 	if status == http.StatusInternalServerError {
