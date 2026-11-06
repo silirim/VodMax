@@ -31,7 +31,9 @@ dopo la nuova sincronizzazione appartengono ad altri film.
   di questo server; se il file non c'è, diventa "non riuscita" con la
   nota "file della registrazione non trovato dopo il ripristino".
 - Le registrazioni finite che non sono nel backup e il cui file è ancora
-  nella cartella restano nella lista.
+  nella cartella restano nella lista. Una registrazione in corso quando è
+  stata fatta la copia, e finita dopo sullo stesso server, resta finita
+  con il suo file (l'MP4 della conversione o il TS) e i dati di adesso.
 - I download restano e ritrovano il loro titolo dopo la sincronizzazione
   (per abbonamento e codice del provider).
 - I backup fatti prima restano ripristinabili: i profili restano quelli

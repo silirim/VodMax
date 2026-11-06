@@ -383,6 +383,44 @@ func TestImportBackupFromAnOlderVersion(t *testing.T) {
 	}
 }
 
+// A copy made while a recording was running, restored on the same server
+// once it has finished: the recording stays completed, with its file (the
+// MP4 of the conversion, or the TS) and what it has now, not "interrupted"
+// and not twice.
+func TestRestoreKeepsARecordingFinishedSinceTheCopy(t *testing.T) {
+	for _, ext := range []string{".mp4", ".ts"} {
+		st, _ := openTest(t)
+		ctx := context.Background()
+		id, err := st.AddRecording(ctx, Recording{GroupKey: "g", Channel: "Rai 1", Title: "Film", Start: 100, Stop: 200})
+		if err != nil {
+			t.Fatal(err)
+		}
+		base := filepath.Join(t.TempDir(), "1-film")
+		st.UpdateRecording(ctx, Recording{ID: id, Status: "recording", File: base + ".ts", Bytes: 10, Stop: 200})
+		open := func(int64, []byte) ([]byte, error) { return []byte("{}"), nil }
+		b, err := st.ExportBackup(ctx, open, open)
+		if err != nil {
+			t.Fatal(err)
+		}
+		file := base + ext // finished early, then converted or left in MPEG-TS
+		st.UpdateRecording(ctx, Recording{ID: id, Status: "completed", File: file, Bytes: 500, Stop: 190})
+		seal := func(int64, []byte) []byte { return []byte("sealed") }
+		recFile := func(name string) string {
+			if name == filepath.Base(file) {
+				return file
+			}
+			return ""
+		}
+		if err := st.ImportBackup(ctx, b, seal, seal, recFile); err != nil {
+			t.Fatal(err)
+		}
+		l, _ := st.Recordings(ctx)
+		if len(l) != 1 || l[0].ID != id || l[0].Status != "completed" || l[0].File != file || l[0].Bytes != 500 || l[0].Stop != 190 || l[0].Error != "" {
+			t.Fatalf("%s after the restore: %+v", ext, l)
+		}
+	}
+}
+
 // An empty guide (a busy panel's blank or HTML answer) does not wipe the
 // programmes still to come; once they are over it is taken.
 func TestEmptyGuideKeepsThePrevious(t *testing.T) {

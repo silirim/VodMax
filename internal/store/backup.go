@@ -411,12 +411,19 @@ func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub fu
 	}
 	for _, r := range b.Recordings {
 		status := r.Status
+		name := filepath.Base(b.RecordingFiles[r.ID])
+		c, same := byID[r.ID]
+		same = same && c.Start == r.Start && c.GroupKey == b.RecordingKeys[r.ID]
+		if same && status == "recording" && recFile(filepath.Base(c.File)) != "" {
+			// Running when the copy was made, finished since on this
+			// server and its file (MP4 after the conversion, or the TS) is
+			// here: the row of now is the truth.
+			r, status, name = c, c.Status, filepath.Base(c.File)
+		} else if same && b.RecordingFiles == nil {
+			name = filepath.Base(c.File) // an older backup, on the same server
+		}
 		if status == "recording" {
 			status, r.Error = "failed", "interrotta (ripristino da backup)"
-		}
-		name := filepath.Base(b.RecordingFiles[r.ID])
-		if c, ok := byID[r.ID]; ok && b.RecordingFiles == nil && c.Start == r.Start && c.GroupKey == b.RecordingKeys[r.ID] {
-			name = filepath.Base(c.File) // an older backup, on the same server
 		}
 		r.File = ""
 		if name != "." {
