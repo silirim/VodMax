@@ -208,16 +208,20 @@
     // The featured title: the first thing to continue, else the newest film.
     const first = cont[0] ? heroFromContinue(cont[0]) : films.items[0] ? heroFromItem(films.items[0]) : null;
     if (first) showHero(hero, first);
-    let heroTimer;
-    main.addEventListener("focusin", (e) => {
-      const card = e.target.closest(".card");
-      if (!card || !card.hero) return;
-      clearTimeout(heroTimer);
-      // Only if the focus is still on that card (moving on quickly with
-      // the remote must not redraw the hero under the new focus).
-      heroTimer = setTimeout(() => { if (document.activeElement === card) showHero(hero, card.hero); }, 350);
-    });
   }
+  // Added once, not at every visit of Home: the hero follows the focused
+  // card only on the page that has one (a card of Film or a search sets
+  // card.hero too, and a listener left from Home fetched its details).
+  let heroTimer;
+  $("content").addEventListener("focusin", (e) => {
+    const card = e.target.closest(".card");
+    const hero = $("content").querySelector(".hero:not(.skeleton)");
+    if (!card || !card.hero || !hero) return;
+    clearTimeout(heroTimer);
+    // Only if the focus is still on that card (moving on quickly with
+    // the remote must not redraw the hero under the new focus).
+    heroTimer = setTimeout(() => { if (document.activeElement === card && hero.isConnected) showHero(hero, card.hero); }, 350);
+  });
 
   function heroFromItem(item) {
     return { id: item.id, title: item.display_title, logo: item.logo,
