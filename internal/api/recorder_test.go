@@ -294,11 +294,11 @@ func TestTruncatedMP4KeepsTheTS(t *testing.T) {
 	}
 }
 
-// A recording left in MPEG-TS (an older version, a failed conversion)
+// A recording left in MPEG-TS (an older version, no ffmpeg at the time)
 // becomes an MP4 at the next start.
 func TestLeftoverTSConvertedAtStart(t *testing.T) {
 	e, _ := tvSetup(t)
-	e.svc.SetFFmpeg(fakeConverter(t, false, true), "") // fails the check: stays TS
+	e.svc.SetFFmpeg("vodmax-test-no-ffmpeg", "") // not installed: stays TS
 	recordFor(t, e, 2, "Vecchia")
 	time.Sleep(4 * time.Second)
 	if names := recFiles(t, e); len(names) != 1 || !strings.HasSuffix(names[0], ".ts") {
@@ -394,5 +394,30 @@ func TestNoConversionWithoutRoom(t *testing.T) {
 	}
 	if names := recFiles(t, e); len(names) != 1 || !strings.HasSuffix(names[0], ".ts") {
 		t.Fatalf("after the restart: %v", names)
+	}
+}
+
+// A conversion that failed is not tried again at every start (two ffmpeg
+// passes over the whole file each time): the TS stays, with a note.
+func TestFailedConversionNotRetriedAtStart(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.svc.SetFFmpeg(fakeConverter(t, false, true), "") // fails the check: stays TS
+	recordFor(t, e, 2, "Rotta")
+	time.Sleep(4 * time.Second)
+	if names := recFiles(t, e); len(names) != 1 || !strings.HasSuffix(names[0], ".ts") {
+		t.Fatalf("before the restart: %v", names)
+	}
+	if l := recRows(t, e); len(l) != 1 || !strings.Contains(l[0].Error, "conversione in MP4 non riuscita") {
+		t.Fatalf("recording: %+v", l)
+	}
+	e.stop()
+	called := filepath.Join(t.TempDir(), "called")
+	ff := filepath.Join(t.TempDir(), "ffmpeg")
+	os.WriteFile(ff, []byte("#!/bin/sh\ntouch "+called+"\nexit 1\n"), 0o700)
+	e.prepare = func(s *service.Service) { s.SetFFmpeg(ff, "") }
+	e.start()
+	time.Sleep(time.Second)
+	if _, err := os.Stat(called); err == nil {
+		t.Fatal("a failed conversion was tried again at the start")
 	}
 }

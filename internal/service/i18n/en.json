@@ -276,6 +276,7 @@
   "indirizzo locale non permesso per le immagini": "local address not allowed for images",
   "immagine non raggiungibile per ora": "image not reachable right now",
   "scrittura sul disco non riuscita: disco pieno o non scrivibile": "could not write to the disk: disk full or not writable",
+  " (conversione in MP4 non riuscita)": " (conversion to MP4 failed)",
   " (forse un altro dispositivo usa l'abbonamento)": " (another device may be using the subscription)",
   "La registrazione “%s” è stata interrotta più volte dal provider: forse un altro dispositivo usa l'abbonamento “%s”": "The recording “%s” was cut by the provider again and again: another device may be using the subscription “%s”",
   "file della registrazione non trovato dopo il ripristino": "recording file not found after the restore",

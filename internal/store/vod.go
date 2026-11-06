@@ -397,6 +397,12 @@ func (s *Store) UpdateRecording(ctx context.Context, r Recording) error {
 	return err
 }
 
+// AddRecordingNote appends note to a recording's note, once.
+func (s *Store) AddRecordingNote(ctx context.Context, id int64, note string) error {
+	_, err := s.w.ExecContext(ctx, `UPDATE recording SET error = error || ? WHERE id = ? AND instr(error, ?) = 0`, note, id, note)
+	return err
+}
+
 // SetRecordingFile points a recording at a new file, if it still has the
 // old one; false if not (deleted, or changed meanwhile).
 func (s *Store) SetRecordingFile(ctx context.Context, id int64, old, file string, bytes int64) (bool, error) {

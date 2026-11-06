@@ -62,7 +62,10 @@ causa sbagliata.
   quando ffprobe c'è e la durata è nota, almeno l'80% della durata.
   Altrimenti resta il TS.
 - A ogni avvio le registrazioni finite rimaste in TS (versioni precedenti,
-  conversioni fallite, riavvii) si riconvertono, una alla volta.
+  ffmpeg non ancora installato, riavvii, disco troppo pieno) si
+  riconvertono, una alla volta, con lo stesso controllo della durata. Una
+  conversione non riuscita non si riprova: la registrazione resta in TS
+  con la nota "conversione in MP4 non riuscita".
 - La conversione parte solo se sul disco c'è posto per una seconda copia
   (oltre al giga che resta sempre libero): l'MP4 si scrive accanto al TS,
   e riempire il disco fermerebbe le registrazioni in corso. Altrimenti
@@ -72,5 +75,3 @@ causa sbagliata.
 
 - Vedere gli altri client dell'account: il provider non lo dice.
 - Avvisare in un altro modo (notifica, e-mail).
-- Ricordare le conversioni non riuscite: una TS che non passa il
-  controllo si riprova a ogni avvio.

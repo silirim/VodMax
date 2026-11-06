@@ -345,8 +345,13 @@ func (s *Service) convertRecording(r store.Recording, secs float64) {
 		}
 	} else if strings.HasSuffix(r.File, ".ts") {
 		if mp4, err := s.remuxRecording(ctx, r.File, secs); err != nil {
-			if s.rec.log != nil && ctx.Err() == nil {
-				s.rec.log.Warn("registrazione lasciata in MPEG-TS", "id", r.ID, "err", err)
+			// No ffmpeg (yet): tried again at the next start.
+			if ctx.Err() == nil && !errors.Is(err, exec.ErrNotFound) && !errors.Is(err, os.ErrNotExist) {
+				if s.rec.log != nil {
+					s.rec.log.Warn("registrazione lasciata in MPEG-TS", "id", r.ID, "err", err)
+				}
+				// Not tried again at every start (two ffmpeg passes each).
+				s.st.AddRecordingNote(context.Background(), r.ID, noConversion)
 			}
 		} else {
 			s.useMP4(r, mp4)
@@ -1152,9 +1157,14 @@ func (e *errorLine) line() string {
 	return e.first
 }
 
+// noConversion is added to the note of a recording whose conversion to
+// MP4 failed: it stays in MPEG-TS.
+const noConversion = " (conversione in MP4 non riuscita)"
+
 // convertLeftovers converts the finished recordings still in MPEG-TS: left
-// so by an older version, by a failed conversion or by a restart in the
-// middle of one. It runs once at each start.
+// so by an older version, by a restart in the middle of a conversion or by
+// a disk too full for it. It runs once at each start; one whose conversion
+// failed is not tried again.
 func (s *Service) convertLeftovers(ctx context.Context) {
 	list, err := s.st.RecordingsInState(ctx, "completed")
 	if err != nil {
@@ -1164,8 +1174,8 @@ func (s *Service) convertLeftovers(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		if strings.HasSuffix(r.File, ".ts") && fileExists(r.File) {
-			s.convertRecording(r, 0)
+		if strings.HasSuffix(r.File, ".ts") && fileExists(r.File) && !strings.Contains(r.Error, noConversion) {
+			s.convertRecording(r, finishedLength(r))
 		}
 	}
 }
