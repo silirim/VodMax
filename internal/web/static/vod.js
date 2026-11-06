@@ -1086,7 +1086,7 @@
   async function play(media, id, title, startAt, mode, keep) {
     diagCount = 0;
     if (!state.play) state.playFrom = document.activeElement;
-    let sess;
+    let sess, forced = false;
     flash(mode === "remux" ? t("Preparazione della conversione…") : t("Avvio…"));
     const native = window.VodMax.native;
     // The Android player reads MKV, AC-3, HEVC: the file as it is.
@@ -1099,6 +1099,7 @@
         // first, then taken over, once.
         : await vodSession(ask).catch((e) => {
           if (e.status !== 409 || !confirm(t("La connessione dell'abbonamento è in uso su un altro dispositivo. Prendere il controllo?"))) throw e;
+          forced = true;
           return vodSession({ ...ask, force: true });
         });
     } catch (e) {
@@ -1123,7 +1124,9 @@
       play(media, id, title, startAt, "remux", tracks);
       return;
     }
-    load(startAt || 0);
+    // Taken over: the video too, or the other device, reopening in the
+    // moment the analysis let the connection go, would get it back.
+    load(startAt || 0, forced);
     saveTimer = setInterval(saveProgress, 15000);
   }
 
