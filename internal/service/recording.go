@@ -841,8 +841,10 @@ func (s *Service) DeleteRecording(ctx context.Context, id int64) error {
 		}
 		os.Remove(edlPath(r.File))
 	}
-	if r.RuleID != 0 && r.Stop > time.Now().Unix() {
-		// Its rule must not schedule it again.
+	if r.RuleID != 0 {
+		// Its rule must not schedule it again, also when it was stopped
+		// early (Stop is then already past) and the programme is still on
+		// air. PurgeCancelled drops the marker a week later.
 		return s.st.CancelRecording(ctx, id)
 	}
 	return s.st.DeleteRecording(ctx, id)

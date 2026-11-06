@@ -26,6 +26,9 @@ finite solo come righe INFO nel log: nessuno se ne è accorto.
   al provider.
 - Un errore di scrittura sul disco (disco pieno) ferma la registrazione e
   tiene quanto registrato.
+- Una registrazione di una regola fermata e poi cancellata resta
+  cancellata: la regola non la riprogramma mentre il programma è ancora in
+  onda (il segno di cancellazione si tiene una settimana).
 - Dopo 3 connessioni di fila chiuse dal provider entro un minuto, lo stato
   avvisa per 12 ore "forse un altro dispositivo usa l'abbonamento" e la
   registrazione finita lo dice nella sua nota.

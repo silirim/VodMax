@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 type ruleMatch struct {
@@ -297,5 +298,40 @@ func TestSuspendedRuleDropsItsRecordings(t *testing.T) {
 	e.do(t, "PUT", "/api/v1/recording-rules/"+strconv.FormatInt(rule.ID, 10), film, true)
 	if l := recRows(t, e); len(l) != 1 {
 		t.Fatalf("resumed rule: %+v", l)
+	}
+}
+
+// A rule recording of the programme on air: the person stops it, then
+// deletes it. The rule must not record it again (Stop is already past
+// after Ferma).
+func TestStoppedThenDeletedRuleRecordingStaysGone(t *testing.T) {
+	e, _ := tvSetup(t)
+	rai := channels(t, e, "?section=tv")[0]
+	rule := map[string]any{"name": "TG", "all": []string{"tg1"}, "channel_id": rai.ID}
+	if code, body := e.do(t, "POST", "/api/v1/recording-rules", rule, true); code != 201 {
+		t.Fatalf("rule: %d %s", code, body)
+	}
+	var id int64
+	for i := 0; i < 50 && id == 0; i++ {
+		if l := recRows(t, e); len(l) == 1 && l[0].Status == "recording" {
+			id = l[0].ID
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if id == 0 {
+		t.Fatalf("not recording: %+v", recRows(t, e))
+	}
+	path := "/api/v1/recordings/" + strconv.FormatInt(id, 10)
+	if code, body := e.do(t, "POST", path+"/stop", nil, true); code/100 != 2 {
+		t.Fatalf("stop: %d %s", code, body)
+	}
+	time.Sleep(1100 * time.Millisecond) // Stop (now) before the delete's now
+	if code, body := e.do(t, "DELETE", path, nil, true); code/100 != 2 {
+		t.Fatalf("delete: %d %s", code, body)
+	}
+	e.do(t, "PUT", "/api/v1/recording-rules/1", rule, true) // the rule's next pass
+	time.Sleep(500 * time.Millisecond)
+	if l := recRows(t, e); len(l) != 0 {
+		t.Fatalf("stopped and deleted, recorded again by the rule: %+v", l)
 	}
 }
