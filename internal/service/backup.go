@@ -57,11 +57,12 @@ func (s *Service) exportData(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Sealed settings (the TMDB key) travel in clear inside the encrypted
-	// backup, so another installation can seal them with its own key.
+	// Sealed settings (TMDB key, client secret of the home account,
+	// assistant key) travel in clear inside the encrypted backup, so
+	// another installation can seal them with its own key.
 	b.Secrets = map[string]string{}
 	for k := range b.Settings {
-		if strings.HasPrefix(k, secretPrefix) {
+		if sealedSetting(k) {
 			if v, err := s.secretSetting(ctx, k); err == nil && v != "" {
 				b.Secrets[k] = v
 			}
@@ -203,9 +204,17 @@ func (s *Service) RestoreBackup(ctx context.Context, data []byte, password strin
 	clear(s.maint.guideErr)
 	clear(s.maint.guideRetry)
 	s.mu.Unlock()
-	for k := range b.Settings {
-		if strings.HasPrefix(k, secretPrefix) {
-			delete(b.Settings, k) // sealed by another installation
+	for k, v := range b.Settings {
+		if !sealedSetting(k) {
+			continue
+		}
+		var b64 string
+		err := json.Unmarshal([]byte(v), &b64)
+		if err == nil {
+			_, err = s.openSealedValue(k, b64)
+		}
+		if err != nil {
+			delete(b.Settings, k) // sealed by another installation (older backups carried some so)
 		}
 	}
 	err = s.st.ImportBackup(ctx, b,
@@ -216,7 +225,7 @@ func (s *Service) RestoreBackup(ctx context.Context, data []byte, password strin
 		return err
 	}
 	for k, v := range b.Secrets {
-		if strings.HasPrefix(k, secretPrefix) {
+		if sealedSetting(k) {
 			if err := s.setSecretSetting(ctx, k, v); err != nil {
 				return err
 			}
@@ -250,6 +259,11 @@ func (s *Service) recordingFile(name string) string {
 		return ""
 	}
 	return p
+}
+
+// sealedSetting tells the settings stored sealed with this server's key.
+func sealedSetting(k string) bool {
+	return strings.HasPrefix(k, secretPrefix) || k == ssoSecretKey || k == assistantSecretKey
 }
 
 var errNoBackupDir = errors.New("cartella dei backup non impostata")

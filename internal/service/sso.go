@@ -181,12 +181,13 @@ func (s *Service) SetSSO(ctx context.Context, in SSOInput) error {
 	}
 	// Everything is checked before anything is saved: a refused form
 	// leaves the stored settings (and secret) as they were.
-	secret, err := s.secretSetting(ctx, ssoSecretKey)
-	if err != nil {
-		return err
-	}
+	// A new secret replaces the old one even when that cannot be opened
+	// any more (sealed by another installation).
+	var secret string
 	if in.Secret != nil {
 		secret = strings.TrimSpace(*in.Secret)
+	} else if secret, err = s.secretSetting(ctx, ssoSecretKey); err != nil {
+		return err
 	}
 	if o.Enabled && (o.Issuer == "" || o.ClientID == "" || secret == "") {
 		return invalid("per accendere l'accesso servono indirizzo del provider, client ID e client secret")

@@ -72,12 +72,16 @@ func (s *Service) secretSetting(ctx context.Context, key string) (string, error)
 	if err := s.st.Setting(ctx, key, &b64); err != nil || b64 == "" {
 		return "", err
 	}
+	plain, err := s.openSealedValue(key, b64)
+	return string(plain), err
+}
+
+func (s *Service) openSealedValue(key, b64 string) ([]byte, error) {
 	sealed, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	plain, err := s.box.Open(sealed, "setting:"+key)
-	return string(plain), err
+	return s.box.Open(sealed, "setting:"+key)
 }
 
 func (s *Service) setSecretSetting(ctx context.Context, key, value string) error {

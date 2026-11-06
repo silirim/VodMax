@@ -211,3 +211,31 @@ func TestRestoreKeepsLaterRecordings(t *testing.T) {
 		resp.Body.Close()
 	}
 }
+
+// The client secret of the home account travels in the backup like the
+// TMDB key: on a new installation the settings open, the secret is there,
+// and a new one can be saved.
+func TestRestoreReSealsTheHomeAccountSecret(t *testing.T) {
+	e := setup(t, true)
+	f := newFakeIdP(t)
+	e.svc.SetSSOClient(f.srv.Client())
+	cfg := map[string]any{"enabled": true, "issuer": f.srv.URL + "/", "client_id": "vodmax", "client_secret": "s3cret", "label": "Authelia",
+		"addresses": []string{e.srv.URL}, "accounts": []map[string]any{{"account": "a@example.org", "profile_id": 1}}}
+	if code, body := e.do(t, "PUT", "/api/v1/settings/sso", cfg, true); code != 200 {
+		t.Fatalf("sso: %d %s", code, body)
+	}
+	_, file := e.do(t, "POST", "/api/v1/backup", map[string]string{"password": "una password lunga"}, true)
+	n := setup(t, true)
+	n.svc.SetSSOClient(f.srv.Client())
+	if code, body := restore(t, n, file, "una password lunga"); code != 204 {
+		t.Fatalf("restore: %d %s", code, body)
+	}
+	if code, body := n.do(t, "GET", "/api/v1/settings/sso", nil, true); code != 200 || !strings.Contains(string(body), `"has_secret":true`) {
+		t.Fatalf("settings after restore: %d %s", code, body)
+	}
+	cfg["client_secret"] = "nuovo"
+	cfg["addresses"] = []string{n.srv.URL}
+	if code, body := n.do(t, "PUT", "/api/v1/settings/sso", cfg, true); code != 200 {
+		t.Fatalf("new secret after restore: %d %s", code, body)
+	}
+}
