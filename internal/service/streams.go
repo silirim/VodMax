@@ -177,7 +177,7 @@ func (s *Service) acquireConn(ctx context.Context, subID int64, viewer string, f
 // upstream opens a provider URL through the subscription's VPN, retrying
 // briefly when a single-connection account is still releasing the
 // previous stream. rangeHeader is forwarded when not empty.
-func (s *Service) upstream(ctx context.Context, subID int64, url, rangeHeader string) (*http.Response, error) {
+func (s *Service) upstream(ctx context.Context, subID int64, url, rangeHeader string) (resp *http.Response, err error) {
 	sub, err := s.st.Subscription(ctx, subID)
 	if err != nil {
 		return nil, err
@@ -189,7 +189,14 @@ func (s *Service) upstream(ctx context.Context, subID int64, url, rangeHeader st
 	if err != nil {
 		return nil, fmt.Errorf("VPN: %w", err)
 	}
+	// The client is used for this stream only: its idle connections are
+	// closed with it, not left open for 90 s.
 	client := provider.NewHTTPClient(tun, 0)
+	defer func() {
+		if resp == nil {
+			client.CloseIdleConnections()
+		}
+	}()
 	var lastStatus int
 	for attempt := 0; attempt < 4; attempt++ {
 		if attempt > 0 {
@@ -204,20 +211,34 @@ func (s *Service) upstream(ctx context.Context, subID int64, url, rangeHeader st
 		if rangeHeader != "" {
 			req.Header.Set("Range", rangeHeader)
 		}
-		resp, err := client.Do(req)
+		r, err := client.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("provider: %w", provider.Redact(err))
 		}
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent {
-			return resp, nil
+		if r.StatusCode == http.StatusOK || r.StatusCode == http.StatusPartialContent {
+			r.Body = closingClient{r.Body, client}
+			return r, nil
 		}
-		lastStatus = resp.StatusCode
-		resp.Body.Close()
-		if resp.StatusCode == http.StatusRequestedRangeNotSatisfiable || resp.StatusCode == http.StatusNotFound {
+		lastStatus = r.StatusCode
+		r.Body.Close()
+		if r.StatusCode == http.StatusRequestedRangeNotSatisfiable || r.StatusCode == http.StatusNotFound {
 			break
 		}
 	}
 	return nil, &UpstreamError{Status: lastStatus}
+}
+
+// closingClient closes a single-use client's idle connections with the
+// body it returned.
+type closingClient struct {
+	io.ReadCloser
+	client *http.Client
+}
+
+func (b closingClient) Close() error {
+	err := b.ReadCloser.Close()
+	b.client.CloseIdleConnections()
+	return err
 }
 
 // UpstreamError means the provider refused the stream.
