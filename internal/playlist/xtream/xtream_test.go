@@ -43,6 +43,18 @@ func fakeServer(t *testing.T) *httptest.Server {
 		case "get_vod_streams":
 			w.Write([]byte(`[{"name":"1408","stream_id":555,"rating":"7.1","container_extension":"mkv","tmdb":3021,"year":"2007"}]`))
 		case "get_series_info":
+			// PHP shapes: an empty info as [], seasons from 0 as a list, a
+			// season as an object, no episodes as [].
+			switch q.Get("series_id") {
+			case "78":
+				w.Write([]byte(`{"info":{"name":"Lista","cast":"C"},"episodes":[
+					[{"id":"1","episode_num":1,"info":[]}, "rotto"],
+					{"0":{"id":"2","episode_num":2,"info":{"plot":"P"}}}]}`))
+				return
+			case "79":
+				w.Write([]byte(`{"info":{"name":"Vuota","cast":"C"},"episodes":[]}`))
+				return
+			}
 			if q.Get("series_id") != "77" {
 				w.Write([]byte(`{}`))
 				return
@@ -90,6 +102,28 @@ func TestLoginAndCatalog(t *testing.T) {
 		if ep.Season.Int() == 0 {
 			t.Fatalf("season missing: %+v", ep)
 		}
+	}
+}
+
+func TestSeriesInfoPHPShapes(t *testing.T) {
+	srv := fakeServer(t)
+	defer srv.Close()
+	c := newClient(t, srv, "p@ss word")
+	ctx := context.Background()
+	info, err := c.SeriesInfo(ctx, "78")
+	if err != nil || len(info.Episodes) != 2 || info.Details.Cast != "C" {
+		t.Fatalf("list of seasons: %+v %v", info, err)
+	}
+	seasons := map[string]string{}
+	for _, ep := range info.Episodes {
+		seasons[ep.ID.String()] = ep.Season.String()
+	}
+	if seasons["1"] != "0" || seasons["2"] != "1" {
+		t.Fatalf("seasons from list indexes: %v", seasons)
+	}
+	info, err = c.SeriesInfo(ctx, "79")
+	if err != nil || len(info.Episodes) != 0 || info.Details.Cast != "C" {
+		t.Fatalf("no episodes: %+v %v", info, err)
 	}
 }
 

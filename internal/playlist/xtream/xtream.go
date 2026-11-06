@@ -145,16 +145,29 @@ type Series struct {
 }
 
 type Episode struct {
-	ID                 Flex `json:"id"`
-	EpisodeNum         Flex `json:"episode_num"`
-	Title              Flex `json:"title"`
-	Season             Flex `json:"season"`
-	ContainerExtension Flex `json:"container_extension"`
-	Info               struct {
-		DurationSecs Flex `json:"duration_secs"`
-		Plot         Flex `json:"plot"`
-		Image        Flex `json:"movie_image"`
-	} `json:"info"`
+	ID                 Flex        `json:"id"`
+	EpisodeNum         Flex        `json:"episode_num"`
+	Title              Flex        `json:"title"`
+	Season             Flex        `json:"season"`
+	ContainerExtension Flex        `json:"container_extension"`
+	Info               EpisodeInfo `json:"info"`
+}
+
+type EpisodeInfo struct {
+	DurationSecs Flex `json:"duration_secs"`
+	Plot         Flex `json:"plot"`
+	Image        Flex `json:"movie_image"`
+}
+
+// UnmarshalJSON ignores an info that is not an object: PHP panels send
+// [] for an empty one.
+func (i *EpisodeInfo) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 || b[0] != '{' {
+		*i = EpisodeInfo{}
+		return nil
+	}
+	type plain EpisodeInfo
+	return json.Unmarshal(b, (*plain)(i))
 }
 
 type SeriesInfo struct {
@@ -233,30 +246,58 @@ func (c *Client) Series(ctx context.Context) ([]Series, error) {
 	return getList[Series](ctx, c, "get_series")
 }
 
-// SeriesInfo returns a series with all its episodes, ordered by season.
+// SeriesInfo returns a series with all its episodes. PHP panels encode an
+// empty map as [] and seasons numbered from 0 as a list, so the episodes
+// and each season may be an object or a list; an episode that does not
+// decode is left out, not the whole series.
 func (c *Client) SeriesInfo(ctx context.Context, seriesID string) (SeriesInfo, error) {
 	var raw struct {
-		Info     json.RawMessage            `json:"info"`
-		Episodes map[string]json.RawMessage `json:"episodes"`
+		Info     json.RawMessage `json:"info"`
+		Episodes json.RawMessage `json:"episodes"`
 	}
 	if err := c.get(ctx, "get_series_info", url.Values{"series_id": {seriesID}}, &raw); err != nil {
 		return SeriesInfo{}, err
 	}
 	out := SeriesInfo{Details: ParseDetails(raw.Info)}
 	json.Unmarshal(raw.Info, &out.Info)
-	for season, msg := range raw.Episodes {
-		var eps []Episode
-		if err := json.Unmarshal(msg, &eps); err != nil {
-			return SeriesInfo{}, fmt.Errorf("episodi stagione %s: %w", season, err)
-		}
-		for i := range eps {
-			if eps[i].Season == "" {
-				eps[i].Season = Flex(season)
+	for _, season := range entries(raw.Episodes) {
+		for _, msg := range entries(season.value) {
+			var ep Episode
+			if json.Unmarshal(msg.value, &ep) != nil {
+				continue
 			}
+			if ep.Season == "" {
+				ep.Season = Flex(season.key)
+			}
+			out.Episodes = append(out.Episodes, ep)
 		}
-		out.Episodes = append(out.Episodes, eps...)
 	}
 	return out, nil
+}
+
+type entry struct {
+	key   string
+	value json.RawMessage
+}
+
+// entries reads a JSON object or list as keyed values, a list keyed by
+// index (a PHP array with keys 0..n); anything else gives none.
+func entries(msg json.RawMessage) []entry {
+	var list []json.RawMessage
+	if json.Unmarshal(msg, &list) == nil {
+		out := make([]entry, len(list))
+		for i, v := range list {
+			out[i] = entry{strconv.Itoa(i), v}
+		}
+		return out
+	}
+	var obj map[string]json.RawMessage
+	json.Unmarshal(msg, &obj)
+	out := make([]entry, 0, len(obj))
+	for k, v := range obj {
+		out = append(out, entry{k, v})
+	}
+	return out
 }
 
 // Kind of stream for URL building.
