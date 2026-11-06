@@ -1021,7 +1021,7 @@ func (s *Service) remuxRecording(ctx context.Context, ts string, secs float64) (
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
 	err := s.ffmpegToMP4(ctx, ts, mp4, "-c", "copy")
-	if err != nil && ctx.Err() == nil {
+	if err != nil && ctx.Err() == nil && !errors.Is(err, exec.ErrNotFound) {
 		// One broken audio frame, normal in a provider's stream, stops the
 		// copy (as at 22:05 of 05/11): the audio is converted instead.
 		if s.rec.log != nil {
@@ -1045,7 +1045,10 @@ func (s *Service) ffmpegToMP4(ctx context.Context, ts, mp4 string, codecs ...str
 	var e errorLine
 	cmd.Stderr = &e
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s", e.line(err))
+		if line := e.line(); line != "" {
+			return fmt.Errorf("%s (%w)", line, err)
+		}
+		return err
 	}
 	return nil
 }
@@ -1112,16 +1115,13 @@ func (e *errorLine) add(line string) {
 	}
 }
 
-func (e *errorLine) line(err error) string {
+func (e *errorLine) line() string {
 	e.add(string(e.part))
 	e.part = nil
-	switch {
-	case e.kept != "":
+	if e.kept != "" {
 		return e.kept
-	case e.first != "":
-		return e.first
 	}
-	return err.Error()
+	return e.first
 }
 
 // convertLeftovers converts the finished recordings still in MPEG-TS: left

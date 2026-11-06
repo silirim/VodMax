@@ -97,12 +97,12 @@ func TestErrorLineKeepsTheError(t *testing.T) {
 		"[out#0/mp4 @ 0x3] Error muxing a packet\nConversion failed!\n"} {
 		e.Write([]byte(part))
 	}
-	if got := e.line(nil); got != "[aac_adtstoasc @ 0x2] Error parsing ADTS frame header!" {
+	if got := e.line(); got != "[aac_adtstoasc @ 0x2] Error parsing ADTS frame header!" {
 		t.Fatalf("line: %q", got)
 	}
 	var w errorLine
 	w.Write([]byte("only a warning"))
-	if got := w.line(nil); got != "only a warning" {
+	if got := w.line(); got != "only a warning" {
 		t.Fatalf("no error line: %q", got)
 	}
 }
