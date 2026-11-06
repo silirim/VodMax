@@ -93,7 +93,12 @@
     window.VodMax.bottomNav(["recordings", "downloads", "mylist"].includes(state.view) ? "more" : state.view);
   }
 
+  // Every render() has a number; a view's answer that arrives after a newer
+  // render started (a quick tab switch, more typing in the search) is
+  // dropped instead of being drawn over the newer page.
+  let renderSeq = 0;
   async function render() {
+    const my = ++renderSeq;
     // Typing in the search box: the results change under it, the focus
     // stays there (on TVs moving it closes the on-screen keyboard).
     const typing = document.activeElement === $("search");
@@ -111,8 +116,9 @@
       else if (state.view === "mylist") await renderMyList(main);
       else await renderGrid(main, state.view);
     } catch (e) {
-      main.replaceChildren(el("p", { className: "empty" }, e.message));
+      if (my === renderSeq) main.replaceChildren(el("p", { className: "empty" }, e.message));
     }
+    if (my !== renderSeq) return;
     if (!typing || document.activeElement !== $("search")) focusFirst(main);
   }
 
@@ -123,7 +129,9 @@
     const list = store.get("tvList", "");
     // A search looks in every channel, whatever the list.
     const q = query ? "" : list === "favorites" ? "?list=favorites" : list ? "?section=" + list : "";
+    const my = renderSeq;
     let channels = await api("GET", "/api/v1/tv/channels" + q);
+    if (my !== renderSeq) return;
     if (query) channels = channels.filter((c) => c.name.toLowerCase().includes(query) || String(c.number) === query);
     const now = Date.now() / 1000;
     const chips = TV_LISTS.map(([id, label]) => {
@@ -171,6 +179,7 @@
   async function renderHome(main) {
     main.replaceChildren(el("section", { className: "hero skeleton" }), el("h2", { className: "section" }, t("Continua a guardare")), skeletonRow(true),
       el("h2", { className: "section" }, t("Nuovi film")), skeletonRow(false));
+    const my = renderSeq;
     const [cont, films, series, favorites, recordings, mine, trending] = await Promise.all([
       api("GET", "/api/v1/continue"),
       api("GET", "/api/v1/catalog/movie?sort=recent&limit=24"),
@@ -183,6 +192,7 @@
     const hero = el("section", { className: "hero" });
     const parts = [hero];
     if (await assistant()) parts.push(tonightBox());
+    if (my !== renderSeq) return;
     parts.push(el("h2", { className: "section" }, t("Continua a guardare")));
     parts.push(cont.length ? el("div", { className: "row" }, ...cont.map(continueCard))
       : el("p", { className: "empty" }, t("Qui compaiono i film e gli episodi iniziati e la prossima puntata delle serie che stai seguendo.")));
@@ -397,7 +407,9 @@
     if (b.category) q.set("category", b.category);
     if (cursor) q.set("cursor", cursor);
     if (!grid) main.replaceChildren(el("h2", { className: "page-title" }, kind === "movie" ? t("Film") : t("Serie")), filterBar(kind, b), skeletonRow(false));
+    const my = renderSeq; // "Altri titoli" too: dropped if the page changed meanwhile
     const page = await api("GET", "/api/v1/catalog/" + kind + "?" + q);
+    if (my !== renderSeq) return;
     if (!grid) {
       grid = el("div", { className: "grid" });
       main.lastElementChild.replaceWith(page.items.length ? grid : el("p", { className: "empty" }, t("Nessun titolo con questi filtri.")));
@@ -473,8 +485,10 @@
 
   async function renderSearch(main) {
     const q = encodeURIComponent(state.query);
+    const my = renderSeq;
     const [films, series] = await Promise.all([
       api("GET", "/api/v1/catalog/movie?limit=40&q=" + q), api("GET", "/api/v1/catalog/series?limit=40&q=" + q)]);
+    if (my !== renderSeq) return;
     const sections = [[t("Film"), films.items], [t("Serie"), series.items]];
     if (state.view === "series") sections.reverse(); // the current tab's kind first
     const parts = [];
@@ -487,6 +501,7 @@
 
   const recState = { scheduled: t("In programma"), recording: t("● In registrazione"), completed: t("Registrata"), failed: t("Non riuscita") };
   async function renderRecordings(main) {
+    const my = renderSeq;
     const [list, space, who] = await Promise.all([api("GET", "/api/v1/recordings"), api("GET", "/api/v1/recordings/space"),
       window.VodMax.me().catch(() => null)]);
     const kids = who && who.profile && who.profile.kind === "kids";
@@ -529,13 +544,16 @@
       })));
     }
     if (!kids) parts.push(...await rulesSection());
+    if (my !== renderSeq) return;
     main.replaceChildren(...parts);
   }
 
   // ---- The downloads page; refreshed while one is running ----
   // ---- My list: films and series kept for later, per profile ----
   async function renderMyList(main) {
+    const my = renderSeq;
     const list = await api("GET", "/api/v1/mylist");
+    if (my !== renderSeq) return;
     main.replaceChildren(el("h2", { className: "page-title" }, t("La mia lista")),
       list.length ? el("div", { className: "grid" }, ...list.map(itemCard))
         : el("p", { className: "empty" }, t("La lista è vuota. Nella scheda di un film o di una serie premi “La mia lista” per ritrovarlo qui.")));
@@ -557,7 +575,9 @@
   }
 
   async function renderDownloads(main) {
+    const my = renderSeq;
     const dl = await downloadList(true);
+    if (my !== renderSeq) return;
     if (!dl) { main.replaceChildren(el("p", { className: "empty" }, t("I download non sono disponibili su questo dispositivo."))); return; }
     main.replaceChildren(downloadsSection(dl));
     watchDownloads(dl);
@@ -921,7 +941,10 @@
       actions.append(el("p", { className: "empty" }, t("Caricamento episodi…")));
       let eps;
       try { eps = await api("GET", "/api/v1/series/" + item.id + "/episodes"); }
-      catch (e) { actions.replaceChildren(el("p", { className: "empty" }, e.message)); return; }
+      catch (e) { if (state.detail === item) actions.replaceChildren(el("p", { className: "empty" }, e.message)); return; }
+      // Another title opened meanwhile (its episodes came from the cache):
+      // this answer must not draw its seasons on that page.
+      if (state.detail !== item) return;
       actions.replaceChildren();
       renderSeasons(item, eps);
       addListButton(item);
