@@ -19,19 +19,25 @@ window.VodMax = (() => {
   })();
 
   // A link may carry the token once: "/#token=…". It is saved and removed
-  // from the address bar.
-  function tokenFromLink() {
-    const t = new URLSearchParams(location.hash.slice(1)).get("token");
-    if (t) {
-      store.set("token", t);
-      store.set("profile", "");
-      history.replaceState(null, "", location.pathname + location.search);
+  // from the address bar. A token of this device that still works is
+  // replaced only after asking: a link sent by someone else would unpair
+  // the device, or sign it in as theirs.
+  async function tokenFromLink() {
+    const link = new URLSearchParams(location.hash.slice(1)).get("token");
+    if (!link) return false;
+    history.replaceState(null, "", location.pathname + location.search);
+    const old = token();
+    if (old && old !== link) {
+      const res = await fetch("/api/v1/me", { headers: { Authorization: "Bearer " + old } }).catch(() => null);
+      if ((!res || res.status !== 401) && !confirm(t("Questo link fa entrare il dispositivo con un altro accesso: quello attuale andrà perso. Continuare?"))) return false;
     }
-    return Boolean(t);
+    store.set("token", link);
+    store.set("profile", "");
+    return true;
   }
-  tokenFromLink();
+  const linkReady = tokenFromLink();
   // Pasting a new link in the same tab only changes the hash: no reload.
-  addEventListener("hashchange", () => { if (tokenFromLink()) location.reload(); });
+  addEventListener("hashchange", async () => { if (await tokenFromLink()) location.reload(); });
 
   // Back from the sign-in with an account of the house: "/#sso=…" is a
   // one-time code for the tokens, "/#sso_error=…" the reason it failed.
@@ -502,6 +508,7 @@ window.VodMax = (() => {
   // Runs start() once the device is paired, otherwise pairs it.
   async function withToken(start) {
     await ssoReady;
+    await linkReady;
     if (!token()) { showPairing(); return; }
     start();
     decorate();
