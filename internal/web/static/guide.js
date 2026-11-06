@@ -14,7 +14,8 @@
   };
   // A narrower window on phones, so programmes stay readable.
   const HOURS = window.matchMedia("(max-width: 600px)").matches ? 1.5 : 3;
-  const state = { from: slot(Date.now() / 1000), list: store.get("guideList", "all"), rows: [], me: null };
+  // seq: windows asked, done: the last one answered (they can arrive out of order).
+  const state = { from: slot(Date.now() / 1000), list: store.get("guideList", "all"), rows: [], me: null, seq: 0, done: 0 };
   let statusTimer;
   function flash(text) {
     $("status").textContent = text;
@@ -31,13 +32,19 @@
   };
 
   async function load(focusKey) {
+    const seq = ++state.seq;
     const q = new URLSearchParams({ from: state.from, hours: HOURS });
     if (state.list === "favorites") q.set("list", "favorites");
     if (state.list === "sport") q.set("section", "sport");
     for (const t of document.querySelectorAll("[data-list]")) t.classList.toggle("active", t.dataset.list === state.list);
     $("guide-when").textContent = dayName(state.from) + " " + hhmm(state.from) + "–" + hhmm(state.from + HOURS * 3600);
-    try { state.rows = (await api("GET", "/api/v1/guide?" + q)).filter((r) => r.programmes.length > 0); }
-    catch (e) { if (!e.handled) flash(e.message); return; }
+    let rows;
+    try { rows = (await api("GET", "/api/v1/guide?" + q)).filter((r) => r.programmes.length > 0); }
+    catch (e) { if (!e.handled && seq === state.seq) flash(e.message); }
+    if (seq !== state.seq) return; // a newer window was asked meanwhile
+    state.done = seq;
+    if (!rows) return;
+    state.rows = rows;
     render(focusKey);
   }
 
@@ -89,7 +96,8 @@
     }
     // A header button pressed by remote keeps the focus: "2 ore ▶" repeats.
     if (!target && document.activeElement && document.querySelector("header.top").contains(document.activeElement)) return;
-    target = target || document.querySelector(".prog.on-air") || document.querySelector(".prog");
+    // No programme in this window: "Adesso", so the remote is not stuck.
+    target = target || document.querySelector(".prog.on-air") || document.querySelector(".prog") || document.querySelector('[data-move="now"]');
     if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: "nearest" }); }
   }
 
@@ -161,7 +169,9 @@
       const list = inRow(row);
       const i = list.indexOf(cur) + (dir === "ArrowRight" ? 1 : -1);
       if (i >= 0 && i < list.length) { list[i].focus(); return; }
-      // Past the edge of the window: move it, staying on the channel.
+      // Past the edge of the window: move it, staying on the channel. Not
+      // while the last move is loading: a held key would stack hours.
+      if (state.done !== state.seq) return;
       state.from += (dir === "ArrowRight" ? 2 : -2) * 3600;
       load({ row, dir });
       return;
@@ -201,9 +211,11 @@
       e.preventDefault();
       return;
     }
-    if (key.startsWith("Arrow") && (!document.activeElement || document.activeElement.classList.contains("prog") || key === "ArrowDown")) {
-      if (!document.activeElement || !document.activeElement.classList.contains("prog")) {
-        const f = document.querySelector(".prog.on-air") || document.querySelector(".prog");
+    // Focus lost (the grid was redrawn): any arrow brings it back.
+    const lost = !document.activeElement || document.activeElement === document.body;
+    if (key.startsWith("Arrow") && (lost || document.activeElement.classList.contains("prog") || key === "ArrowDown")) {
+      if (lost || !document.activeElement.classList.contains("prog")) {
+        const f = document.querySelector(".prog.on-air") || document.querySelector(".prog") || document.querySelector('[data-move="now"]');
         if (f) f.focus();
       } else move(key);
       e.preventDefault();
