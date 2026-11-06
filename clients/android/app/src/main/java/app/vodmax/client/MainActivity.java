@@ -83,6 +83,9 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         pipAvailable = Pip.available(this);
         if (pipAvailable) pipToggle = Pip.listen(this, () -> page("window.VodMaxNativePipToggle && window.VodMaxNativePipToggle()"));
+        LocalServer.onExit = () -> runOnUiThread(() -> {
+            if (!isDestroyed() && prefs().getBoolean(KEY_LOCAL, false)) openLocal();
+        });
         server = prefs().getString(KEY_SERVER, null);
         if (server != null) server = normalize(server); // saved by older versions as typed
         if (prefs().getBoolean(KEY_LOCAL, false)) openLocal();
