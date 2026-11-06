@@ -67,7 +67,9 @@ go vet ./...
 go test -race ./...
 ```
 
-CI runs the same plus gitleaks. Never commit or push with a failing test:
+CI runs the same plus gitleaks, and builds the Android app with its JVM
+tests (`./gradlew assembleDebug testDebugUnitTest` in `clients/android`).
+Never commit or push with a failing test:
 gate the commit on the test exit code. Interface changes are also checked
 in a browser at TV and phone widths (no horizontal overflow).
 

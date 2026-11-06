@@ -27,7 +27,8 @@ setup.
 ## Before a pull request
 
 - `gofmt`, `go vet ./...` and `go test -race ./...` must pass (CI checks
-  them too, together with gitleaks).
+  them too, together with gitleaks and a build of the Android app with its
+  JVM tests).
 - No real data: no provider addresses, credentials, playlists or private
   network addresses. Tests use fake servers and generated credentials.
 - Important choices have a page in [docs/decisioni](docs/decisioni)
@@ -75,7 +76,8 @@ dire "non ancora tradotto". Dettagli in [docs/traduzioni.md](docs/traduzioni.md)
 ### Prima di una pull request
 
 - `gofmt`, `go vet ./...` e `go test -race ./...` devono passare (lo
-  controlla anche la CI, insieme a gitleaks).
+  controlla anche la CI, insieme a gitleaks e alla compilazione dell'app
+  Android con i suoi test JVM).
 - Nessun dato reale: niente indirizzi di provider, credenziali, playlist o
   indirizzi di rete privati. I test usano server finti e credenziali generate.
 - Le scelte importanti hanno una scheda in [docs/decisioni](docs/decisioni).

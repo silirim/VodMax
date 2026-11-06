@@ -90,3 +90,12 @@ go test -race ./...
 I test del tunnel creano due VPN interne nello stesso processo e verificano
 che il traffico passi dal tunnel, che a VPN chiusa non parta nessuna
 connessione e che un server VPN irraggiungibile non causi fughe di traffico.
+`packaging/update_test.go` esegue `vodmax-update` con curl e server finti
+(la scelta della versione, senza rete né installazione).
+
+L'app Android si compila con i suoi test JVM (anche in CI, job `android`):
+
+```sh
+cd clients/android
+./gradlew assembleDebug testDebugUnitTest
+```
