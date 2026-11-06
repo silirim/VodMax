@@ -34,8 +34,12 @@ go build ./cmd/vodmax-server
 ```
 
 Al primo avvio crea in `-data` il database, la chiave di cifratura
-(`secret.key`) e il token di amministrazione (`admin.token`). Ogni chiamata
-API, tranne `/api/v1/health`, richiede `Authorization: Bearer <token>`.
+(`secret.key`) e il token di amministrazione (`admin.token`). Le chiamate
+`/api/v1` richiedono `Authorization: Bearer <token>`, con il token di un
+dispositivo abbinato o `admin.token`, e quasi tutte il profilo scelto in
+`X-Profile`; sono aperte `/api/v1/health`, l'abbinamento (`/api/v1/pair`) e
+l'accesso con account (`/api/v1/sso`, `/auth/sso`). `/stream`, `/out` e
+`/img` hanno il permesso nell'indirizzo (ticket, sessione o chiave).
 La tabella elenca le chiamate principali; l'elenco completo, con il livello
 di accesso di ognuna, è in `internal/api/api.go`. Gli errori sono
 `{"error": "…"}` nella lingua della richiesta; il testo di un errore
