@@ -475,9 +475,10 @@ func (s *Service) record(ctx context.Context, a *activeRec) error {
 		case busy:
 			// Nothing was asked of the provider: try again soon, the
 			// connection frees up when the recording of the programme
-			// before ends or when nobody watches any more.
+			// before ends or when nobody watches any more. With priority
+			// only recordings hold it: the priority stays.
 			wait = recordRetry
-			priority = time.Since(prioritySince) >= recordPriorityEvery
+			priority = priority || time.Since(prioritySince) >= recordPriorityEvery
 		default:
 			wait = min(wait*2, recordRetryMax)
 			priority = time.Since(prioritySince) >= recordPriorityEvery
