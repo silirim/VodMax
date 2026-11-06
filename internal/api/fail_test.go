@@ -47,3 +47,28 @@ func TestFailHidesInternalDetail(t *testing.T) {
 		}
 	}
 }
+
+// The per-client limits trust a forwarded address only from a tunnel on
+// the same host; a client in the house cannot pick its own.
+func TestClientAddr(t *testing.T) {
+	cases := []struct{ remote, cf, xff, want string }{
+		{"192.168.1.20:5000", "", "", "192.168.1.20"},
+		{"192.168.1.20:5000", "203.0.113.9", "198.51.100.1", "192.168.1.20"},
+		{"127.0.0.1:5000", "203.0.113.9", "198.51.100.1", "203.0.113.9"},
+		{"[::1]:5000", "", "10.9.9.9, 198.51.100.1", "198.51.100.1"},
+		{"127.0.0.1:5000", "", "", "127.0.0.1"},
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest("POST", "/api/v1/pair", nil)
+		r.RemoteAddr = c.remote
+		if c.cf != "" {
+			r.Header.Set("CF-Connecting-IP", c.cf)
+		}
+		if c.xff != "" {
+			r.Header.Set("X-Forwarded-For", c.xff)
+		}
+		if got := clientAddr(r); got != c.want {
+			t.Errorf("%+v: %q", c, got)
+		}
+	}
+}

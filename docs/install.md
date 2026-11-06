@@ -51,7 +51,10 @@ vodmax-server -version
   `/out`, `/api/v1/progress` and `/api/v1/health` without the login: the
   Android app's player and other apps call them, and VodMax already guards
   them with tickets, a key or the device token. The login happens inside
-  the app, once.
+  the app, once. The limits per address on pairing codes and home sign-ins
+  count the address the tunnel forwards (`CF-Connecting-IP`,
+  `X-Forwarded-For`) only when the tunnel runs on the same host; a proxy
+  on another machine makes everyone behind it one address.
 - **Data**: everything is in `/var/lib/vodmax` (database, encryption key,
   admin token, recordings, downloads, backups). Downloads can go to another
   disk with `-downloads /path` in `vodmax.service` (the folder must be

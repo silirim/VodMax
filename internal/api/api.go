@@ -1578,9 +1578,27 @@ func (a *api) approvePairing(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, d)
 }
 
+// clientAddr is the address the per-client limits count. Behind a tunnel
+// on the same host (cloudflared) every request comes from loopback: then
+// the address the tunnel forwards counts. From any other address the
+// headers are ignored, or a client in the house could dodge the limits.
+func clientAddr(r *http.Request) string {
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
+		return host
+	}
+	if v := r.Header.Get("CF-Connecting-IP"); v != "" {
+		return v
+	}
+	// The last entry is the one the proxy added; earlier ones are the client's claims.
+	if v := r.Header.Get("X-Forwarded-For"); v != "" {
+		return strings.TrimSpace(v[strings.LastIndex(v, ",")+1:])
+	}
+	return host
+}
+
 func (a *api) startPairing(w http.ResponseWriter, r *http.Request) {
-	client, _, _ := net.SplitHostPort(r.RemoteAddr)
-	p, err := a.svc.StartPairing(client)
+	p, err := a.svc.StartPairing(clientAddr(r))
 	if err != nil {
 		a.fail(w, r, err)
 		return

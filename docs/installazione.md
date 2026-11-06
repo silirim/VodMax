@@ -50,7 +50,10 @@ vodmax-server -version
   `/stream`, `/out`, `/api/v1/progress` e `/api/v1/health`: li chiamano il
   player dell'app Android e le altre app, e VodMax li protegge già con
   biglietti, chiave o token del dispositivo. Il login si fa dentro l'app,
-  una volta.
+  una volta. I limiti per indirizzo su codici di abbinamento e accessi con
+  account contano l'indirizzo inoltrato dal tunnel (`CF-Connecting-IP`,
+  `X-Forwarded-For`) solo se il tunnel gira sullo stesso host; con un proxy
+  su un'altra macchina chi passa da lì conta come un solo indirizzo.
 - **Dati**: tutto in `/var/lib/vodmax` (database, chiave di cifratura,
   token di amministrazione, registrazioni, download, backup). I download
   possono andare su un altro disco con `-downloads /percorso` in
