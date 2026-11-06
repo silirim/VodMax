@@ -328,6 +328,25 @@ func (n *looseInt) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// wordList is a list of words that small models sometimes write as a
+// single string ("juventus").
+type wordList []string
+
+func (w *wordList) UnmarshalJSON(b []byte) error {
+	var one string
+	if json.Unmarshal(b, &one) == nil {
+		*w = nil
+		if one = strings.TrimSpace(one); one != "" {
+			*w = wordList{one}
+		}
+		return nil
+	}
+	var list []string
+	json.Unmarshal(b, &list)
+	*w = list
+	return nil
+}
+
 // jsonObject finds the JSON object in an answer: models sometimes wrap it
 // in text or in a code block.
 func jsonObject(answer string, v any) error {
@@ -436,13 +455,13 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (RuleProposal,
 	}
 	var out struct {
 		Name        string   `json:"name"`
-		All         []string `json:"all"`
-		Any         []string `json:"any"`
-		None        []string `json:"none"`
+		All         wordList `json:"all"`
+		Any         wordList `json:"any"`
+		None        wordList `json:"none"`
 		Channel     string   `json:"channel"`
 		Section     string   `json:"section"`
 		LiveOnly    bool     `json:"live_only"`
-		Keep        int      `json:"keep"`
+		Keep        looseInt `json:"keep"`
 		Date        string   `json:"date"`
 		Time        string   `json:"time"`
 		Explanation string   `json:"explanation"`
@@ -459,7 +478,7 @@ func (s *Service) AssistantRule(ctx context.Context, text string) (RuleProposal,
 	if name == "" && strings.TrimSpace(out.Date+out.Time) == "" {
 		name = text
 	}
-	p.Rule = RuleInput{Name: truncate(name, 60), All: out.All, Any: out.Any, None: out.None, LiveOnly: out.LiveOnly, Keep: out.Keep}
+	p.Rule = RuleInput{Name: truncate(name, 60), All: out.All, Any: out.Any, None: out.None, LiveOnly: out.LiveOnly, Keep: int(out.Keep)}
 	if out.Section == "sport" || out.Section == "tv" {
 		p.Rule.Section = out.Section
 	}
@@ -693,7 +712,7 @@ func (s *Service) requestFor(ctx context.Context, a AssistantSettings, wish stri
 	var raw struct {
 		About  string   `json:"about"`
 		Person string   `json:"person"`
-		Genres []string `json:"genres"`
+		Genres wordList `json:"genres"`
 		Titles []struct {
 			Title string   `json:"title"`
 			Year  looseInt `json:"year"`
@@ -1014,21 +1033,19 @@ func (s *Service) AssistantTonight(ctx context.Context, wish string) (Tonight, e
 	dropped := 0
 	for _, r := range raw.Picks {
 		code := strings.ToUpper(strings.TrimSpace(r.Code))
-		if seen[code] || len(code) < 2 || len(out.Picks) == 5 {
+		if seen[code] || len(out.Picks) == 5 {
 			continue
 		}
-		n, err := strconv.Atoi(code[1:])
-		if err != nil {
-			continue
-		}
+		n, err := strconv.Atoi(code[min(1, len(code)):])
 		var p Pick
 		switch {
-		case code[0] == 'T' && n >= 0 && n < len(tv):
+		case err == nil && code[0] == 'T' && n >= 0 && n < len(tv):
 			p = tv[n].Pick
-		case code[0] == 'L' && n >= 0 && n < len(lib):
+		case err == nil && code[0] == 'L' && n >= 0 && n < len(lib):
 			p = lib[n].Pick
 		default:
-			continue // a code the model made up
+			dropped++ // a code the model made up: its intro may describe it
+			continue
 		}
 		if seen["title:"+fold(p.Title)] {
 			continue

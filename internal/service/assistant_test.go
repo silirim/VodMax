@@ -275,3 +275,16 @@ func TestRequestYearInTitle(t *testing.T) {
 		}
 	}
 }
+
+// Small models write a number as a string or a single word without a
+// list: the rule still reads.
+func TestAssistantRuleLooseAnswer(t *testing.T) {
+	svc, _ := catalogService(t, "live", nil)
+	fakeModelFor(t, svc, func(string) string {
+		return `{"name":"Juventus","all":"juventus","any":[],"none":["highlights"],"keep":"3","explanation":"Le partite."}`
+	})
+	p, err := svc.AssistantRule(context.Background(), "registra la juve, tienine 3")
+	if err != nil || p.Rule.Keep != 3 || strings.Join(p.Rule.All, ",") != "juventus" || strings.Join(p.Rule.None, ",") != "highlights" {
+		t.Fatalf("%+v %v", p.Rule, err)
+	}
+}

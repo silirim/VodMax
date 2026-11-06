@@ -331,6 +331,19 @@ func TestAssistant(t *testing.T) {
 	if code != 200 || json.Unmarshal(body, &tn) != nil || len(tn.Picks) != 0 || tn.Intro != "Stasera niente del genere." || !strings.Contains(string(body), `"picks":[]`) {
 		t.Fatalf("nothing fits: %d %s", code, body)
 	}
+	// Only codes the model made up: its intro describes picks that are not
+	// there, VodMax says nothing fits instead.
+	m.answer = func(system, user string) string {
+		if strings.Contains(system, "home catalog") {
+			return `{"titles":[]}`
+		}
+		return `{"intro":"Ecco tre film perfetti per stasera.","picks":[{"code":"T999","why":"?"},{"code":"L42","why":"?"},{"code":"","why":"?"}]}`
+	}
+	code, body = e.do(t, "POST", "/api/v1/assistant/tonight", map[string]string{"wish": "tre film"}, true)
+	tn.Picks, tn.Intro = nil, ""
+	if code != 200 || json.Unmarshal(body, &tn) != nil || len(tn.Picks) != 0 || !strings.HasPrefix(tn.Intro, "Niente di adatto") {
+		t.Fatalf("made-up codes: %d %s", code, body)
+	}
 }
 
 // The first step of a precise request ("a film with…") reads what is
