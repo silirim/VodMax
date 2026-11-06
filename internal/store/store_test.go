@@ -584,3 +584,35 @@ func TestPurgeGoneItems(t *testing.T) {
 		t.Fatalf("left %d rows, plain %d, meta %d", left, id("5"), meta)
 	}
 }
+
+// A provider swaps the stream ids of two channels: a recording scheduled
+// on Rai 1 stays on Rai 1, now under the other id.
+func TestSwappedStreamIDsKeepRecordingChannel(t *testing.T) {
+	st, sub := openTest(t)
+	ctx := context.Background()
+	live := func(a, b string) []Item {
+		key := map[string]string{"Rai 1": "rai 1", "Rai 2": "rai 2"}
+		return []Item{
+			{Kind: "live", SourceID: "101", Title: a, DisplayTitle: a, GroupKey: key[a]},
+			{Kind: "live", SourceID: "102", Title: b, DisplayTitle: b, GroupKey: key[b]},
+		}
+	}
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live"}, nil, live("Rai 1", "Rai 2"), false); err != nil {
+		t.Fatal(err)
+	}
+	var id int64
+	st.r.QueryRowContext(ctx, `SELECT id FROM item WHERE source_id = '101'`).Scan(&id)
+	now := time.Now().Unix()
+	if _, err := st.AddRecording(ctx, Recording{ItemID: id, GroupKey: "rai 1", Channel: "Rai 1", Title: "Film", Start: now + 3600, Stop: now + 7200}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live"}, nil, live("Rai 2", "Rai 1"), false); err != nil {
+		t.Fatal(err)
+	}
+	var key string
+	st.r.QueryRowContext(ctx, `SELECT group_key FROM recording`).Scan(&key)
+	ch, err := st.ChannelForGroup(ctx, key)
+	if key != "rai 1" || err != nil || ch.Title != "Rai 1" {
+		t.Fatalf("recording on Rai 1 now records %q (key %q, %v)", ch.Title, key, err)
+	}
+}

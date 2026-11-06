@@ -240,9 +240,11 @@ func carryGroupKeys(ctx context.Context, tx *sql.Tx) error {
 		`INSERT OR IGNORE INTO series_marker (series_key, intro_start, intro_end, credits, updated_at)
 			SELECT m.new, s.intro_start, s.intro_end, s.credits, s.updated_at FROM series_marker s JOIN temp.moved_key m ON m.kind = 'series' AND m.old = s.series_key`,
 		`DELETE FROM series_marker WHERE series_key IN (SELECT old FROM temp.moved_key WHERE kind = 'series')`,
-		// A recording follows its own channel.
+		// A recording follows its own channel, only when its old key is on
+		// no available channel: a provider that swaps or reuses stream ids
+		// must not move it onto another channel.
 		`UPDATE recording SET group_key = (SELECT i.group_key FROM item i WHERE i.id = recording.item_id)
-			WHERE item_id IN (SELECT id FROM temp.moved_item)`,
+			WHERE item_id IN (SELECT id FROM temp.moved_item) AND group_key IN (SELECT old FROM temp.moved_key WHERE kind = 'live')`,
 		// A rule follows the channel it last recorded, else the only one
 		// its old key leads to; "" means any channel and stays.
 		`UPDATE recording_rule SET spec = json_set(spec, '$.channel', t.new) FROM (
