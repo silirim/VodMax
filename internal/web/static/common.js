@@ -266,9 +266,20 @@ window.VodMax = (() => {
     if (!meCache) meCache = api("GET", "/api/v1/me");
     return meCache;
   }
+  // A browser that signed in with the admin token swaps it for a device
+  // token of its own (decision 0044): the master key does not stay here.
+  async function adoptMaster() {
+    try {
+      const r = await api("POST", "/api/v1/devices/adopt");
+      store.set("token", r.token);
+      store.set("profile", r.profile);
+      location.reload();
+    } catch { /* keeps the admin token */ }
+  }
   async function decorate() {
     let who;
     try { who = await me(); } catch { return; }
+    if (who.is_master) adoptMaster();
     for (const a of document.querySelectorAll('a[href="/settings.html"]')) a.hidden = !who.admin;
     const nav = document.getElementById("tabs");
     if (nav && who.profile && !document.getElementById("profile-chip")) {

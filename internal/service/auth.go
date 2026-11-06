@@ -65,8 +65,13 @@ type Identity struct {
 	NeedsPIN bool
 }
 
+// Admin: the master key gives admin rights unless a non-admin profile was
+// chosen with it (a kids profile there stays a kids profile).
 func (i Identity) Admin() bool {
-	return i.DeviceID == MasterDevice || (i.Profile != nil && i.Profile.Kind == "admin" && !i.NeedsPIN)
+	if i.Profile != nil && i.Profile.Kind != "admin" {
+		return false
+	}
+	return i.DeviceID == MasterDevice || (i.Profile != nil && !i.NeedsPIN)
 }
 
 func (i Identity) Viewer() Viewer {
@@ -519,6 +524,27 @@ func (s *Service) UpdateDevice(ctx context.Context, id int64, name string, lock 
 
 func (s *Service) DeleteDevice(ctx context.Context, id int64) error {
 	return s.st.DeleteDevice(ctx, id)
+}
+
+// AdoptMaster gives a browser that signed in with the admin token a device
+// token of its own, so the master key does not stay in its storage: the
+// browser appears in Devices (revocable) and choosing another profile
+// there asks for PINs as on any device. The profile in use, which the
+// master key may enter without PIN (it is the emergency key), carries
+// over; pasting admin.token again is still the way back in.
+func (s *Service) AdoptMaster(ctx context.Context, id Identity) (token, profileToken string, err error) {
+	if id.DeviceID != MasterDevice {
+		return "", "", ErrForbidden
+	}
+	token = randomToken()
+	dev, err := s.st.AddDevice(ctx, T(ctx, "Accesso con il token di amministrazione"), hashToken(token))
+	if err != nil {
+		return "", "", err
+	}
+	if id.Profile != nil {
+		profileToken = strconv.FormatInt(id.Profile.ID, 10) + "." + s.profileSignature(dev, *id.Profile)
+	}
+	return token, profileToken, nil
 }
 
 // PairingRequest is what a new device shows and polls.

@@ -428,3 +428,40 @@ func TestNameLimitsCountLetters(t *testing.T) {
 		t.Fatalf("41 letters accepted: %d", code)
 	}
 }
+
+// A browser signed in with the admin token gets a device of its own, in
+// the admin profile; there the PINs count as on any device. With the
+// admin token, a kids profile chosen stays a kids profile.
+func TestAdoptAdminToken(t *testing.T) {
+	e, _ := tvSetup(t)
+	e.do(t, "PATCH", "/api/v1/profiles/1", map[string]any{"pin": "9753"}, true)
+	code, out := e.do(t, "POST", "/api/v1/profiles", map[string]any{"name": "Bimbi", "kind": "kids"}, true)
+	var kids struct{ ID int64 }
+	if code != 201 || json.Unmarshal(out, &kids) != nil {
+		t.Fatalf("add: %d %s", code, out)
+	}
+	_, kidsTok := selectProfile(t, e, token, kids.ID, "")
+	if code, _ := e.call(t, "PATCH", "/api/v1/profiles/"+strconv.FormatInt(kids.ID, 10), map[string]any{"kind": "standard"}, token, kidsTok); code != 403 {
+		t.Fatalf("kids profile on the admin token changed itself: %d", code)
+	}
+
+	code, out = e.do(t, "POST", "/api/v1/devices/adopt", nil, true)
+	var got struct{ Token, Profile string }
+	if code != 200 || json.Unmarshal(out, &got) != nil || got.Token == "" || !strings.HasPrefix(got.Profile, "1.") {
+		t.Fatalf("adopt: %d %s", code, out)
+	}
+	_, me := e.call(t, "GET", "/api/v1/me", nil, got.Token, got.Profile)
+	if !strings.Contains(string(me), `"admin":true`) || !strings.Contains(string(me), `"is_master":false`) {
+		t.Fatalf("me after adopt: %s", me)
+	}
+	if _, list := e.do(t, "GET", "/api/v1/devices", nil, true); !strings.Contains(string(list), "token di amministrazione") {
+		t.Fatalf("adopted browser not in Devices: %s", list)
+	}
+	// Without its profile token, the admin profile now wants the PIN.
+	if code, _ := selectProfile(t, e, got.Token, 1, ""); code != 403 {
+		t.Fatalf("admin profile without PIN on the adopted device: %d", code)
+	}
+	if code, _ := e.call(t, "POST", "/api/v1/devices/adopt", nil, got.Token, got.Profile); code != 403 {
+		t.Fatalf("a device token adopted again: %d", code)
+	}
+}

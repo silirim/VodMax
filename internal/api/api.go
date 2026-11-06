@@ -56,6 +56,7 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	route("GET /api/v1/devices", levelAdmin, a.devices)
 	route("PATCH /api/v1/devices/{id}", levelAdmin, a.patchDevice)
 	route("DELETE /api/v1/devices/{id}", levelAdmin, a.deleteDevice)
+	route("POST /api/v1/devices/adopt", levelDevice, a.adoptMaster)
 	route("POST /api/v1/pair/approve", levelAdmin, a.approvePairing)
 	route("GET /api/v1/vpn", levelAdmin, a.listVPN)
 	route("POST /api/v1/vpn", levelAdmin, a.addVPN)
@@ -1514,6 +1515,15 @@ func (a *api) devices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
+}
+
+func (a *api) adoptMaster(w http.ResponseWriter, r *http.Request) {
+	token, profile, err := a.svc.AdoptMaster(r.Context(), identity(r))
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"token": token, "profile": profile})
 }
 
 func (a *api) patchDevice(w http.ResponseWriter, r *http.Request) {

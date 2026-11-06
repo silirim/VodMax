@@ -265,5 +265,6 @@
   "fermata prima della fine": "fermata prima della fine",
   "la registrazione non è in corso": "la registrazione non è in corso",
   "paese non valido": "paese non valido",
-  "errore interno del server: i dettagli sono nel registro": "errore interno del server: i dettagli sono nel registro"
+  "errore interno del server: i dettagli sono nel registro": "errore interno del server: i dettagli sono nel registro",
+  "Accesso con il token di amministrazione": "Accesso con il token di amministrazione"
 }
