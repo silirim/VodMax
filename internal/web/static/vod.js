@@ -953,6 +953,8 @@
       item.rating ? "★ " + Number(item.rating).toLocaleString(locale, { maximumFractionDigits: 1 }) : ""].filter(Boolean).join(" · ");
     $("detail-image").hidden = !item.logo;
     if (item.logo) $("detail-image").src = item.logo;
+    // A poster the server cannot fetch (404, 502) leaves no broken-image box.
+    $("detail-image").onerror = () => { $("detail-image").hidden = true; };
     showDetails(item);
     $("seasons").replaceChildren();
     $("episodes").replaceChildren();
