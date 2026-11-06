@@ -37,7 +37,10 @@ Al primo avvio crea in `-data` il database, la chiave di cifratura
 (`secret.key`) e il token di amministrazione (`admin.token`). Ogni chiamata
 API, tranne `/api/v1/health`, richiede `Authorization: Bearer <token>`.
 La tabella elenca le chiamate principali; l'elenco completo, con il livello
-di accesso di ognuna, è in `internal/api/api.go`.
+di accesso di ognuna, è in `internal/api/api.go`. Gli errori sono
+`{"error": "…"}` nella lingua della richiesta; il testo di un errore
+inatteso (500) arriva solo a un profilo amministratore, gli altri leggono
+un messaggio generico e il dettaglio resta nel log del server.
 
 | Metodo e percorso | Scopo |
 |---|---|

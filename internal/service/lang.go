@@ -31,9 +31,6 @@ func init() {
 	files, _ := fs.Glob(messageFiles, "i18n/*.json")
 	for _, f := range files {
 		code := strings.TrimSuffix(path.Base(f), ".json")
-		if code == "it" {
-			continue
-		}
 		raw, _ := messageFiles.ReadFile(f)
 		m := map[string]string{}
 		if err := json.Unmarshal(raw, &m); err != nil {
@@ -44,9 +41,22 @@ func init() {
 				delete(m, k)
 			}
 		}
-		catalogs[code] = m
-		Languages = append(Languages, code)
+		catalogs[code] = m // "it" too: its keys are the texts written for people
+		if code != "it" {
+			Languages = append(Languages, code)
+		}
 	}
+}
+
+// ErrInternal replaces, for anyone but an admin, the text of an unexpected
+// failure: it may carry SQL errors, file paths or the provider's address.
+var ErrInternal = errors.New("errore interno del server: i dettagli sono nel registro")
+
+// Public reports whether an error's text is one written for people (a
+// known message), not a wrapped internal detail.
+func Public(err error) bool {
+	_, ok := catalogs["it"][err.Error()]
+	return ok
 }
 
 type langKey struct{}

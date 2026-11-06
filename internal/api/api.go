@@ -323,6 +323,10 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	if status == http.StatusInternalServerError {
 		a.log.Error("richiesta fallita", "path", r.URL.Path, "err", err)
+		// Only an admin sees the detail; capability routes (/stream) carry no identity.
+		if id, ok := r.Context().Value(identityKey{}).(service.Identity); (!ok || !id.Admin()) && !service.Public(err) {
+			err = service.ErrInternal
+		}
 	}
 	writeJSON(w, status, map[string]string{"error": service.Localize(service.LangOf(r.Context()), err)})
 }

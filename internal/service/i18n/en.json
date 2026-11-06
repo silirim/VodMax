@@ -264,5 +264,6 @@
   "la VPN scelta non esiste": "the chosen VPN does not exist",
   "fermata prima della fine": "stopped before the end",
   "la registrazione non è in corso": "the recording is not in progress",
-  "paese non valido": "invalid country"
+  "paese non valido": "invalid country",
+  "errore interno del server: i dettagli sono nel registro": "internal server error: the details are in the server log"
 }
