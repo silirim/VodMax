@@ -7,6 +7,7 @@
     <string name="setup_checking">Checking the server…</string>
     <string name="setup_unreachable">The server isn\'t responding at this address: make sure it\'s on and on the same network.</string>
     <string name="error_title">Server unreachable</string>
+    <string name="reconnecting">Reconnecting to the server…</string>
     <string name="error_retry">Try again</string>
     <string name="error_change">Change address</string>
     <string name="local_text">No server at home? VodMax can run on this device alone: add a subscription and a VPN in Settings. No recordings or live TV pause.</string>

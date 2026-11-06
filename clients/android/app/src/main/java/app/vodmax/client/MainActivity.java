@@ -61,6 +61,10 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> picking;
     private byte[] saving;
     private boolean signingIn;
+    // A page of the server did not load: trying again before giving up.
+    private boolean reconnecting;
+    private String retried;
+    private long retriedAt;
     // The sign-in is the one of a proxy in front of the server: Back there
     // cannot go back to the server (it would send us to the login again).
     private boolean proxyLogin;
@@ -174,12 +178,7 @@ public class MainActivity extends Activity {
 
     private void openLocal() {
         dropWeb();
-        TextView wait = new TextView(this);
-        wait.setText(R.string.local_starting);
-        wait.setTextColor(0xFFA9ABB5);
-        wait.setTextSize(20);
-        wait.setGravity(android.view.Gravity.CENTER);
-        setContentView(insetted(wait));
+        setContentView(insetted(note(R.string.local_starting)));
         new Thread(() -> {
             try {
                 String token = LocalServer.start(this);
@@ -293,7 +292,7 @@ public class MainActivity extends Activity {
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame()) showOffline();
+                if (request.isForMainFrame()) showOffline(request.getUrl().toString());
             }
         });
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -343,12 +342,64 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void showOffline() {
+    private TextView note(int text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextColor(0xFFA9ABB5);
+        t.setTextSize(20);
+        t.setGravity(android.view.Gravity.CENTER);
+        return t;
+    }
+
+    /**
+     * The server restarts (an update) or the Wi-Fi is still coming back
+     * after standby: four tries over at least 15 s, keeping the page, before
+     * the first screen, which loses it.
+     */
+    private void showOffline(String url) {
         if (prefs().getBoolean(KEY_LOCAL, false)) {
             openLocal();
             return;
         }
-        showSetup(getString(R.string.error_title) + ": " + server + ". " + getString(R.string.setup_unreachable));
+        if (reconnecting || web == null) return;
+        // The server answers but this page still fails: no endless retries.
+        if (url.equals(retried) && android.os.SystemClock.elapsedRealtime() - retriedAt < 10_000) {
+            showSetup(getString(R.string.error_title) + ": " + server + ". " + getString(R.string.setup_unreachable));
+            return;
+        }
+        reconnecting = true;
+        WebView w = web;
+        String base = server;
+        FrameLayout root = (FrameLayout) w.getParent();
+        TextView wait = note(R.string.reconnecting);
+        root.addView(wait, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        w.setVisibility(View.INVISIBLE); // not the WebView's own error page
+        new Thread(() -> {
+            boolean ok = false;
+            for (int pause : new int[] {1000, 2000, 4000, 8000}) {
+                try {
+                    Thread.sleep(pause);
+                } catch (InterruptedException e) {
+                    break;
+                }
+                ok = reachable(base);
+                if (ok) break;
+            }
+            boolean back = ok;
+            runOnUiThread(() -> {
+                reconnecting = false;
+                if (web != w) return; // another page or the first screen meanwhile
+                if (!back) {
+                    showSetup(getString(R.string.error_title) + ": " + server + ". " + getString(R.string.setup_unreachable));
+                    return;
+                }
+                root.removeView(wait);
+                w.setVisibility(View.VISIBLE);
+                retried = url;
+                retriedAt = android.os.SystemClock.elapsedRealtime();
+                w.loadUrl(url);
+            });
+        }).start();
     }
 
     /** Called by the page: window.VodMaxNative. */
