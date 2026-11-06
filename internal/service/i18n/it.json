@@ -266,5 +266,8 @@
   "la registrazione non è in corso": "la registrazione non è in corso",
   "paese non valido": "paese non valido",
   "errore interno del server: i dettagli sono nel registro": "errore interno del server: i dettagli sono nel registro",
-  "Accesso con il token di amministrazione": "Accesso con il token di amministrazione"
+  "Accesso con il token di amministrazione": "Accesso con il token di amministrazione",
+  "da questo indirizzo di VodMax non si entra con l'account: chi gestisce il server può aggiungerlo in Impostazioni → Dispositivi": "da questo indirizzo di VodMax non si entra con l'account: chi gestisce il server può aggiungerlo in Impostazioni → Dispositivi",
+  "indirizzo di VodMax non valido: %s (per esempio https://vodmax.example.org)": "indirizzo di VodMax non valido: %s (per esempio https://vodmax.example.org)",
+  "aggiungi almeno un indirizzo da cui si apre VodMax": "aggiungi almeno un indirizzo da cui si apre VodMax"
 }

@@ -50,6 +50,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0042](0042-il-tuo-paese.md) | Il tuo paese, scelto da te | **Approvata** |
 | [0043](0043-paese-al-primo-avvio.md) | Il paese al primo avvio, con le bandiere | **Approvata** |
 | [0044](0044-token-di-amministrazione-fuori-dal-browser.md) | Il token di amministrazione non resta nel browser | Proposta |
+| [0045](0045-accesso-con-account-da-indirizzi-noti.md) | Accesso con account solo dagli indirizzi di VodMax elencati | Proposta |
 
 ## Ordine consigliato per decidere
 

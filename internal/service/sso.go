@@ -47,6 +47,7 @@ var (
 	ErrSSOLogin   = errors.New("accesso non riuscito: riprova dall'inizio")
 	ErrSSOBusy    = errors.New("troppi accessi iniziati e non finiti: riprova tra qualche minuto")
 	ErrSSOAccount = errors.New("questo account non è collegato a nessun profilo di VodMax: chiedi a chi gestisce il server")
+	ErrSSOAddress = errors.New("da questo indirizzo di VodMax non si entra con l'account: chi gestisce il server può aggiungerlo in Impostazioni → Dispositivi")
 )
 
 // SSOAccount links an account (its e-mail or username) to a profile.
@@ -63,6 +64,17 @@ type SSOSettings struct {
 	ClientID string       `json:"client_id"`
 	Label    string       `json:"label"`
 	Accounts []SSOAccount `json:"accounts"`
+	// Addresses are the VodMax base URLs (scheme://host) a sign-in may
+	// start from. The return address sent to the provider is built from
+	// the request's Host, which any client can set: with a provider that
+	// accepts loose return addresses, the code would reach someone else's
+	// host. Empty on settings saved before the list existed: any address.
+	Addresses []string `json:"addresses,omitempty"`
+}
+
+// ssoAllowed reports whether a sign-in may start from base.
+func (o SSOSettings) ssoAllowed(base string) bool {
+	return len(o.Addresses) == 0 || slices.Contains(o.Addresses, strings.ToLower(base))
 }
 
 type ssoState struct {
@@ -111,12 +123,13 @@ func (s *Service) SSOSettings(ctx context.Context) (SSOSettings, bool, error) {
 
 // SSOInput changes the configuration; Secret nil keeps the current one.
 type SSOInput struct {
-	Enabled  bool         `json:"enabled"`
-	Issuer   string       `json:"issuer"`
-	ClientID string       `json:"client_id"`
-	Secret   *string      `json:"client_secret"`
-	Label    string       `json:"label"`
-	Accounts []SSOAccount `json:"accounts"`
+	Enabled   bool         `json:"enabled"`
+	Issuer    string       `json:"issuer"`
+	ClientID  string       `json:"client_id"`
+	Secret    *string      `json:"client_secret"`
+	Label     string       `json:"label"`
+	Accounts  []SSOAccount `json:"accounts"`
+	Addresses []string     `json:"addresses"`
 }
 
 func (s *Service) SetSSO(ctx context.Context, in SSOInput) error {
@@ -150,6 +163,22 @@ func (s *Service) SetSSO(ctx context.Context, in SSOInput) error {
 		seen[a.Account] = true
 		o.Accounts = append(o.Accounts, a)
 	}
+	for _, a := range in.Addresses {
+		a = strings.ToLower(strings.TrimRight(strings.TrimSpace(a), "/"))
+		if a == "" {
+			continue
+		}
+		u, err := url.Parse(a)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.User != nil {
+			return invalid("indirizzo di VodMax non valido: %s (per esempio https://vodmax.example.org)", a)
+		}
+		if !slices.Contains(o.Addresses, a) {
+			o.Addresses = append(o.Addresses, a)
+		}
+	}
+	if o.Enabled && len(o.Addresses) == 0 {
+		return invalid("aggiungi almeno un indirizzo da cui si apre VodMax")
+	}
 	// Everything is checked before anything is saved: a refused form
 	// leaves the stored settings (and secret) as they were.
 	secret, err := s.secretSetting(ctx, ssoSecretKey)
@@ -182,9 +211,9 @@ func (s *Service) SetSSO(ctx context.Context, in SSOInput) error {
 
 // SSOButton is what the pairing screen shows: whether to offer the sign-in
 // and the name of the button.
-func (s *Service) SSOButton(ctx context.Context) (bool, string) {
+func (s *Service) SSOButton(ctx context.Context, base string) (bool, string) {
 	o, _, err := s.SSOSettings(ctx)
-	if err != nil || !o.Enabled {
+	if err != nil || !o.Enabled || !o.ssoAllowed(base) {
 		return false, ""
 	}
 	return true, o.Label
@@ -249,9 +278,13 @@ func (s *Service) fetchDiscovery(ctx context.Context, issuer string) (*ssoDiscov
 	return d, nil
 }
 
-// SSOStart returns the address of the provider's sign-in page; redirect is
-// VodMax's callback address, which the provider must know.
-func (s *Service) SSOStart(ctx context.Context, redirect, client string) (string, error) {
+// SSOCallback is the path of VodMax's return address, which the provider
+// must know for each address in SSOSettings.Addresses.
+const SSOCallback = "/auth/sso/callback"
+
+// SSOStart returns the address of the provider's sign-in page for a
+// sign-in started from base (scheme://host of the request).
+func (s *Service) SSOStart(ctx context.Context, base, client string) (string, error) {
 	o, _, err := s.SSOSettings(ctx)
 	if err != nil {
 		return "", err
@@ -259,6 +292,10 @@ func (s *Service) SSOStart(ctx context.Context, redirect, client string) (string
 	if !o.Enabled {
 		return "", ErrSSOOff
 	}
+	if !o.ssoAllowed(base) {
+		return "", ErrSSOAddress
+	}
+	redirect := base + SSOCallback
 	d, err := s.ssoDiscover(ctx, o.Issuer)
 	if err != nil {
 		return "", err

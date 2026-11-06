@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -39,19 +41,55 @@ func TestSSOStartPerClient(t *testing.T) {
 	}
 	secret := "x"
 	if err := s.SetSSO(ctx, SSOInput{Enabled: true, Issuer: "https://login.example", ClientID: "vm", Secret: &secret,
-		Accounts: []SSOAccount{{Account: "a@b.it", ProfileID: p[0].ID}}}); err != nil {
+		Accounts: []SSOAccount{{Account: "a@b.it", ProfileID: p[0].ID}}, Addresses: []string{"http://tv"}}); err != nil {
 		t.Fatal(err)
 	}
 	s.sso.disc = &ssoDiscovery{configured: "https://login.example", fetched: time.Now(), AuthEndpoint: "https://login.example/auth"}
 	for i := range ssoLoginsPerClient {
-		if _, err := s.SSOStart(ctx, "http://tv/cb", "10.0.0.5"); err != nil {
+		if _, err := s.SSOStart(ctx, "http://tv", "10.0.0.5"); err != nil {
 			t.Fatalf("start %d: %v", i, err)
 		}
 	}
-	if _, err := s.SSOStart(ctx, "http://tv/cb", "10.0.0.5"); !errors.Is(err, ErrSSOBusy) {
+	if _, err := s.SSOStart(ctx, "http://tv", "10.0.0.5"); !errors.Is(err, ErrSSOBusy) {
 		t.Fatalf("over the limit: %v", err)
 	}
-	if _, err := s.SSOStart(ctx, "http://tv/cb", "10.0.0.6"); err != nil {
+	if _, err := s.SSOStart(ctx, "http://tv", "10.0.0.6"); err != nil {
 		t.Fatalf("another address: %v", err)
+	}
+}
+
+// A sign-in starts only from the addresses of VodMax the admin listed;
+// settings saved before the list existed keep working from any address.
+func TestSSOStartAddresses(t *testing.T) {
+	s, _ := localTestService(t)
+	ctx := context.Background()
+	p, err := s.st.Profiles(ctx)
+	if err != nil || len(p) == 0 {
+		t.Fatal(p, err)
+	}
+	secret := "x"
+	in := SSOInput{Enabled: true, Issuer: "https://login.example", ClientID: "vm", Secret: &secret,
+		Accounts: []SSOAccount{{Account: "a@b.it", ProfileID: p[0].ID}}, Addresses: []string{" HTTP://Casa.example:8095/ "}}
+	if err := s.SetSSO(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	s.sso.disc = &ssoDiscovery{configured: "https://login.example", fetched: time.Now(), AuthEndpoint: "https://login.example/auth"}
+	if to, err := s.SSOStart(ctx, "http://casa.example:8095", "10.0.0.5"); err != nil || !strings.Contains(to, url.QueryEscape("http://casa.example:8095/auth/sso/callback")) {
+		t.Fatalf("listed address: %s %v", to, err)
+	}
+	if _, err := s.SSOStart(ctx, "http://attacker.example", "10.0.0.5"); !errors.Is(err, ErrSSOAddress) {
+		t.Fatalf("unlisted address: %v", err)
+	}
+	if on, _ := s.SSOButton(ctx, "http://attacker.example"); on {
+		t.Fatal("button shown on an unlisted address")
+	}
+	// Saved by an older version: no list.
+	o, _, _ := s.SSOSettings(ctx)
+	o.Addresses = nil
+	if err := s.st.SetSetting(ctx, ssoKey, o); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SSOStart(ctx, "http://tunnel.example", "10.0.0.5"); err != nil {
+		t.Fatalf("settings without a list: %v", err)
 	}
 }

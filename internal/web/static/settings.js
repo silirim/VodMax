@@ -1441,6 +1441,9 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       placeholder: o.has_secret ? t("configurato: lascia vuoto per non cambiarlo") : t("dal provider di accesso") });
     const label = input({ value: o.label, placeholder: t("es. Authelia"), maxLength: 30 });
     const enabled = input({ type: "checkbox", checked: o.enabled });
+    // Where a sign-in may start from (decision 0045): this address until the admin adds others.
+    const known = (o.addresses || []).length ? o.addresses : [o.here];
+    const addresses = el("textarea", { className: "focusable", spellcheck: false, rows: 2, value: known.join("\n") });
     const rows = el("div", { className: "sso-accounts" });
     const addRow = (a = { account: "", profile_id: profiles[0] && profiles[0].id }) => {
       const account = input({ value: a.account, placeholder: t("e-mail o nome utente"), spellcheck: false, autocomplete: "off" });
@@ -1455,12 +1458,15 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     const save = el("button", { className: "small primary focusable full", type: "submit" }, t("Salva"));
     const form = el("form", { className: "form" }, ...field(t("Indirizzo del provider (issuer)"), issuer), ...field("Client ID", client),
       ...field("Client secret", secret), ...field(t("Nome del pulsante"), label),
+      ...field(t("Indirizzi di VodMax"), addresses),
+      el("p", { className: "note full" }, t("Uno per riga, per esempio quello di casa e quello del tunnel: da altri indirizzi il pulsante non compare. " +
+        "Ognuno va registrato anche nel provider, come indirizzo di ritorno.")),
       el("label", {}, t("Account")), el("div", {}, rows, el("div", { className: "buttons" }, button(t("Aggiungi un account"), () => addRow()))),
       el("label", {}, ""), el("label", { className: "check" }, enabled, t("Mostra «Entra con…» sui dispositivi non abbinati")), save);
     form.onsubmit = async (e) => {
       e.preventDefault();
       const body = { enabled: enabled.checked, issuer: issuer.value, client_id: client.value, label: label.value,
-        accounts: [...rows.children].map((r) => r.read()).filter((a) => a.account) };
+        accounts: [...rows.children].map((r) => r.read()).filter((a) => a.account), addresses: addresses.value.split("\n") };
       if (secret.value) body.client_secret = secret.value;
       try { await api("PUT", "/api/v1/settings/sso", body); flash(t("Accesso con account salvato")); render(); }
       catch (err) { flash(err.message); }
@@ -1469,7 +1475,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       el("p", { className: "note" }, t("Se in casa usi Authelia, Authentik, Keycloak o un altro provider OpenID Connect, chi apre VodMax da un browser " +
         "può entrare con il suo account invece del codice. Ogni account entra sempre e solo nel profilo che gli colleghi qui, senza PIN; " +
         "il browser compare tra i dispositivi abbinati e si revoca come gli altri. Nel provider crea un client con questo indirizzo di ritorno:")),
-      cmd(o.redirect_uri),
+      ...known.map((a) => cmd(a + o.callback)),
       el("p", { className: "note" }, t("Scope: openid, email, profile. Il secret resta cifrato sul server e non viene mai mostrato.")), form];
   }
 

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -104,8 +105,17 @@ func TestSSOSignIn(t *testing.T) {
 		t.Fatalf("http issuer accepted: %d %s", code, body)
 	}
 	cfg["issuer"] = f.srv.URL + "/"
+	if code, body := e.do(t, "PUT", "/api/v1/settings/sso", cfg, true); code != 400 {
+		t.Fatalf("on without an address of VodMax: %d %s", code, body)
+	}
+	cfg["addresses"] = []string{"ftp://x"}
+	if code, body := e.do(t, "PUT", "/api/v1/settings/sso", cfg, true); code != 400 {
+		t.Fatalf("bad address accepted: %d %s", code, body)
+	}
+	cfg["addresses"] = []string{e.srv.URL + "/", ""}
 	if code, body := e.do(t, "PUT", "/api/v1/settings/sso", cfg, true); code != 200 || strings.Contains(string(body), "s3cret") ||
-		!strings.Contains(string(body), `"has_secret":true`) || !strings.Contains(string(body), "/auth/sso/callback") {
+		!strings.Contains(string(body), `"has_secret":true`) || !strings.Contains(string(body), "/auth/sso/callback") ||
+		!strings.Contains(string(body), `"addresses":["`+e.srv.URL+`"]`) {
 		t.Fatalf("settings: %d %s", code, body)
 	}
 	if code, body := e.call(t, "GET", "/api/v1/sso", nil, "", ""); code != 200 || !strings.Contains(string(body), `"label":"Authelia"`) {
@@ -152,6 +162,22 @@ func TestSSOSignIn(t *testing.T) {
 		t.Fatalf("token for another client accepted: %v", frag)
 	}
 	f.wrongAud = false
+	// Started with someone else's Host: no return address towards them.
+	noFollow0 := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	req, _ := http.NewRequest("GET", e.srv.URL+"/auth/sso/start", nil)
+	req.Host = "attacker.example"
+	if resp, err := noFollow0.Do(req); err != nil || !strings.Contains(resp.Header.Get("Location"), "sso_error") {
+		t.Fatalf("start from another host: %v %v", err, resp.Header.Get("Location"))
+	}
+	req, _ = http.NewRequest("GET", e.srv.URL+"/api/v1/sso", nil)
+	req.Header.Set("X-Forwarded-Host", "attacker.example")
+	if resp, err := http.DefaultClient.Do(req); err == nil {
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if !strings.Contains(string(b), `"enabled":false`) {
+			t.Fatalf("button on another host: %s", b)
+		}
+	}
 	// A state nobody started.
 	noFollow := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, _ := noFollow.Get(e.srv.URL + "/auth/sso/callback?code=good-code&state=forged")

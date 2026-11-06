@@ -199,9 +199,11 @@ colorati del telecomando).
 Se in casa c'è già un provider di accesso (Authelia, Authentik, Keycloak o un
 qualsiasi provider OpenID Connect), dai browser si può entrare con un account
 invece del codice di abbinamento: Impostazioni → Dispositivi → *Accesso con
-account di casa*. Nel provider crea un client con l'indirizzo di ritorno
-mostrato lì (scope `openid email profile`), poi collega ogni account (e-mail
-o nome utente) a un profilo. Ogni account entra sempre e solo nel suo profilo.
+account di casa*. Elenca gli indirizzi da cui si apre VodMax (quello di
+casa, quello di un tunnel), nel provider crea un client con gli indirizzi di
+ritorno mostrati lì (scope `openid email profile`), poi collega ogni account
+(e-mail o nome utente) a un profilo. Da un indirizzo fuori dall'elenco il
+pulsante non compare. Ogni account entra sempre e solo nel suo profilo.
 Il provider deve essere raggiungibile in `https://`.
 
 ### Telefono e tablet Android, Android TV, Google TV

@@ -10,10 +10,8 @@ import (
 
 // Sign-in with an account of the house (OpenID Connect).
 
-func ssoRedirect(r *http.Request) string { return baseURL(r) + "/auth/sso/callback" }
-
 func (a *api) ssoButton(w http.ResponseWriter, r *http.Request) {
-	on, label := a.svc.SSOButton(r.Context())
+	on, label := a.svc.SSOButton(r.Context(), baseURL(r))
 	writeJSON(w, http.StatusOK, map[string]any{"enabled": on, "label": label})
 }
 
@@ -26,7 +24,7 @@ func (a *api) ssoBack(w http.ResponseWriter, r *http.Request, key, value string)
 }
 
 func (a *api) ssoStart(w http.ResponseWriter, r *http.Request) {
-	to, err := a.svc.SSOStart(r.Context(), ssoRedirect(r), clientAddr(r))
+	to, err := a.svc.SSOStart(r.Context(), baseURL(r), clientAddr(r))
 	if err != nil {
 		a.log.Warn("accesso con account esterno", "err", err)
 		a.ssoBack(w, r, "sso_error", service.Localize(service.LangOf(r.Context()), err))
@@ -80,7 +78,7 @@ func (a *api) ssoView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"enabled": o.Enabled, "issuer": o.Issuer, "client_id": o.ClientID, "label": o.Label,
-		"accounts": o.Accounts, "has_secret": secret, "redirect_uri": ssoRedirect(r)})
+		"accounts": o.Accounts, "addresses": o.Addresses, "has_secret": secret, "here": baseURL(r), "callback": service.SSOCallback})
 }
 
 func (a *api) putSSO(w http.ResponseWriter, r *http.Request) {
