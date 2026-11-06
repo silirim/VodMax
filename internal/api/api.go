@@ -1105,7 +1105,7 @@ func (a *api) vodSession(w http.ResponseWriter, r *http.Request) {
 
 func (a *api) vodDirect(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
-	stream, err := a.svc.OpenDirect(r.Context(), r.PathValue("session"), r.Header.Get("Range"), r.URL.Query().Get("force") == "1")
+	stream, err := a.svc.OpenDirect(r.Context(), r.PathValue("session"), r.Header.Get("Range"), r.URL.Query().Get("force"))
 	if err != nil {
 		a.log.Info("film diretto: richiesta rifiutata", "range", r.Header.Get("Range"), "err", err)
 		a.fail(w, r, err)
@@ -1139,7 +1139,7 @@ func (a *api) vodRemux(w http.ResponseWriter, r *http.Request) {
 	if v, err := strconv.Atoi(q.Get("sub")); err == nil {
 		sub = v
 	}
-	stream, err := a.svc.OpenRemux(r.Context(), r.PathValue("session"), max(t, 0), q.Get("force") == "1", audio, sub)
+	stream, err := a.svc.OpenRemux(r.Context(), r.PathValue("session"), max(t, 0), q.Get("force") != "", audio, sub)
 	if err != nil {
 		a.fail(w, r, err)
 		return

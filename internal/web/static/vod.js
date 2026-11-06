@@ -1313,7 +1313,9 @@
 
   function load(position, force) {
     const p = state.play;
-    const extra = force ? "force=1" : "";
+    // A new value per "take control": the server honours each one once, so
+    // the browser's retries of this address cannot take the connection back.
+    const extra = force ? "force=" + Date.now() : "";
     if (p.sess.mode === "remux") {
       p.offset = position;
       video.src = p.sess.url + "?t=" + Math.floor(position) + "&audio=" + p.audio + "&sub=" + p.sub + (extra ? "&" + extra : "");

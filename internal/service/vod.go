@@ -191,6 +191,7 @@ type vodSession struct {
 	subFile  string // WebVTT being written by the current remux
 	catchup  *catchupInfo
 	cache    *rangeCache // direct mode: the single provider connection
+	forced   string      // direct mode: the last "take control" value honoured
 	local    bool        // url is a file of a local collection
 }
 
@@ -452,7 +453,10 @@ func (s *Service) session(id string) (*vodSession, error) {
 // OpenDirect relays (a range of) the provider file. Each request replaces
 // the viewer's previous stream: browsers abandon the old request when
 // seeking.
-func (s *Service) OpenDirect(ctx context.Context, sessionID, rangeHeader string, force bool) (*Stream, error) {
+// force is the value of one "take control" (a new one per confirmation):
+// it is honoured once, so the player's later ranges and retries of the
+// same address ask like anyone else.
+func (s *Service) OpenDirect(ctx context.Context, sessionID, rangeHeader, force string) (*Stream, error) {
 	sess, err := s.session(sessionID)
 	if err != nil {
 		return nil, err
@@ -516,10 +520,16 @@ func parseRange(h string) (from, to int64, ranged bool, err error) {
 // directCache returns the session's single-connection cache, making a new
 // one if there is none or the last one failed (e.g. busy, then "take
 // control"). A healthy cache is kept even with force: the player repeats
-// ?force=1 on every range of the same file.
-func (s *Service) directCache(sess *vodSession, force bool) (*rangeCache, error) {
+// the same force value on every range of the same file.
+func (s *Service) directCache(sess *vodSession, force string) (*rangeCache, error) {
 	s.vod.mu.Lock()
 	defer s.vod.mu.Unlock()
+	// A value already honoured is a retry or a later range of the same
+	// address: after someone else took control it must not take it back.
+	honour := force != "" && force != sess.forced
+	if honour {
+		sess.forced = force
+	}
 	if sess.cache != nil {
 		sess.cache.mu.Lock()
 		failed := sess.cache.err != nil
@@ -542,7 +552,7 @@ func (s *Service) directCache(sess *vodSession, force bool) (*rangeCache, error)
 	// Force takes the connection once. Later acquires (after an idle
 	// pause, or after someone else took control) ask like anyone else,
 	// so the film cannot silently take it back.
-	first := force
+	first := honour
 	sess.cache = newRangeCache(dir,
 		func() (context.Context, func(), error) {
 			ctx, release, err := s.acquire(context.Background(), subID, viewer, first, false)

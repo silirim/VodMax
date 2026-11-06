@@ -75,7 +75,7 @@ func TestForcedDirectFilmDoesNotTakeBack(t *testing.T) {
 	s, sub := oneConnectionService(t)
 	srv := slowFile(t, 64<<20)
 	sess := &vodSession{id: "sessaaaa", viewer: "film-viewer-1", subID: sub, url: srv.URL, mode: "direct", expires: time.Now().Add(time.Hour)}
-	cache, err := s.directCache(sess, true)
+	cache, err := s.directCache(sess, "1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestForceOnEveryRangeKeepsTheCache(t *testing.T) {
 	s, sub := oneConnectionService(t)
 	srv := slowFile(t, 8<<20)
 	sess := &vodSession{id: "sessbbbb", viewer: "film-viewer-1", subID: sub, url: srv.URL, mode: "direct", expires: time.Now().Add(time.Hour)}
-	c1, err := s.directCache(sess, true)
+	c1, err := s.directCache(sess, "1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestForceOnEveryRangeKeepsTheCache(t *testing.T) {
 	read := make(chan error, 1)
 	go func() { read <- c1.WriteRange(context.Background(), io.Discard, 0, 4<<20-1) }()
 	time.Sleep(300 * time.Millisecond)
-	if c2, _ := s.directCache(sess, true); c2 != c1 {
+	if c2, _ := s.directCache(sess, "1"); c2 != c1 {
 		t.Fatal("a forced range replaced a healthy cache")
 	}
 	if err := <-read; err != nil {
@@ -144,7 +144,7 @@ func TestDirectFilmProviderStalls(t *testing.T) {
 	}))
 	defer func() { srv.CloseClientConnections(); srv.Close() }()
 	sess := &vodSession{id: "sesscccc", viewer: "film-viewer-1", subID: sub, url: srv.URL, mode: "direct", expires: time.Now().Add(time.Hour)}
-	cache, err := s.directCache(sess, false)
+	cache, err := s.directCache(sess, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,4 +170,56 @@ func TestDirectFilmProviderStalls(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+// The player keeps the same forced address for the whole film: after the
+// TV takes control, a retried range of that address must not take the
+// connection back. A new "take control" (a new value) still does.
+func TestForcedAddressDoesNotTakeBackAfterTakeover(t *testing.T) {
+	s, sub := oneConnectionService(t)
+	srv := slowFile(t, 64<<20)
+	sess := &vodSession{id: "sessdddd", viewer: "film-viewer-1", subID: sub, url: srv.URL, mode: "direct", expires: time.Now().Add(time.Hour)}
+	cache, err := s.directCache(sess, "100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	read := make(chan error, 1)
+	go func() { read <- cache.WriteRange(context.Background(), io.Discard, 0, 64<<20-1) }()
+	time.Sleep(300 * time.Millisecond)
+	tvCtx, tvRelease, err := s.acquire(context.Background(), sub, "tv-viewer-02", true, false)
+	if err != nil {
+		t.Fatalf("take control refused: %v", err)
+	}
+	if err := <-read; err == nil {
+		t.Fatal("film read went on after the TV took control")
+	}
+
+	retry, err := s.directCache(sess, "100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	err = retry.WriteRange(ctx, io.Discard, 0, 1<<20)
+	cancel()
+	if tvCtx.Err() != nil {
+		t.Fatalf("a retry of the forced address took the connection back from the TV (cause %v)", context.Cause(tvCtx))
+	}
+	if !errors.As(err, new(ConnectionBusy)) {
+		t.Fatalf("retry got %v, want busy", err)
+	}
+
+	again, err := s.directCache(sess, "200")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer again.Close()
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := again.WriteRange(ctx, io.Discard, 0, 1<<20); err != nil {
+		t.Fatalf("a new take control did not take the connection: %v", err)
+	}
+	if tvCtx.Err() == nil {
+		t.Fatal("a new take control left the TV playing")
+	}
+	tvRelease()
 }
