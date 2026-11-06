@@ -80,3 +80,21 @@ func TestParseWithoutStop(t *testing.T) {
 		t.Fatalf("programmes: %v", got)
 	}
 }
+
+// Guides in a single-byte encoding are read; an unknown one is refused.
+func TestParseLatin1(t *testing.T) {
+	doc := "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<tv><channel id=\"a\"><display-name>Rete\xe8</display-name></channel>" +
+		"<programme start=\"20261029200000 +0100\" stop=\"20261029210000 +0100\" channel=\"a\"><title>Citt\xe0</title></programme></tv>"
+	g, err := Parse(strings.NewReader(doc), Options{})
+	if err != nil || len(g.Programmes) != 1 || g.Programmes[0].Title != "Città" || g.Channels[0].Names[0] != "Reteè" {
+		t.Fatalf("latin-1: %+v %v", g, err)
+	}
+	for _, enc := range []string{"windows-1252", "cp1251", "KOI8-R", "utf-8"} {
+		if _, err := Parse(strings.NewReader(`<?xml version="1.0" encoding="`+enc+`"?><tv></tv>`), Options{}); err != nil {
+			t.Errorf("%s: %v", enc, err)
+		}
+	}
+	if _, err := Parse(strings.NewReader(`<?xml version="1.0" encoding="EBCDIC-X"?><tv></tv>`), Options{}); err == nil {
+		t.Error("unknown encoding accepted")
+	}
+}

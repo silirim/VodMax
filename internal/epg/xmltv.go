@@ -8,6 +8,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"golang.org/x/text/encoding/charmap"
 )
 
 // Channel is an XMLTV <channel>.
@@ -45,17 +47,46 @@ type Options struct {
 	Keep      Filter
 }
 
+// charsetReader reads the single-byte encodings that older grabbers and
+// external guides still declare (ISO-8859-x, windows-125x, KOI8), besides
+// UTF-8.
+func charsetReader(charset string, input io.Reader) (io.Reader, error) {
+	name := alnum(charset)
+	switch {
+	case name == "utf8" || name == "usascii" || name == "ascii":
+		return input, nil
+	case name == "latin1":
+		name = "iso88591"
+	case strings.HasPrefix(name, "cp125"):
+		name = "windows" + name[2:]
+	}
+	for _, e := range charmap.All {
+		if m, ok := e.(*charmap.Charmap); ok && alnum(m.String()) == name {
+			return m.NewDecoder().Reader(input), nil
+		}
+	}
+	return nil, fmt.Errorf("codifica %q non supportata", charset)
+}
+
+// alnum lowers s to its letters and digits: "ISO 8859-1" → "iso88591".
+func alnum(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r + 'a' - 'A'
+		}
+		return -1
+	}, s)
+}
+
 // Parse streams an XMLTV document. Channel ids are lower-cased.
 func Parse(r io.Reader, opts Options) (*Guide, error) {
 	keep := opts.Keep
 	dec := xml.NewDecoder(r)
 	dec.Strict = false
-	dec.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
-		if strings.EqualFold(charset, "utf-8") || strings.EqualFold(charset, "us-ascii") {
-			return input, nil
-		}
-		return nil, fmt.Errorf("codifica %q non supportata", charset)
-	}
+	dec.CharsetReader = charsetReader
 	g := &Guide{}
 	// A programme without stop (optional in XMLTV) ends when the next one
 	// of its channel starts.
