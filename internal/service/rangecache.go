@@ -51,7 +51,6 @@ type rangeCache struct {
 	err      error
 	closed   bool
 	running  bool
-	fetchPos int64  // chunk the open upstream is at, -1 if none
 	stopSlot func() // ends the fetcher's connection slot, so Close frees it at once
 }
 
@@ -59,7 +58,7 @@ func newRangeCache(dir string, acquire func() (context.Context, func(), error),
 	open func(ctx context.Context, from int64) (io.ReadCloser, int64, error)) *rangeCache {
 	return &rangeCache{dir: dir, chunk: cacheChunk, ahead: cacheAhead, batch: cacheBatch, budget: cacheBudget, stall: cacheStall,
 		acquire: acquire, open: open, size: -1, have: map[int64]time.Time{}, readers: map[int]int64{},
-		waiting: map[int64]int{}, changed: make(chan struct{}), fetchPos: -1}
+		waiting: map[int64]int{}, changed: make(chan struct{})}
 }
 
 // broadcast must be called with mu held.
@@ -286,7 +285,6 @@ func (c *rangeCache) fetch() {
 		}
 		c.mu.Lock()
 		c.running = false
-		c.fetchPos = -1
 		c.mu.Unlock()
 	}()
 	buf := make([]byte, c.chunk)
@@ -365,7 +363,6 @@ func (c *rangeCache) fetch() {
 				c.size = size
 				c.broadcast()
 			}
-			c.fetchPos = k
 			c.mu.Unlock()
 		}
 		n := c.chunk
@@ -396,9 +393,6 @@ func (c *rangeCache) fetch() {
 		c.mu.Unlock()
 		pos++
 		sinceJump++
-		c.mu.Lock()
-		c.fetchPos = pos
-		c.mu.Unlock()
 	}
 }
 
