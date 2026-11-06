@@ -515,7 +515,7 @@ body.with-panel #server-problems { display: none; }
 .setup-panel button.sso { display: block; width: 100%; margin-top: 0.5rem; }
 #profiles.setup-panel { background: var(--surface); box-shadow: 0 0 0 100vmax rgba(11, 12, 16, 0.92); }
 /* Body classes set by common.js (no :has(): webOS 22 ignores it). */
-body.with-player #server-problems, body.with-panel #server-problems { display: none; }
+body.with-player #server-problems, body.with-panel #server-problems, body.with-detail #server-problems { display: none; }
 #profile-chip { flex: none; }
 #profile-chip + #search { margin-left: 0; }
 /* Medium screens: tighter menu, so it fits without scrolling sideways. */
