@@ -41,7 +41,9 @@ registrava mai, e dalla guida si rifiutava. Ora conta solo la parte di un
 programma che i margini dei vicini non raggiungono: si registrano tutti e
 due. Con una sola connessione la seconda registrazione parte quando
 finisce la prima; i suoi primi minuti sono alla fine del file della
-prima.
+prima. Con più connessioni, finché la prima è in corso la seconda prende
+solo una connessione libera: non toglie la TV a chi guarda un altro
+canale per minuti che la prima sta già registrando.
 
 ### Conversione in MP4
 

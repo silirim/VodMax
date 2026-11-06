@@ -450,10 +450,14 @@ func (s *Service) record(ctx context.Context, a *activeRec) error {
 			return fmt.Errorf("canale non più disponibile: %w", err)
 		}
 		before, opened := a.size(), time.Now()
-		if priority {
+		// Back to back on one channel the earlier recording's file already
+		// holds these minutes: no viewer of another channel is cut for
+		// them. The priority comes back once that recording ends.
+		p := priority && !s.earlierRunning(a)
+		if p {
 			prioritySince = opened
 		}
-		err = s.recordOnce(ctx, a, it, f, priority)
+		err = s.recordOnce(ctx, a, it, f, p)
 		if ctx.Err() != nil {
 			// Reaching the stop time closes the stream: not an error
 			// (earlier interruptions still count).
@@ -499,6 +503,19 @@ func (s *Service) record(ctx context.Context, a *activeRec) error {
 		}
 	}
 	return gap
+}
+
+// earlierRunning reports whether a recording of the same channel that
+// started before a is still running.
+func (s *Service) earlierRunning(a *activeRec) bool {
+	s.rec.mu.Lock()
+	defer s.rec.mu.Unlock()
+	for _, o := range s.rec.running {
+		if o != a && o.rec.GroupKey == a.rec.GroupKey && o.rec.Start < a.rec.Start {
+			return true
+		}
+	}
+	return false
 }
 
 // contended notes that the provider keeps closing a recording soon after
