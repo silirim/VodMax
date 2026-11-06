@@ -2,6 +2,10 @@
 // categories. Secrets are written, never read back.
 "use strict";
 
+// Object.fromEntries needs Chromium 73: LG webOS 5 (2020) and old Android
+// WebViews do not have it.
+const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o; }, {});
+
 (() => {
   const { store, api, hhmm, countryName, proposeCountry } = window.VodMax;
   const t = window.VodMaxI18n.t;
@@ -227,7 +231,7 @@
     // "No VPN" is a choice only when the providers may be reached without
     // one (Settings → VPN); a subscription left without one says so.
     const vpns = net.vpn_only ? list : [...list, { id: 0, name: t("Nessuna VPN (rete normale)") }];
-    const vpnName = Object.fromEntries(vpns.map((v) => [v.id, v.name]));
+    const vpnName = fromEntries(vpns.map((v) => [v.id, v.name]));
     if (net.vpn_only) vpnName[0] = t("nessuna: in attesa di una VPN");
     const parts = [el("h2", {}, t("Abbonamenti")),
       el("p", { className: "note" }, net.vpn_only ? t("Playlist dei provider (Xtream Codes, M3U o portali Stalker). Ogni abbonamento passa dalla sua VPN: senza VPN il provider non viene mai contattato.")
@@ -290,7 +294,7 @@
       try {
         const r = await api("POST", "/api/v1/subscriptions/" + s.id + "/sync");
         const sel = r.selection || {};
-        const n = Object.fromEntries(["live", "movie", "series"].map((k) => [k, sel[k] ? sel[k].cards : 0]));
+        const n = fromEntries(["live", "movie", "series"].map((k) => [k, sel[k] ? sel[k].cards : 0]));
         flash(r.guide ? t("Sincronizzato: {live} canali, {movie} film, {series} serie, guida {programmes} programmi", { ...n, programmes: r.guide.programmes })
           : t("Sincronizzato: {live} canali, {movie} film, {series} serie", n));
       } catch (e) { flash(e.message); }
@@ -1393,7 +1397,7 @@
   // ---- Devices ----
   async function renderDevices(main) {
     const [devices, profiles] = await Promise.all([api("GET", "/api/v1/devices"), api("GET", "/api/v1/profiles")]);
-    const profileName = Object.fromEntries(profiles.map((p) => [p.id, p.name]));
+    const profileName = fromEntries(profiles.map((p) => [p.id, p.name]));
     const lockSelect = (value) => {
       const s = el("select", { className: "focusable" }, el("option", { value: "" }, t("Tutti i profili (si sceglie all'avvio)")),
         ...profiles.map((p) => el("option", { value: p.id }, t("Solo {name}", { name: p.name }))));
