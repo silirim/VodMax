@@ -7,6 +7,7 @@
     <string name="setup_checking">Controllo il server…</string>
     <string name="setup_unreachable">Il server non risponde a questo indirizzo: controlla che sia acceso e nella stessa rete.</string>
     <string name="error_title">Server non raggiungibile</string>
+    <string name="reconnecting">Riconnessione al server…</string>
     <string name="error_retry">Riprova</string>
     <string name="error_change">Cambia indirizzo</string>
     <string name="local_text">Nessun server in casa? VodMax può funzionare solo su questo dispositivo: aggiungi abbonamento e VPN nelle Impostazioni. Senza registrazioni né pausa della diretta.</string>
@@ -23,6 +24,7 @@
     <string name="save_cancelled">salvataggio annullato</string>
     <string name="save_failed">file non salvato</string>
     <string name="update_refused">aggiornamento rifiutato: non viene dalle release di VodMax</string>
+    <string name="update_not_vodmax">aggiornamento rifiutato: il file non è l\'app VodMax</string>
     <string name="update_bad_checksum">il file scaricato non corrisponde alla release (checksum diverso)</string>
     <string name="pip_play">Riproduci</string>
     <string name="pip_pause">Pausa</string>

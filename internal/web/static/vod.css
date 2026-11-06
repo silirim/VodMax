@@ -46,7 +46,7 @@
 /* Episodes of a series: a row of cards, picture above, title and plot. */
 /* Written for the older browsers of TVs too: no aspect-ratio, inset or
    flex gap here. */
-.episodes.ep-row { display: flex; padding: 0.6rem 0.4rem 1rem; margin: 0 -0.4rem; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; }
+.episodes.ep-row { display: flex; padding: 0.7rem 0.8rem 1rem; margin: 0 -0.8rem; overflow-x: auto; scrollbar-width: none; }
 .episodes.ep-row::-webkit-scrollbar { display: none; }
 .episodes.ep-row li { flex: none; width: 22vw; min-width: 15rem; max-width: 24rem; margin-right: var(--gap); }
 .episodes .ep-card {
@@ -65,6 +65,9 @@
 .ep-text strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ep-plot { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--soft); font-size: 0.88rem; line-height: 1.4; }
 .ep-card.next .ep-num { color: rgba(0, 214, 202, 0.45); }
+/* The arrows scroll a card into view with room for its focus ring and
+   zoom (the row clips them otherwise, and the screen's edge cuts them). */
+.card, .card-x, .episodes .ep-card { scroll-margin: 1rem; }
 
 /* Recordings */
 .recs { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }

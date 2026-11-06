@@ -50,7 +50,7 @@ telecomando.
 | 📺 **Diretta** | Zapping da telecomando (numeri, P+/P−, solo preferiti), elenco dei canali, ora e a seguire, numerazione ufficiale, sezioni sport e radio, **multivisione** (2 o 4 canali insieme) |
 | 🗓️ **Guida TV** | Griglia dei programmi da XMLTV (della playlist e fonti esterne); registra o riguarda dalla guida |
 | ⏸️ **Pausa e archivio** | Pausa e riavvolgimento della diretta, programma dall'inizio, archivio della playlist |
-| ⏺️ **Registrazioni** | Il programma in onda, dalla guida o per regola ("ogni partita", "il telegiornale", solo dirette), con controllo di disco e connessioni; "salta la pubblicità" con Comskip |
+| ⏺️ **Registrazioni** | Il programma in onda, dalla guida o per regola ("ogni partita", "il telegiornale", solo dirette), con controllo di disco e connessioni; "salta la pubblicità" con Comskip (facoltativo, da installare a parte: non è nell'immagine Docker) |
 | 🎬 **Film e serie** | Locandine, trama e cast, continua a guardare, episodio successivo, la mia lista, salta la sigla, lingua dell'audio e sottotitoli, MKV/AVI/HEVC convertiti al volo (anche con la scheda grafica: VAAPI, Quick Sync, NVENC) |
 | ⬇️ **Download** | Film, episodi, stagioni o serie intere copiati sul disco del server, da guardare senza la playlist; uno alla volta e solo con una connessione libera (chi guarda ha la precedenza), anche solo di notte |
 | 📁 **Raccolte locali** | Cartelle di film o serie con i nomi di Jellyfin/Kodi/Plex, file `.nfo` e immagini accanto ai video |

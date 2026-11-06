@@ -67,7 +67,9 @@ go vet ./...
 go test -race ./...
 ```
 
-CI runs the same plus gitleaks. Never commit or push with a failing test:
+CI runs the same plus gitleaks, and builds the Android app with its JVM
+tests (`./gradlew assembleDebug testDebugUnitTest` in `clients/android`).
+Never commit or push with a failing test:
 gate the commit on the test exit code. Interface changes are also checked
 in a browser at TV and phone widths (no horizontal overflow).
 
@@ -96,9 +98,11 @@ Versions are `X.Y.Z`, betas `X.Y.Z-beta.N` (offered only to who opts in).
 2. `scripts/release.sh X.Y.Z[-beta.N]` builds `dist/<version>/`: server
    archives for amd64, arm64 and armv7, the signed APK, the webOS package and
    `SHA256SUMS`. It needs Go, JDK 17 and the Android SDK/NDK, and Node for
-   webOS.
-3. Check the APK signature with `apksigner verify --print-certs` (it must be
-   the release key, not the debug key) and `sha256sum -c SHA256SUMS`.
+   webOS. It stops when `versionName`, `appinfo.json` or a `versionCode` not
+   above the previous tag's do not match, when the APK or the IPK cannot be
+   built, and when the APK has the debug key (`DEBUG=1` only for local tests).
+3. Look at the APK certificate (`apksigner verify --print-certs`) and run
+   `sha256sum -c SHA256SUMS`.
 4. Look at the diff since the previous tag for addresses or secrets.
 5. Commit "Versione X", annotated tag `vX`, push `main` and the tag. CI
    builds and publishes the Docker image for the tag.

@@ -22,6 +22,14 @@ import java.util.TimeZone;
 final class LocalServer {
     static final String URL = "http://127.0.0.1:8095";
     private static Process process;
+    // The process that answered start(): only its own exit is reported.
+    private static Process watched;
+    /**
+     * Runs (on a background thread) when the server dies by itself. Until
+     * the app reacts, another app could take the loopback port and get the
+     * page's token and bridge: the app reopens at once, which checks again.
+     */
+    static Runnable onExit;
 
     private LocalServer() {
     }
@@ -43,7 +51,22 @@ final class LocalServer {
             process = pb.start();
             File log = new File(context.getFilesDir(), "server.log");
             Process p = process;
-            new Thread(() -> copyLog(p.getInputStream(), log)).start();
+            new Thread(() -> {
+                copyLog(p.getInputStream(), log); // until the process closes its output
+                try {
+                    p.waitFor();
+                } catch (InterruptedException e) {
+                    return;
+                }
+                Runnable r = null;
+                synchronized (LocalServer.class) {
+                    if (watched == p) {
+                        watched = null;
+                        r = onExit;
+                    }
+                }
+                if (r != null) r.run();
+            }).start();
             long until = System.currentTimeMillis() + 30000;
             while (!running()) {
                 if (exited(p)) throw new Exception(context.getString(R.string.local_exited, p.exitValue()));
@@ -52,6 +75,7 @@ final class LocalServer {
             }
             // Something answers, but our process has gone: someone else's port.
             if (exited(p)) throw new Exception(context.getString(R.string.local_port_busy));
+            watched = p;
         }
         try (InputStream in = new FileInputStream(new File(data, "admin.token"))) {
             return new String(readAll(in), StandardCharsets.UTF_8).trim();
@@ -59,6 +83,7 @@ final class LocalServer {
     }
 
     static synchronized void stop() {
+        watched = null; // stopped on purpose: nothing to reopen
         if (process != null) process.destroy();
         process = null;
     }

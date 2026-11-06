@@ -52,6 +52,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0044](0044-token-di-amministrazione-fuori-dal-browser.md) | Il token di amministrazione non resta nel browser | Proposta |
 | [0045](0045-accesso-con-account-da-indirizzi-noti.md) | Accesso con account solo dagli indirizzi di VodMax elencati | Proposta |
 | [0046](0046-spazio-prima-le-registrazioni.md) | Disco quasi pieno: prima le registrazioni, poi la pausa della diretta | Proposta |
+| [0047](0047-lettore-android-a-schermo-intero.md) | Il lettore dell'app Android a schermo intero, anche per le registrazioni | Proposta |
 | [0048](0048-registrazioni-insistere-quando-serve.md) | Registrazioni: insistere quando serve, non quando è inutile | Proposta |
 | [0049](0049-backup-con-profili-e-registrazioni.md) | Backup: profili compresi, registrazioni recenti tenute | Proposta |
 | [0050](0050-assistente-serata-e-tempi.md) | Assistente: tutta la serata, e risposte che si possono usare | Proposta |

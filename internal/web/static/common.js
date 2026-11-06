@@ -18,18 +18,26 @@ window.VodMax = (() => {
     return id;
   })();
 
-  // A link may carry the token once: "/#token=…". It is saved and removed
-  // from the address bar. A token of this device that still works is
-  // replaced only after asking: a link sent by someone else would unpair
-  // the device, or sign it in as theirs.
+  // A link may carry the token once: "/#token=…". It is removed from the
+  // address bar and saved when this browser has no token, or one the
+  // server refuses (the Android app's own server sends a link only when its
+  // admin.token changed). A token that still works is replaced only after
+  // asking: a link someone sends must not unpair this device or move it
+  // onto theirs.
   async function tokenFromLink() {
     const link = new URLSearchParams(location.hash.slice(1)).get("token");
     if (!link) return false;
     history.replaceState(null, "", location.pathname + location.search);
-    const old = token();
-    if (old && old !== link) {
-      const res = await fetch("/api/v1/me", { headers: { Authorization: "Bearer " + old } }).catch(() => null);
-      if ((!res || res.status !== 401) && !confirm(t("Questo link fa entrare il dispositivo con un altro accesso: quello attuale andrà perso. Continuare?"))) return false;
+    const now = token();
+    if (link === now) return false;
+    if (now) {
+      // The device a token belongs to; null when the server refuses it.
+      const me = (tok) => fetch("/api/v1/me", { headers: { Authorization: "Bearer " + tok } })
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      const [cur, next] = await Promise.all([me(now), me(link)]);
+      if (!next) return false; // the link opens nothing: keep this device
+      if (cur && !confirm(t("Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?",
+        { link: next.device.name, current: cur.device.name }))) return false;
     }
     store.set("token", link);
     store.set("profile", "");
@@ -117,9 +125,17 @@ window.VodMax = (() => {
   }
 
   // Pairing: the device shows a code, an admin approves it elsewhere.
-  let pairingTimer;
-  async function showPairing(fresh) {
+  // A page fails several requests with 401 at once: they share one run,
+  // or each would ask for a code of its own and keep polling it (the
+  // server allows only a few codes per address).
+  let pairingTimer, pairingRun = null;
+  function showPairing(fresh) {
+    if (!pairingRun) pairingRun = startPairing(fresh).finally(() => { pairingRun = null; });
+    return pairingRun;
+  }
+  async function startPairing(fresh) {
     clearTimeout(pairingTimer);
+    pairingPoll = null; // a poll of the previous code still waiting stops there
     // The code of this device is kept while it is valid: moving between
     // pages does not ask for new ones (the server allows a few per address).
     let req = fresh ? null : store.get("pairing", null);
@@ -140,7 +156,7 @@ window.VodMax = (() => {
       return;
     }
     const code = el("p", { className: "pair-code" }, req.code);
-    const admin = el("button", { type: "button", className: "link", onclick: () => { clearTimeout(pairingTimer); askToken(); } }, t("Ho il token di amministrazione"));
+    const admin = el("button", { type: "button", className: "link", onclick: () => { clearTimeout(pairingTimer); pairingPoll = null; askToken(); } }, t("Ho il token di amministrazione"));
     const sso = await fetch("/api/v1/sso").then((r) => r.json()).catch(() => ({}));
     const ssoButton = sso.enabled ? el("button", { type: "button", className: "sso", onclick: () => { location.href = "/auth/sso/start"; } },
       sso.label ? t("Entra con {name}", { name: sso.label }) : t("Entra con il tuo account")) : null;
@@ -160,8 +176,10 @@ window.VodMax = (() => {
           location.reload();
           return;
         }
-        if (res.status === 404) { store.set("pairing", null); showPairing(true); return; }
+        if (res.status === 404) { if (poll === pairingPoll) { store.set("pairing", null); showPairing(true); } return; }
       } catch { /* network hiccup: keep polling */ }
+      if (poll !== pairingPoll) return; // a newer code has its own loop
+      clearTimeout(pairingTimer); // the foreground check may have polled meanwhile: one loop only
       pairingTimer = setTimeout(poll, 3000);
     };
     pairingTimer = setTimeout(poll, 3000);
@@ -440,7 +458,6 @@ window.VodMax = (() => {
   // ---- Phone: navigation bar at the bottom, like the streaming apps;
   // "Altro" opens a sheet with the rest. On the menu page the entries
   // press its tabs; elsewhere they are links. ----
-  const phoneNav = window.matchMedia("(max-width: 800px)");
   let navBar = null;
   function bottomNav(active) {
     if (!navBar) {
@@ -631,15 +648,24 @@ window.VodMax = (() => {
     go.focus();
   }
 
-  async function api(method, path, body) {
-    const headers = { "Content-Type": "application/json" };
+  // Who is asking: the device, the profile in use and the language of the
+  // server's messages. Also for the requests that do not go through api()
+  // (backup files): admin routes need the profile as much as the token.
+  function authHeaders() {
+    const headers = { "X-VodMax-Lang": window.VodMaxI18n.lang };
     if (token()) headers.Authorization = "Bearer " + token();
     if (profileToken()) headers["X-Profile"] = profileToken();
-    headers["X-VodMax-Lang"] = window.VodMaxI18n.lang; // server messages in the same language
+    return headers;
+  }
+
+  async function api(method, path, body) {
+    const headers = { "Content-Type": "application/json", ...authHeaders() };
     const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     const data = res.status === 204 ? null : await res.json().catch(() => null);
     if (res.status === 401) {
-      showPairing();
+      // Checks that repeat (server status every 30 s) leave an open pairing
+      // or token panel as it is: no new code, no form wiped while typing.
+      if (!document.querySelector("#pairing, #token-setup")) showPairing();
       throw handled(t("dispositivo non abbinato"));
     }
     if (res.status === 403 && data && data.code === "profile_required") {
@@ -765,7 +791,10 @@ window.VodMax = (() => {
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (destroyed || !data.fatal) return;
         const status = data.response && data.response.code;
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && (status === 403 || status === 404) && data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR) {
+        // The buffer is gone: on the first load, or on a later reload of
+        // the live playlist (hls.js calls that a level load).
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && (status === 403 || status === 404) &&
+          (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR || data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR)) {
           if (onError) onError("ended", status);
         } else if (data.type === Hls.ErrorTypes.NETWORK_ERROR && recoveries < 5) {
           recoveries++;
@@ -884,5 +913,5 @@ window.VodMax = (() => {
   // The Android app's native player (window.VodMaxNative), if present.
   const native = window.VodMaxNative || null;
 
-  return { countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, bottomNav, closeSheet, sheetOpen, label, store, viewer, token, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
+  return { countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, bottomNav, closeSheet, sheetOpen, label, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
 })();

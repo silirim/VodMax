@@ -42,6 +42,10 @@ vodmax-server -version
   Senza, VodMax funziona, ma niente pausa della diretta, niente
   registrazioni, e i file MKV/AVI non partono nel browser (l'app Android li
   riproduce comunque).
+- **Comskip** (facoltativo): segna la pubblicità nelle registrazioni, per
+  "salta la pubblicità". Non è nei pacchetti di Debian né
+  nell'immagine Docker: compilalo dai sorgenti e metti `comskip` in
+  `/usr/local/bin`. Senza, tutto il resto funziona.
 - **Porta**: l'interfaccia è su `http://<server>:8095`; si cambia in
   `vodmax.service` (`-listen`). Tienila dentro la rete di casa; da fuori usa
   una tua VPN (WireGuard, Tailscale…) invece di aprire la porta.
@@ -100,6 +104,10 @@ container: Intel/AMD con `--device /dev/dri` e `--group-add <id del gruppo
 render>` (`getent group render`; l'immagine ha il driver VAAPI Intel su x86-64, AMD funziona con l'installazione nativa),
 NVIDIA con NVIDIA Container Toolkit (`--gpus all`, con un ffmpeg che abbia
 NVENC). Poi Impostazioni → Sistema → *Conversione video* → *Prova*.
+Con l'installazione nativa (`vodmax.service`) la scheda è in `/dev/dri`, che
+solo il gruppo `render` può aprire: `sudo usermod -aG render vodmax`, poi
+`sudo systemctl restart vodmax`. Serve anche all'assistente integrato per
+usare la scheda tramite Vulkan.
 
 ### Aggiornare
 
@@ -175,7 +183,8 @@ una versione nuova.
      le impronte. Gira sul server, in ascolto solo sul server stesso, e si
      spegne dopo 10 minuti senza richieste. *Rimuovi* cancella tutto.
      Linux x86-64 o ARM64; la scheda video si usa tramite Vulkan se ci sono
-     `libvulkan1` e i suoi driver. Con **Docker** il modello gira nel
+     `libvulkan1` e i suoi driver e `vodmax` è nel gruppo `render` (vedi
+     *Scheda grafica*). Con **Docker** il modello gira nel
      servizio facoltativo `assistant` del compose:
      `docker compose --profile assistant up -d`.
    - **Servizio online**: Claude, OpenAI, Mistral, Gemini o OpenRouter con
@@ -273,7 +282,8 @@ sviluppatore**. Se è troppo complicato, usa il browser della TV (sopra).
 
    (`tv_webos` è il file della chiave che `--getkey` salva in `~/.ssh`.)
 4. Apri VodMax sulla TV, scrivi l'indirizzo del server e approva il codice di
-   abbinamento.
+   abbinamento. Per cambiare server in seguito, premi OK o Indietro mentre
+   all'avvio l'app mostra "Collegamento a…".
 
 La Modalità sviluppatore dura **50 ore**: prima che scada apri l'app
 Developer Mode e premi *Extend*, altrimenti le app installate così non si

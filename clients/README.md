@@ -9,8 +9,12 @@ usa: [docs/installazione.md](../docs/installazione.md).
 
 Un solo APK. L'interfaccia è in una WebView; film, episodi, registrazioni
 e catch-up sono riprodotti dal player nativo Media3 (MKV, AC-3/E-AC-3,
-HEVC senza conversione sul server, tracce audio e sottotitoli). Il tasto
-Indietro passa dalla pagina; il banner compare nel launcher di Android TV.
+HEVC senza conversione sul server, tracce audio e sottotitoli). Sul
+telefono il lettore si apre in orizzontale; il pulsante schermo intero torna
+alla rotazione del telefono (decisione 0047). Le registrazioni in MPEG-TS si
+spostano riaprendo il file dal secondo scelto. Il tasto Indietro passa dalla
+pagina (prima esce dallo schermo intero della TV in diretta); il banner
+compare nel launcher di Android TV.
 
 ```sh
 cd clients/android
@@ -37,7 +41,9 @@ Fire OS (non sulla Fire TV Stick 4K Select, che usa Vega OS).
 ## LG webOS — `webos/`
 
 Un avvio leggero: chiede l'indirizzo del server, controlla che risponda e
-apre l'interfaccia (player del browser della TV). Pacchetto con gli
+apre l'interfaccia (player del browser della TV). All'avvio con l'indirizzo
+salvato aspetta un secondo e mezzo: OK o Indietro tornano al modulo per
+cambiare server; Indietro sul modulo chiude l'app. Pacchetto con gli
 strumenti LG:
 
 ```sh

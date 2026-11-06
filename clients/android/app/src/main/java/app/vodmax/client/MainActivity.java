@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -33,6 +34,7 @@ import org.json.JSONObject;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Locale;
 
 /**
  * The VodMax app: the server's interface in a WebView (the same one as in
@@ -59,6 +61,10 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> picking;
     private byte[] saving;
     private boolean signingIn;
+    // A page of the server did not load: trying again before giving up.
+    private boolean reconnecting;
+    private String retried;
+    private long retriedAt;
     // The sign-in is the one of a proxy in front of the server: Back there
     // cannot go back to the server (it would send us to the login again).
     private boolean proxyLogin;
@@ -67,13 +73,21 @@ public class MainActivity extends Activity {
     private boolean pipAvailable, pipPlaying;
     private int pipWidth, pipHeight;
     private BroadcastReceiver pipToggle;
+    // The page's video in full screen (live TV, the browser player): the
+    // WebView hands over a view to lay over everything.
+    private View fullView;
+    private WebChromeClient.CustomViewCallback fullDone;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         pipAvailable = Pip.available(this);
         if (pipAvailable) pipToggle = Pip.listen(this, () -> page("window.VodMaxNativePipToggle && window.VodMaxNativePipToggle()"));
+        LocalServer.onExit = () -> runOnUiThread(() -> {
+            if (!isDestroyed() && prefs().getBoolean(KEY_LOCAL, false)) openLocal();
+        });
         server = prefs().getString(KEY_SERVER, null);
+        if (server != null) server = normalize(server); // saved by older versions as typed
         if (prefs().getBoolean(KEY_LOCAL, false)) openLocal();
         else if (server == null) showSetup(null);
         else open("/");
@@ -86,10 +100,7 @@ public class MainActivity extends Activity {
     // ---- First run: the server address ----
 
     private void showSetup(String message) {
-        if (web != null) {
-            web.destroy();
-            web = null;
-        }
+        dropWeb();
         View setup = getLayoutInflater().inflate(R.layout.setup, null);
         setContentView(insetted(setup));
         EditText field = findViewById(R.id.server);
@@ -132,14 +143,25 @@ public class MainActivity extends Activity {
         field.requestFocus();
     }
 
-    /** "192.168.1.10:8095" → "http://192.168.1.10:8095"; null if not an address. */
+    /**
+     * "192.168.1.10:8095" → "http://192.168.1.10:8095"; null if not an
+     * address. In the form the WebView reports URLs in (lower-case scheme
+     * and host, no default port): navigations are told apart from other
+     * sites by comparing with it, and "http://NAS:80" would match nothing.
+     */
     static String normalize(String s) {
         s = s.trim();
         if (s.isEmpty()) return null;
-        if (!s.startsWith("http://") && !s.startsWith("https://")) s = "http://" + s;
-        while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
+        String lower = s.toLowerCase(Locale.ROOT);
+        if (!lower.startsWith("http://") && !lower.startsWith("https://")) s = "http://" + s;
         Uri u = Uri.parse(s);
-        return u.getHost() == null || u.getHost().isEmpty() ? null : s;
+        String scheme = u.getScheme().toLowerCase(Locale.ROOT), host = u.getHost();
+        if (host == null || host.isEmpty()) return null;
+        int port = u.getPort();
+        boolean defaultPort = port == -1 || (port == 80 && scheme.equals("http")) || (port == 443 && scheme.equals("https"));
+        String path = u.getEncodedPath() == null ? "" : u.getEncodedPath();
+        while (path.endsWith("/")) path = path.substring(0, path.length() - 1);
+        return scheme + "://" + host.toLowerCase(Locale.ROOT) + (defaultPort ? "" : ":" + port) + path;
     }
 
     private static boolean reachable(String base) {
@@ -158,16 +180,8 @@ public class MainActivity extends Activity {
     // ---- This device alone: the server inside the app ----
 
     private void openLocal() {
-        if (web != null) {
-            web.destroy();
-            web = null;
-        }
-        TextView wait = new TextView(this);
-        wait.setText(R.string.local_starting);
-        wait.setTextColor(0xFFA9ABB5);
-        wait.setTextSize(20);
-        wait.setGravity(android.view.Gravity.CENTER);
-        setContentView(insetted(wait));
+        dropWeb();
+        setContentView(insetted(note(R.string.local_starting)));
         new Thread(() -> {
             try {
                 String token = LocalServer.start(this);
@@ -220,6 +234,27 @@ public class MainActivity extends Activity {
                 }
                 return true;
             }
+
+            // Without these the page's full-screen button does nothing in the app.
+            @Override
+            public void onShowCustomView(View v, CustomViewCallback done) {
+                if (fullView != null) {
+                    done.onCustomViewHidden();
+                    return;
+                }
+                fullView = v;
+                fullDone = done;
+                ((FrameLayout) getWindow().getDecorView()).addView(v, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+                PlayerActivity.immersive(MainActivity.this, true);
+                if (!PlayerActivity.tv(MainActivity.this)) setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                v.requestFocus();
+            }
+
+            @Override
+            public void onHideCustomView() {
+                leaveFullScreen();
+            }
         });
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -260,7 +295,7 @@ public class MainActivity extends Activity {
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame()) showOffline();
+                if (request.isForMainFrame()) showOffline(request.getUrl().toString());
             }
         });
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -292,12 +327,82 @@ public class MainActivity extends Activity {
         return root;
     }
 
-    private void showOffline() {
+    private void leaveFullScreen() {
+        if (fullView == null) return;
+        ((FrameLayout) getWindow().getDecorView()).removeView(fullView);
+        fullView = null;
+        fullDone = null;
+        PlayerActivity.immersive(this, false);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        if (web != null) web.requestFocus();
+    }
+
+    private void dropWeb() {
+        leaveFullScreen();
+        if (web != null) {
+            web.destroy();
+            web = null;
+        }
+    }
+
+    private TextView note(int text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextColor(0xFFA9ABB5);
+        t.setTextSize(20);
+        t.setGravity(android.view.Gravity.CENTER);
+        return t;
+    }
+
+    /**
+     * The server restarts (an update) or the Wi-Fi is still coming back
+     * after standby: four tries over at least 15 s, keeping the page, before
+     * the first screen, which loses it.
+     */
+    private void showOffline(String url) {
         if (prefs().getBoolean(KEY_LOCAL, false)) {
             openLocal();
             return;
         }
-        showSetup(getString(R.string.error_title) + ": " + server + ". " + getString(R.string.setup_unreachable));
+        if (reconnecting || web == null) return;
+        // The server answers but this page still fails: no endless retries.
+        if (url.equals(retried) && android.os.SystemClock.elapsedRealtime() - retriedAt < 10_000) {
+            showSetup(getString(R.string.error_title) + ": " + server + ". " + getString(R.string.setup_unreachable));
+            return;
+        }
+        reconnecting = true;
+        WebView w = web;
+        String base = server;
+        FrameLayout root = (FrameLayout) w.getParent();
+        TextView wait = note(R.string.reconnecting);
+        root.addView(wait, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        w.setVisibility(View.INVISIBLE); // not the WebView's own error page
+        new Thread(() -> {
+            boolean ok = false;
+            for (int pause : new int[] {1000, 2000, 4000, 8000}) {
+                try {
+                    Thread.sleep(pause);
+                } catch (InterruptedException e) {
+                    break;
+                }
+                ok = reachable(base);
+                if (ok) break;
+            }
+            boolean back = ok;
+            runOnUiThread(() -> {
+                reconnecting = false;
+                if (web != w) return; // another page or the first screen meanwhile
+                if (!back) {
+                    showSetup(getString(R.string.error_title) + ": " + server + ". " + getString(R.string.setup_unreachable));
+                    return;
+                }
+                root.removeView(wait);
+                w.setVisibility(View.VISIBLE);
+                retried = url;
+                retriedAt = android.os.SystemClock.elapsedRealtime();
+                w.loadUrl(url);
+            });
+        }).start();
     }
 
     /** Called by the page: window.VodMaxNative. */
@@ -489,6 +594,13 @@ public class MainActivity extends Activity {
     // to close, the app goes to the background.
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Back leaves full screen first, as in a browser.
+        if (keyCode == KeyEvent.KEYCODE_BACK && fullDone != null) {
+            WebChromeClient.CustomViewCallback done = fullDone;
+            leaveFullScreen();
+            done.onCustomViewHidden();
+            return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && web != null && signingIn) {
             // Back on the account's site: the sign-in is given up. On the
             // login of a proxy, the server is out of reach without it: back

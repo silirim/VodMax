@@ -21,7 +21,7 @@ principi, scenari e direzione in [direzione.md](direzione.md).
 | `internal/library` | Raccolte locali: titoli e anni dai nomi dei file, episodi (`S01E03`, `1x03`, `Stagione N`), `.nfo` e immagini accanto ai video. |
 | `internal/lineup` | Riconoscimento dei canali nazionali e numerazione LCN ufficiale. |
 | `internal/epg` | Lettura in streaming delle guide XMLTV. |
-| `internal/web` | Interfaccia da telecomando: menu (`/`: Home, Film, Serie, Registrazioni), TV (`/tv.html`), guida (`/guide.html`), multiview (`/multiview.html`), Impostazioni (`/settings.html`); HTML/JS senza framework, mpegts.js 1.8.2 incluso, testi tradotti da `static/i18n/`. Un link `/#token=…` salva il token di accesso (chiede conferma prima di sostituire un token che funziona); il token di amministrazione si scambia subito con un dispositivo (0044). |
+| `internal/web` | Interfaccia da telecomando: menu (`/`: Home, Film, Serie, Registrazioni), TV (`/tv.html`), guida (`/guide.html`), multiview (`/multiview.html`), Impostazioni (`/settings.html`); HTML/JS senza framework, mpegts.js 1.8.2 incluso, testi tradotti da `static/i18n/`. Un link `/#token=…` salva il token di accesso; se il browser ne ha già uno che funziona, chiede prima di sostituirlo, dicendo i nomi dei due dispositivi; il token di amministrazione si scambia subito con un dispositivo ([0044](decisioni/0044-token-di-amministrazione-fuori-dal-browser.md)). |
 | `clients/android`, `clients/webos` | App Android (WebView sull'interfaccia del server, lettore Media3, server interno per l'uso da solo) e avvio per TV LG webOS. |
 | `cmd/vodmax-server` | Il server. |
 | `cmd/vodmax-probe` | Strumento di prova: `.conf`, tunnel, login Xtream. |
@@ -85,6 +85,7 @@ guasto; il client la ignora.
 | `POST /api/v1/settings/assistant/local` `{model}` · `…/local/cancel` · `DELETE …/local` | Installa, annulla o rimuove l'assistente integrato |
 | `POST /api/v1/settings/assistant/models` · `…/test` | Modelli offerti da un servizio; prova dell'assistente |
 | `POST /api/v1/assistant/rule` `{text}` · `POST /api/v1/assistant/tonight` `{wish}` | Una regola da una frase (non salvata); proposte per stasera. 502 quando il modello o il suo servizio non danno una risposta usabile, 504 oltre il tempo massimo ([0050](decisioni/0050-assistente-serata-e-tempi.md)) |
+| `POST /api/v1/debug/player` `{event, detail}` | Un errore del player del browser, scritto nel log del server; tutti gli eventi solo da un browser con `localStorage` `vodmax.playerDebug` = `true` |
 
 ## Test
 
@@ -98,3 +99,12 @@ go test -race ./...
 I test del tunnel creano due VPN interne nello stesso processo e verificano
 che il traffico passi dal tunnel, che a VPN chiusa non parta nessuna
 connessione e che un server VPN irraggiungibile non causi fughe di traffico.
+`packaging/update_test.go` esegue `vodmax-update` con curl e server finti
+(la scelta della versione, senza rete né installazione).
+
+L'app Android si compila con i suoi test JVM (anche in CI, job `android`):
+
+```sh
+cd clients/android
+./gradlew assembleDebug testDebugUnitTest
+```

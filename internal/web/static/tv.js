@@ -37,6 +37,7 @@
     digits: "",
     timers: {},
     retries: {},           // network retries per channel
+    tuneGen: 0,            // bumped by every tune: older answers are ignored
   };
 
   function zapList() { return state.favoritesOnly ? LISTS[1] : LISTS[state.listIndex === 1 ? 0 : state.listIndex]; }
@@ -65,21 +66,25 @@
   // ---- Playback ----
   // One provider connection per zap: the player opens the relay directly
   // and a refused stream (409, connection busy) is reported as an error.
+  // Every tune has a generation: an answer or an error that arrives after a
+  // newer zap belongs to a channel already left, and is dropped. Comparing
+  // channel objects is not enough, the 60 s refresh replaces them.
   async function tune(channel, force) {
     if (!channel) return;
+    const gen = ++state.tuneGen;
     state.current = channel;
     store.set("last", channel.id);
     showBanner(channel, false);
     stopPlayer();
-    if (await tuneTimeshift(channel, force)) return;
+    if (await tuneTimeshift(channel, force, gen)) return;
     let url;
     try {
       url = (await api("POST", "/api/v1/live/" + channel.id + "/ticket", { viewer })).url;
     } catch (e) {
-      flash(e.message);
+      if (gen === state.tuneGen) flash(e.message);
       return;
     }
-    if (state.current !== channel) return; // zapped meanwhile
+    if (gen !== state.tuneGen) return; // zapped meanwhile
     if (!window.mpegts || !mpegts.isSupported()) {
       flash(t("Questo dispositivo non supporta la riproduzione MPEG-TS nel browser"));
       return;
@@ -97,7 +102,7 @@
         state.retries[channel.id] = attempt;
         if (attempt > 2) { flash(t("La diretta si è interrotta")); return; }
         flash(t("La diretta si è interrotta: la riapro…"));
-        state.timers.retry = setTimeout(() => state.current === channel && tune(channel), 1500);
+        retune(gen, 1500);
       },
       onSilent: () => {
         if (state.player === player) flash(t("Il canale non manda immagini: riprova o scegli un altro canale"), true);
@@ -123,11 +128,16 @@
         }
         state.retries[channel.id] = attempt;
         flash(t("Flusso interrotto: nuovo tentativo {n} di 3…", { n: attempt }));
-        state.timers.retry = setTimeout(() => state.current === channel && tune(channel), 1500 * attempt);
+        retune(gen, 1500 * attempt);
       },
     });
     state.player = player;
     showControls();
+  }
+
+  // The same channel again after a while, unless the viewer zapped.
+  function retune(gen, ms) {
+    state.timers.retry = setTimeout(() => gen === state.tuneGen && tune(state.current), ms);
   }
 
   function stopPlayer() {
@@ -146,15 +156,19 @@
   // ---- Live with pause and rewind (server buffer, HLS) ----
   let liveSettings;
   const canHLS = () => (window.Hls && Hls.isSupported()) || $("video").canPlayType("application/vnd.apple.mpegurl") !== "";
-  // Returns false when the direct stream must be used instead.
-  async function tuneTimeshift(channel, force) {
+  // Returns false when the direct stream must be used instead, true when
+  // handled (or superseded by a newer tune).
+  async function tuneTimeshift(channel, force, gen) {
     if (!liveSettings) liveSettings = await api("GET", "/api/v1/settings/live").catch(() => ({ mode: "direct" }));
+    if (gen !== state.tuneGen) return true;
     if (liveSettings.mode !== "timeshift" || !canHLS()) return false;
     flash(t("Sintonizzazione…"));
     let buf;
     try {
       buf = await api("POST", "/api/v1/live/" + channel.id + "/timeshift", { viewer, force: Boolean(force) });
     } catch (e) {
+      // A newer zap replaced this open (the server says so with an error).
+      if (gen !== state.tuneGen) return true;
       if (e.status === 423) { flash(e.message); return true; }
       if (e.status === 409) {
         confirmDialog(t("Tutte le connessioni dell'abbonamento sono in uso su un altro dispositivo.\n\nPrendere il controllo?"),
@@ -165,7 +179,7 @@
       flash(e.message);
       return true;
     }
-    if (state.current !== channel) { navigator.sendBeacon(buf.stop); return true; } // zapped meanwhile
+    if (gen !== state.tuneGen) { navigator.sendBeacon(buf.stop); return true; } // zapped meanwhile
     $("status").hidden = true;
     state.buffer = buf;
     const player = window.VodMax.hlsPlayer($("video"), buf.url, {
@@ -176,7 +190,7 @@
           // connection, or a recording): open the channel again.
           stopPlayer();
           flash(t("Diretta interrotta: riapro il canale…"));
-          state.timers.retry = setTimeout(() => state.current === channel && tune(channel), 2000);
+          retune(gen, 2000);
           return;
         }
         flash(t("Riproduzione non riuscita ({type})", { type }));

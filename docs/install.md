@@ -42,6 +42,10 @@ vodmax-server -version
   Without it VodMax works, but there is no pause of live TV, no recordings
   and MKV/AVI files do not play in the browser (the Android app plays them
   anyway).
+- **Comskip** (optional): marks the ads in recordings, for "skip ad". It is
+  not in Debian's packages nor in the Docker image: build it from
+  its sources and put `comskip` in `/usr/local/bin`. Without it everything
+  else works.
 - **Port**: the interface is on `http://<server>:8095`. Change it in
   `vodmax.service` (`-listen`). Keep it inside your home network; from
   outside use your own VPN (WireGuard, Tailscale...) rather than opening the
@@ -100,6 +104,10 @@ Intel/AMD with `--device /dev/dri` and `--group-add <render group id>`
 (`getent group render`; the image has the Intel VAAPI driver on x86-64, AMD works with a native install), NVIDIA
 with the NVIDIA Container Toolkit (`--gpus all`, with an ffmpeg that has
 NVENC). Then Settings → System → *Video conversion* → *Test*.
+With the native install (`vodmax.service`) the card is in `/dev/dri`, which
+only the `render` group can open: `sudo usermod -aG render vodmax`, then
+`sudo systemctl restart vodmax`. The built-in assistant needs the same to
+use the card through Vulkan.
 
 ### Updating
 
@@ -175,7 +183,7 @@ is out.
      the server itself, and stops after 10 minutes without requests.
      *Remove* deletes everything. Linux x86-64 or ARM64; a graphics card
      is used through Vulkan when `libvulkan1` and its drivers are
-     installed. With **Docker** the model runs in the optional `assistant`
+     installed and `vodmax` is in the `render` group (see *Graphics card*). With **Docker** the model runs in the optional `assistant`
      service of the compose file: `docker compose --profile assistant up -d`.
    - **Online service**: Claude, OpenAI, Mistral, Gemini or OpenRouter with
      an **API key** (a Claude Pro/Max or ChatGPT Plus subscription can't be
@@ -270,7 +278,8 @@ If that is too much, use the TV browser instead (above).
 
    (`tv_webos` is the key file `--getkey` saves in `~/.ssh`.)
 4. Open VodMax on the TV, enter the server address and approve the pairing
-   code.
+   code. To change server later, press OK or Back while the app shows
+   "Connecting to…" at start-up.
 
 Developer Mode lasts **50 hours**: open the Developer Mode app and press
 *Extend* before it expires, otherwise apps installed this way stop opening

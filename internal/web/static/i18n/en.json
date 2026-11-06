@@ -101,6 +101,7 @@
   "Più votati": "Top rated",
   "Nessun titolo con questi filtri.": "No titles match these filters.",
   "Altri titoli": "More titles",
+  "Altri canali": "More channels",
   "Ordina": "Sort",
   "Voto": "Rating",
   "Categoria": "Category",
@@ -780,7 +781,7 @@
   "Un momento…": "One moment…",
   "Schermo intero": "Full screen",
   "Esci dallo schermo intero": "Exit full screen",
-  "Questo link fa entrare il dispositivo con un altro accesso: quello attuale andrà perso. Continuare?": "This link signs the device in with another access: the current one will be lost. Continue?",
   "Indirizzi di VodMax": "VodMax addresses",
-  "Uno per riga, per esempio quello di casa e quello del tunnel: da altri indirizzi il pulsante non compare. Ognuno va registrato anche nel provider, come indirizzo di ritorno.": "One per line, for example the home one and the tunnel one: from other addresses the button does not appear. Register each one in the provider too, as a return address."
+  "Uno per riga, per esempio quello di casa e quello del tunnel: da altri indirizzi il pulsante non compare. Ognuno va registrato anche nel provider, come indirizzo di ritorno.": "One per line, for example the home one and the tunnel one: from other addresses the button does not appear. Register each one in the provider too, as a return address.",
+  "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?": "This link pairs the browser with the device “{link}” instead of “{current}”. Replace it?"
 }

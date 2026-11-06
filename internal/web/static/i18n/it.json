@@ -101,6 +101,7 @@
   "Più votati": "Più votati",
   "Nessun titolo con questi filtri.": "Nessun titolo con questi filtri.",
   "Altri titoli": "Altri titoli",
+  "Altri canali": "Altri canali",
   "Ordina": "Ordina",
   "Voto": "Voto",
   "Categoria": "Categoria",
@@ -780,7 +781,7 @@
   "Un momento…": "Un momento…",
   "Schermo intero": "Schermo intero",
   "Esci dallo schermo intero": "Esci dallo schermo intero",
-  "Questo link fa entrare il dispositivo con un altro accesso: quello attuale andrà perso. Continuare?": "Questo link fa entrare il dispositivo con un altro accesso: quello attuale andrà perso. Continuare?",
   "Indirizzi di VodMax": "Indirizzi di VodMax",
-  "Uno per riga, per esempio quello di casa e quello del tunnel: da altri indirizzi il pulsante non compare. Ognuno va registrato anche nel provider, come indirizzo di ritorno.": "Uno per riga, per esempio quello di casa e quello del tunnel: da altri indirizzi il pulsante non compare. Ognuno va registrato anche nel provider, come indirizzo di ritorno."
+  "Uno per riga, per esempio quello di casa e quello del tunnel: da altri indirizzi il pulsante non compare. Ognuno va registrato anche nel provider, come indirizzo di ritorno.": "Uno per riga, per esempio quello di casa e quello del tunnel: da altri indirizzi il pulsante non compare. Ognuno va registrato anche nel provider, come indirizzo di ritorno.",
+  "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?": "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?"
 }

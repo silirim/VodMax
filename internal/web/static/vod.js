@@ -93,7 +93,12 @@
     window.VodMax.bottomNav(["recordings", "downloads", "mylist"].includes(state.view) ? "more" : state.view);
   }
 
+  // Every render() has a number; a view's answer that arrives after a newer
+  // render started (a quick tab switch, more typing in the search) is
+  // dropped instead of being drawn over the newer page.
+  let renderSeq = 0;
   async function render() {
+    const my = ++renderSeq;
     // Typing in the search box: the results change under it, the focus
     // stays there (on TVs moving it closes the on-screen keyboard).
     const typing = document.activeElement === $("search");
@@ -111,8 +116,9 @@
       else if (state.view === "mylist") await renderMyList(main);
       else await renderGrid(main, state.view);
     } catch (e) {
-      main.replaceChildren(el("p", { className: "empty" }, e.message));
+      if (my === renderSeq) main.replaceChildren(el("p", { className: "empty" }, e.message));
     }
+    if (my !== renderSeq) return;
     if (!typing || document.activeElement !== $("search")) focusFirst(main);
   }
 
@@ -123,7 +129,9 @@
     const list = store.get("tvList", "");
     // A search looks in every channel, whatever the list.
     const q = query ? "" : list === "favorites" ? "?list=favorites" : list ? "?section=" + list : "";
+    const my = renderSeq;
     let channels = await api("GET", "/api/v1/tv/channels" + q);
+    if (my !== renderSeq) return;
     if (query) channels = channels.filter((c) => c.name.toLowerCase().includes(query) || String(c.number) === query);
     const now = Date.now() / 1000;
     const chips = TV_LISTS.map(([id, label]) => {
@@ -137,7 +145,7 @@
     });
     const guide = el("a", { className: "chip focusable", href: "/guide.html" });
     window.VodMax.label(guide, "calendar-days", t("Guida TV"));
-    const items = channels.slice(0, 600).map((c) => {
+    const item = (c) => {
       const p = c.now;
       const pct = p ? Math.min(100, Math.max(0, ((now - p.start) / (p.stop - p.start)) * 100)) : 0;
       const b = el("button", { className: "focusable" }, el("span", { className: "num" }, c.number || ""),
@@ -148,11 +156,25 @@
           p ? el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })) : null));
       b.onclick = () => { location.href = "/tv.html?channel=" + c.id; };
       return el("li", {}, b);
-    });
+    };
+    // 600 at a time (a long list is slow to draw on a TV); the rest on
+    // request, like the films' grid, so no channel is out of reach.
+    const PAGE = 600;
+    const ol = el("ol", { className: "channels" }, ...channels.slice(0, PAGE).map(item));
+    let more = null;
+    if (channels.length > PAGE) {
+      more = el("button", { className: "button more focusable" }, t("Altri canali"));
+      more.onclick = () => {
+        const n = ol.children.length;
+        ol.append(...channels.slice(n, n + PAGE).map(item));
+        if (ol.children.length >= channels.length) more.remove();
+        focusFirst(ol.children[n]);
+      };
+    }
     main.replaceChildren(el("h2", { className: "page-title" }, "TV"), el("div", { className: "tv-tools" }, ...chips, guide),
       query ? el("p", { className: "empty" }, t("{n} canali per “{query}” (nome o numero)", { n: channels.length, query: state.query })) : "",
-      items.length ? el("ol", { className: "channels" }, ...items) : el("p", { className: "empty" }, list === "favorites"
-        ? t("Nessun preferito: in TV premi il tasto giallo (F) su un canale.") : t("Nessun canale.")));
+      channels.length ? ol : el("p", { className: "empty" }, list === "favorites"
+        ? t("Nessun preferito: in TV premi il tasto giallo (F) su un canale.") : t("Nessun canale.")), more || "");
   }
 
   // ---- Home: a featured title on top (it follows the focused card),
@@ -171,6 +193,7 @@
   async function renderHome(main) {
     main.replaceChildren(el("section", { className: "hero skeleton" }), el("h2", { className: "section" }, t("Continua a guardare")), skeletonRow(true),
       el("h2", { className: "section" }, t("Nuovi film")), skeletonRow(false));
+    const my = renderSeq;
     const [cont, films, series, favorites, recordings, mine, trending] = await Promise.all([
       api("GET", "/api/v1/continue"),
       api("GET", "/api/v1/catalog/movie?sort=recent&limit=24"),
@@ -183,6 +206,7 @@
     const hero = el("section", { className: "hero" });
     const parts = [hero];
     if (await assistant()) parts.push(tonightBox());
+    if (my !== renderSeq) return;
     parts.push(el("h2", { className: "section" }, t("Continua a guardare")));
     parts.push(cont.length ? el("div", { className: "row" }, ...cont.map(continueCard))
       : el("p", { className: "empty" }, t("Qui compaiono i film e gli episodi iniziati e la prossima puntata delle serie che stai seguendo.")));
@@ -198,16 +222,20 @@
     // The featured title: the first thing to continue, else the newest film.
     const first = cont[0] ? heroFromContinue(cont[0]) : films.items[0] ? heroFromItem(films.items[0]) : null;
     if (first) showHero(hero, first);
-    let heroTimer;
-    main.addEventListener("focusin", (e) => {
-      const card = e.target.closest(".card");
-      if (!card || !card.hero) return;
-      clearTimeout(heroTimer);
-      // Only if the focus is still on that card (moving on quickly with
-      // the remote must not redraw the hero under the new focus).
-      heroTimer = setTimeout(() => { if (document.activeElement === card) showHero(hero, card.hero); }, 350);
-    });
   }
+  // Added once, not at every visit of Home: the hero follows the focused
+  // card only on the page that has one (a card of Film or a search sets
+  // card.hero too, and a listener left from Home fetched its details).
+  let heroTimer;
+  $("content").addEventListener("focusin", (e) => {
+    const card = e.target.closest(".card");
+    const hero = $("content").querySelector(".hero:not(.skeleton)");
+    if (!card || !card.hero || !hero) return;
+    clearTimeout(heroTimer);
+    // Only if the focus is still on that card (moving on quickly with
+    // the remote must not redraw the hero under the new focus).
+    heroTimer = setTimeout(() => { if (document.activeElement === card && hero.isConnected) showHero(hero, card.hero); }, 350);
+  });
 
   function heroFromItem(item) {
     return { id: item.id, title: item.display_title, logo: item.logo,
@@ -299,12 +327,13 @@
   // A request to record, asked in the "tonight" box: the programmes the
   // guide has at that time, to record once, or a rule for every airing.
   // False when the assistant for rules cannot answer (a viewer, a kids
-  // profile): the box then suggests as usual.
+  // profile): the box then suggests as usual. Any other error (the model
+  // still loading, a timeout) is shown, not swapped for suggestions.
   async function recordWish(text, result) {
     const who = await window.VodMax.me().catch(() => null);
     if (who && who.profile && who.profile.kind === "kids") return false;
     let p;
-    try { p = await api("POST", "/api/v1/assistant/rule", { text }); } catch (e) { return false; }
+    try { p = await api("POST", "/api/v1/assistant/rule", { text }); } catch (e) { if (e.status === 403) return false; throw e; }
     let once = p.once || [], fromRule = false;
     // No day or time ("registra Feyenoord Inter"): the next airings of the
     // rule, the live one first, are what to record once.
@@ -399,7 +428,9 @@
     if (b.category && b.categorySub) q.set("category_subscription", b.categorySub);
     if (cursor) q.set("cursor", cursor);
     if (!grid) main.replaceChildren(el("h2", { className: "page-title" }, kind === "movie" ? t("Film") : t("Serie")), filterBar(kind, b), skeletonRow(false));
+    const my = renderSeq; // "Altri titoli" too: dropped if the page changed meanwhile
     const page = await api("GET", "/api/v1/catalog/" + kind + "?" + q);
+    if (my !== renderSeq) return;
     if (!grid) {
       grid = el("div", { className: "grid" });
       main.lastElementChild.replaceWith(page.items.length ? grid : el("p", { className: "empty" }, t("Nessun titolo con questi filtri.")));
@@ -476,8 +507,10 @@
 
   async function renderSearch(main) {
     const q = encodeURIComponent(state.query);
+    const my = renderSeq;
     const [films, series] = await Promise.all([
       api("GET", "/api/v1/catalog/movie?limit=40&q=" + q), api("GET", "/api/v1/catalog/series?limit=40&q=" + q)]);
+    if (my !== renderSeq) return;
     const sections = [[t("Film"), films.items], [t("Serie"), series.items]];
     if (state.view === "series") sections.reverse(); // the current tab's kind first
     const parts = [];
@@ -490,6 +523,7 @@
 
   const recState = { scheduled: t("In programma"), recording: t("● In registrazione"), completed: t("Registrata"), failed: t("Non riuscita") };
   async function renderRecordings(main) {
+    const my = renderSeq;
     const [list, space, who] = await Promise.all([api("GET", "/api/v1/recordings"), api("GET", "/api/v1/recordings/space"),
       window.VodMax.me().catch(() => null)]);
     const kids = who && who.profile && who.profile.kind === "kids";
@@ -532,13 +566,16 @@
       })));
     }
     if (!kids) parts.push(...await rulesSection());
+    if (my !== renderSeq) return;
     main.replaceChildren(...parts);
   }
 
   // ---- The downloads page; refreshed while one is running ----
   // ---- My list: films and series kept for later, per profile ----
   async function renderMyList(main) {
+    const my = renderSeq;
     const list = await api("GET", "/api/v1/mylist");
+    if (my !== renderSeq) return;
     main.replaceChildren(el("h2", { className: "page-title" }, t("La mia lista")),
       list.length ? el("div", { className: "grid" }, ...list.map(itemCard))
         : el("p", { className: "empty" }, t("La lista è vuota. Nella scheda di un film o di una serie premi “La mia lista” per ritrovarlo qui.")));
@@ -560,7 +597,9 @@
   }
 
   async function renderDownloads(main) {
+    const my = renderSeq;
     const dl = await downloadList(true);
+    if (my !== renderSeq) return;
     if (!dl) { main.replaceChildren(el("p", { className: "empty" }, t("I download non sono disponibili su questo dispositivo."))); return; }
     main.replaceChildren(downloadsSection(dl));
     watchDownloads(dl);
@@ -924,7 +963,10 @@
       actions.append(el("p", { className: "empty" }, t("Caricamento episodi…")));
       let eps;
       try { eps = await api("GET", "/api/v1/series/" + item.id + "/episodes"); }
-      catch (e) { actions.replaceChildren(el("p", { className: "empty" }, e.message)); return; }
+      catch (e) { if (state.detail === item) actions.replaceChildren(el("p", { className: "empty" }, e.message)); return; }
+      // Another title opened meanwhile (its episodes came from the cache):
+      // this answer must not draw its seasons on that page.
+      if (state.detail !== item) return;
       actions.replaceChildren();
       renderSeasons(item, eps);
       addListButton(item);
@@ -1047,11 +1089,18 @@
     let sess;
     flash(mode === "remux" ? t("Preparazione della conversione…") : t("Avvio…"));
     const native = window.VodMax.native;
+    // The Android player reads MKV, AC-3, HEVC: the file as it is.
+    const ask = { viewer, mode: native ? "direct" : mode || "" };
+    const vodSession = (body) => api("POST", "/api/v1/vod/" + media + "/" + id + "/session", body);
     try {
       sess = media === "catchup"
         ? await api("POST", "/api/v1/catchup/" + id + "/session", { viewer, ...state.catchup })
-        // The Android player reads MKV, AC-3, HEVC: the file as it is.
-        : await api("POST", "/api/v1/vod/" + media + "/" + id + "/session", { viewer, mode: native ? "direct" : mode || "" });
+        // The only connection is busy on another device (409): asked
+        // first, then taken over, once.
+        : await vodSession(ask).catch((e) => {
+          if (e.status !== 409 || !confirm(t("La connessione dell'abbonamento è in uso su un altro dispositivo. Prendere il controllo?"))) throw e;
+          return vodSession({ ...ask, force: true });
+        });
     } catch (e) {
       flash(e.message);
       // The next episode did not start: its card goes, the error stays read.
@@ -1137,8 +1186,14 @@
   // the app go to the background.
   window.VodMaxNativeBack = () => {
     if (window.VodMax.sheetOpen()) { window.VodMax.closeSheet(); return true; }
-    if ($("picker") || !$("player").hidden || !$("detail").hidden || state.query) {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    // Panels with a Back of their own (my profile, the update notice, the
+    // PIN of "Chi guarda?"); not the profile choice or pairing, where Back
+    // still sends the app to the background.
+    const panel = document.querySelector("#my-profile, #update-banner") || [...document.querySelectorAll(".setup-panel")].find((p) => p.back);
+    if (panel || $("picker") || !$("player").hidden || !$("detail").hidden || state.query) {
+      // From the focused element, so that the panels' capture handlers on
+      // document stop it before the menu's own handler sees it.
+      (document.activeElement || document.body).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       return true;
     }
     if (state.view !== "home") { state.view = "home"; render(); return true; }
@@ -1262,8 +1317,18 @@
       startSubtitles();
     } else {
       p.offset = 0;
+      // Until the metadata arrives the video's clock says 0: the position
+      // asked for is where the conversion or "take control" start.
+      p.startAt = position;
+      p.loaded = false;
       video.src = p.sess.url + (extra ? "?" + extra : "");
-      if (position > 0) video.addEventListener("loadedmetadata", () => { video.currentTime = position; }, { once: true });
+      // Only for this player: one closed before its metadata arrived must
+      // not move the next video (another film, a recording) to its time.
+      video.addEventListener("loadedmetadata", () => {
+        if (state.play !== p) return;
+        p.loaded = true;
+        if (position > 0) video.currentTime = position;
+      }, { once: true });
     }
     video.play().catch(() => flash(t("Premi OK per avviare")));
     showBar();
@@ -1274,6 +1339,7 @@
     const p = state.play;
     if (!p) return 0;
     if (p.growing) return p.growing.recorded + (performance.now() - p.growing.at) / 1000;
+    if (p.reopen) return p.duration; // the video holds only what follows the offset
     return p.sess.mode === "direct" && isFinite(video.duration) ? video.duration : p.duration;
   }
 
@@ -1296,8 +1362,7 @@
   function seek(delta) {
     const p = state.play;
     if (!p) return;
-    if (p.growing) { seekGrowing(position() + delta); return; }
-    if (p.ts) { p.ts.seek(delta); showBar(); return; }
+    if (p.reopen) { seekTS(position() + delta); return; }
     const target = Math.max(0, Math.min(position() + delta, (duration() || Infinity) - 5));
     learnIntro(position(), target);
     if (p.sess.mode === "direct") video.currentTime = target;
@@ -1310,11 +1375,10 @@
     const p = state.play;
     if (!p) return;
     const d = duration();
-    if (p.growing) { seekGrowing(target); return; }
+    if (p.reopen) { seekTS(target); return; }
     target = Math.max(0, Math.min(target, (d || Infinity) - 3));
     learnIntro(position(), target);
-    if (p.ts) p.ts.seek(target - position());
-    else if (p.sess.mode === "direct") video.currentTime = target;
+    if (p.sess.mode === "direct") video.currentTime = target;
     else load(target);
     showBar();
   }
@@ -1371,19 +1435,21 @@
     // Find out why: a busy connection answers 409, one held by a recording 423.
     const status = await fetch(p.sess.url + (p.sess.mode === "remux" ? "?t=0" : ""), { headers: { Range: "bytes=0-0" } })
       .then((r) => { r.body && r.body.cancel(); return r.status; }).catch(() => 0);
+    if (state.play !== p) return; // closed meanwhile
+    const at = p.sess.mode === "direct" && !p.loaded ? p.startAt : position();
     if (status === 423) {
       flash(t("Tutte le connessioni dell'abbonamento sono occupate da una registrazione in corso"));
       stopPlayback(true);
       return;
     }
     if (status === 409) {
-      if (confirm(t("La connessione dell'abbonamento è in uso su un altro dispositivo. Prendere il controllo?"))) load(position(), true);
+      if (confirm(t("La connessione dell'abbonamento è in uso su un altro dispositivo. Prendere il controllo?"))) load(at, true);
       else stopPlayback(true);
       return;
     }
     if (p.sess.mode === "direct" && !p.fellBack) {
       flash(t("Formato non leggibile dal browser: conversione sul server…"));
-      play(p.media, p.id, p.title, position(), "remux");
+      play(p.media, p.id, p.title, at, "remux");
       return;
     }
     flash(t("Riproduzione non riuscita"));
@@ -1511,7 +1577,12 @@
   $("next-now").onclick = () => playNext(true);
   $("next-cancel").onclick = () => { if (state.play) state.play.nextCancelled = true; conceal($("next-card")); };
 
-  // ---- Diagnostics: what the player does, sent to the server log ----
+  // ---- Diagnostics: player errors, sent to the server log ----
+  // Only errors: every event plus a tick every 10 s wrote up to 300 lines
+  // per film in the server log and hid real problems. localStorage
+  // "vodmax.playerDebug" = true sends them all again from one browser, to
+  // chase a playback problem on a device.
+  const diagAll = store.get("playerDebug", false);
   let diagCount = 0;
   function diag(event, extra) {
     const p = state.play;
@@ -1524,10 +1595,10 @@
       net: video.networkState, paused: video.paused, buffered: ranges.join(" "),
       error: video.error ? video.error.code + " " + (video.error.message || "") : "", ...extra } }).catch(() => {});
   }
-  for (const ev of ["loadstart", "loadedmetadata", "canplay", "playing", "waiting", "stalled", "pause", "play", "seeking", "seeked", "error", "emptied", "abort"]) {
+  for (const ev of diagAll ? ["loadstart", "loadedmetadata", "canplay", "playing", "waiting", "stalled", "pause", "play", "seeking", "seeked", "error", "emptied", "abort"] : ["error"]) {
     video.addEventListener(ev, () => diag(ev));
   }
-  setInterval(() => { if (state.play && !video.paused) diag("tick"); }, 10000);
+  if (diagAll) setInterval(() => { if (state.play && !video.paused) diag("tick"); }, 10000);
 
   function saveProgress() {
     const p = state.play;
@@ -1547,7 +1618,10 @@
     clearInterval(subTimer);
     if (subTrack) subTrack.mode = "disabled";
     closeMenu();
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    // Only when the player closes: play() also passes here (save false) for
+    // the next episode, another audio track or the server's conversion,
+    // and full screen must stay.
+    if (save && document.fullscreenElement) document.exitFullscreen().catch(() => {});
     if (state.play && state.play.ts) state.play.ts.destroy();
     video.pause();
     video.removeAttribute("src");
@@ -1619,30 +1693,32 @@
       from = await choose(t("Registrazione in corso"), [[0, t("Dall'inizio"), "undo-2"], ["live", t("In diretta"), "radio"]]);
       if (from === null) return;
     }
-    let url, breaks, recorded;
-    try { ({ url, commercials: breaks, recorded } = await api("POST", "/api/v1/recordings/" + r.id + "/ticket")); } catch (e) { flash(e.message); return; }
+    let url, breaks, recorded, ts, length;
+    try { ({ url, commercials: breaks, recorded, ts, duration: length } = await api("POST", "/api/v1/recordings/" + r.id + "/ticket")); } catch (e) { flash(e.message); return; }
     const growing = typeof recorded === "number";
     if (!growing) from = 0; // finished in the meantime: a normal file
+    // MPEG-TS (in progress, or left so when the conversion to MP4 failed):
+    // players cannot seek far in it, so the server reopens it at the
+    // chosen second (?t=). Finished MP4 files are seekable as they are.
+    const isTS = growing || Boolean(ts);
     const startSec = from === "live" ? Math.max(0, recorded - 4) : 0;
     if (window.VodMax.native) {
       playNative({ media: "recording", id: r.id, title: r.title + " · " + r.channel, startAt: 0, live: growing,
-        sess: { mode: "direct", url: growing ? url + "?t=" + from : url },
-        restart: growing ? { url: url + "?t=", offset: startSec, duration: Math.max(1, recorded), grows: true } : null });
+        sess: { mode: "direct", url: isTS ? url + "?t=" + from : url },
+        restart: isTS ? { url: url + "?t=", offset: startSec, duration: Math.max(1, growing ? recorded : length || 0), grows: growing } : null });
       return;
     }
     stopPlayback(false);
-    state.play = { recording: r, title: r.title, sess: { mode: "direct", url }, offset: 0, duration: r.stop - r.start, breaks: breaks || [] };
+    // The real length from the server: a recording stopped early is
+    // shorter than its scheduled slot.
+    state.play = { recording: r, title: r.title, sess: { mode: "direct", url }, offset: 0, duration: length || r.stop - r.start, breaks: breaks || [] };
     if (growing) state.play.growing = { recorded, at: performance.now() };
     $("player-audio").hidden = $("player-subs").hidden = true;
     $("player-title").textContent = r.title + " · " + r.channel;
     $("player").hidden = false;
-    // Finished recordings are MP4 (seekable); recordings in progress, or
-    // left in MPEG-TS, go through mpegts.js.
-    const isTS = growing || !(await fetch(url, { headers: { Range: "bytes=0-0" } })
-      .then((res) => { res.body && res.body.cancel(); return (res.headers.get("Content-Type") || "").includes("mp4"); }).catch(() => false));
     if (isTS && window.mpegts && mpegts.isSupported()) {
-      if (growing) openGrowing(from);
-      else state.play.ts = window.VodMax.tsPlayer(video, url, { live: false, onError: recordingError });
+      state.play.reopen = true;
+      openTS(from);
       $("player-live").hidden = !growing;
     } else {
       video.src = url;
@@ -1653,28 +1729,29 @@
 
   function recordingError(type, detail) { flash(t("Registrazione non riproducibile ({detail})", { detail })); }
 
-  // Opens the recording in progress at a second (or "live").
-  function openGrowing(from) {
+  // Opens a TS recording at a second (or "live" while it is recorded).
+  // The video's clock starts again at 0: position() adds the offset.
+  function openTS(from) {
     const p = state.play;
-    if (!p || !p.growing) return;
+    if (!p || !p.reopen) return;
     if (p.ts) p.ts.destroy();
     p.offset = from === "live" ? Math.max(0, duration() - 4) : Math.max(0, from);
     p.ts = window.VodMax.tsPlayer(video, p.sess.url + "?t=" + (from === "live" ? "live" : Math.floor(p.offset)), { live: true, onError: recordingError });
     showBar();
   }
 
-  // In a recording in progress: inside what the browser holds, a plain
-  // seek; elsewhere the stream is reopened there.
-  function seekGrowing(target) {
+  // In a TS recording: inside what the browser holds, a plain seek;
+  // elsewhere the stream is reopened there.
+  function seekTS(target) {
     const p = state.play;
     const d = duration();
-    if (target >= d - 8) { openGrowing("live"); return; }
-    target = Math.max(0, target);
+    if (p.growing && target >= d - 8) { openTS("live"); return; }
+    target = Math.max(0, d > 5 ? Math.min(target, d - 5) : target);
     const b = video.buffered, at = target - p.offset;
     for (let i = 0; i < b.length; i++) {
       if (at >= b.start(i) && at <= b.end(i) - 1) { p.ts.seek(target - position()); showBar(); return; }
     }
-    openGrowing(target);
+    openTS(target);
   }
 
   // ---- Remote control navigation ----
@@ -1710,10 +1787,19 @@
       const along = horizontal ? Math.abs(dx) : Math.abs(dy);
       const across = horizontal ? Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom))
         : Math.max(0, Math.max(a.left, b.left) - Math.min(a.right, b.right));
+      // Left and Right stay on the line: in a row of wide episode cards the
+      // season tab above is nearer than the next card, and at the end of a
+      // row the nearest thing to the right is a card rows below.
+      if (horizontal && across > 0) continue;
       const score = along + across * 3;
       if (score < bestScore) { bestScore = score; best = e; }
     }
-    if (best) best.focus();
+    if (!best) return;
+    // Scrolled by the least that shows it whole (scroll-margin keeps the
+    // focus ring in view): focus() alone centres a card that is off screen,
+    // so quick presses made a row jump back and forth.
+    best.focus({ preventScroll: true });
+    best.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   document.addEventListener("keydown", (e) => {
@@ -1821,7 +1907,7 @@
       audio: () => openMenu("audio"), subs: () => openMenu("subs"),
       live: () => {
         const p = state.play;
-        if (p && p.growing && duration() - position() > 15) openGrowing("live");
+        if (p && p.growing && duration() - position() > 15) openTS("live");
         else if (p && p.ts) { p.ts.goLive(); showBar(); }
       },
       next: () => playNext(true),
@@ -1863,8 +1949,11 @@
     showDownloadsTab();
     if (asked.get("catchup")) {
       state.catchup = { start: Number(asked.get("start")), stop: Number(asked.get("stop")), title: asked.get("title") || "" };
-      const back = asked.get("back") || "";
-      state.catchupBack = back.startsWith("/") && !back.startsWith("//") ? back : "";
+      // Only a page of this server: browsers read "/\host" and "/\t/host"
+      // as another host, so the check is the parsed origin, not the text.
+      let back = null;
+      try { back = asked.get("back") ? new URL(asked.get("back"), location.origin) : null; } catch { /* not a URL */ }
+      state.catchupBack = back && back.origin === location.origin ? back.pathname + back.search + back.hash : "";
       history.replaceState(null, "", "/");
       play("catchup", Number(asked.get("catchup")), state.catchup.title, 0, "remux");
     }

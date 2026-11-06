@@ -1,7 +1,8 @@
 name: docker
 
 # The server image ghcr.io/silirim/vodmax, for amd64, arm64 and armv7,
-# published with each release (tag v*) or by hand with a version.
+# published with each release (tag v*) or by hand with a version. Only a
+# tag moves "latest", which Compose and Unraid users pull automatically.
 on:
   push:
     tags: ["v*"]
@@ -29,6 +30,14 @@ jobs:
           v="${{ github.event.inputs.version }}"
           [ -n "$v" ] || v="${GITHUB_REF_NAME#v}"
           echo "version=$v" >> "$GITHUB_OUTPUT"
+      # ci.yml runs on the same tag but in parallel, and a workflow cannot
+      # wait for another one's job: the image is built only after the same
+      # checks pass here.
+      - name: Test
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+          go test -race -count=1 ./...
       - name: Build the server
         run: |
           for t in amd64: arm64: arm:7; do
@@ -52,7 +61,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}},value=v${{ steps.v.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=v${{ steps.v.outputs.version }}
-            type=raw,value=latest,enable=${{ !contains(steps.v.outputs.version, '-') }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && !contains(steps.v.outputs.version, '-') }}
       - uses: docker/build-push-action@v6
         with:
           context: .

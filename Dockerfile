@@ -1,7 +1,11 @@
 # VodMax server image. The binaries are built outside (GitHub Actions, see
 # .github/workflows/docker.yml) into build/linux_<arch>/vodmax-server; this
 # file only assembles the image for each platform.
-FROM alpine:3.20
+# The current stable Alpine branch: ffmpeg comes from its community
+# repository, which gets fixes only until the next stable branch, so move
+# to each new branch (May and December) and re-test conversion with the
+# graphics card.
+FROM alpine:3.24
 
 # ffmpeg: pause of live TV, recordings, MKV/AVI in the browser.
 # su-exec: see packaging/docker-entrypoint.sh (PUID/PGID).
