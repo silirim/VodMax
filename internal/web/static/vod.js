@@ -387,7 +387,7 @@
   const SORTS = [["recent", t("Più recenti")], ["title", "A–Z"], ["rating", t("Più votati")]];
   const RATINGS = [[0, t("Tutti")], [6, "6+"], [7, "7+"], [8, "8+"]];
   function browseState(kind) {
-    return { sort: "recent", minRating: 0, category: "", categoryName: "", ...store.get("browse." + kind, {}) };
+    return { sort: "recent", minRating: 0, category: "", categorySub: 0, categoryName: "", ...store.get("browse." + kind, {}) };
   }
 
   async function renderGrid(main, kind, cursor, grid) {
@@ -395,6 +395,8 @@
     const q = new URLSearchParams({ limit: 60, sort: b.sort });
     if (b.minRating) q.set("min_rating", b.minRating);
     if (b.category) q.set("category", b.category);
+    // Two providers (or two local collections) can use the same category id.
+    if (b.category && b.categorySub) q.set("category_subscription", b.categorySub);
     if (cursor) q.set("cursor", cursor);
     if (!grid) main.replaceChildren(el("h2", { className: "page-title" }, kind === "movie" ? t("Film") : t("Serie")), filterBar(kind, b), skeletonRow(false));
     const page = await api("GET", "/api/v1/catalog/" + kind + "?" + q);
@@ -436,7 +438,7 @@
       ...RATINGS.map(([v, text]) => chip(text, b.minRating === v, () => set({ minRating: v }))),
       el("span", { className: "chip-label" }, t("Categoria")),
       chip(b.category ? b.categoryName : t("Tutte"), Boolean(b.category), () => pickCategory(kind, b, set), "list"),
-      b.category ? chip(t("Togli"), false, () => set({ category: "", categoryName: "" }), "x") : null);
+      b.category ? chip(t("Togli"), false, () => set({ category: "", categorySub: 0, categoryName: "" }), "x") : null);
   }
 
   // A panel to choose among hundreds of provider categories: type to
@@ -454,13 +456,14 @@
     const draw = () => {
       const f = filter.value.trim().toLowerCase();
       const all = el("button", { className: "chip focusable" + (b.category ? "" : " active") }, el("span", { className: "name" }, t("Tutte")));
-      all.onclick = () => { close(); set({ category: "", categoryName: "" }); };
+      all.onclick = () => { close(); set({ category: "", categorySub: 0, categoryName: "" }); };
       // Names that start with the text first ("azione" before "animazione").
       const found = list.filter((c) => !f || c.name.toLowerCase().includes(f))
         .sort((x, y) => (f ? Number(!x.name.toLowerCase().startsWith(f)) - Number(!y.name.toLowerCase().startsWith(f)) : 0));
       options.replaceChildren(...(f ? [] : [all]), ...found.map((c) => {
-        const o = el("button", { className: "chip focusable" + (c.id === b.category ? " active" : ""), title: c.name }, el("span", { className: "name" }, c.name), el("small", {}, c.titles));
-        o.onclick = () => { close(); set({ category: c.id, categoryName: c.name }); };
+        const active = c.id === b.category && (!b.categorySub || c.subscription === b.categorySub);
+        const o = el("button", { className: "chip focusable" + (active ? " active" : ""), title: c.name }, el("span", { className: "name" }, c.name), el("small", {}, c.titles));
+        o.onclick = () => { close(); set({ category: c.id, categorySub: c.subscription, categoryName: c.name }); };
         return o;
       }));
     };

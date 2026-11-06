@@ -495,6 +495,7 @@ func (a *api) catalog(w http.ResponseWriter, r *http.Request) {
 	query.Limit, _ = strconv.Atoi(q.Get("limit"))
 	query.MinRating, _ = strconv.ParseFloat(q.Get("min_rating"), 64)
 	query.SubscriptionID, _ = strconv.ParseInt(q.Get("subscription"), 10, 64)
+	query.CategorySubscription, _ = strconv.ParseInt(q.Get("category_subscription"), 10, 64)
 	if len(query.Text) > 200 {
 		query.Text = query.Text[:200]
 	}

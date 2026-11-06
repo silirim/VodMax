@@ -826,7 +826,7 @@ func (s *Service) genreTitles(ctx context.Context, genres []string, wish string)
 				continue
 			}
 			matched++
-			page, err := s.Catalog(ctx, store.Query{Kind: kind, CategoryID: c.ID, Sort: "rating", Limit: 30})
+			page, err := s.Catalog(ctx, store.Query{Kind: kind, CategoryID: c.ID, CategorySubscription: c.Subscription, Sort: "rating", Limit: 30})
 			if err != nil {
 				continue
 			}

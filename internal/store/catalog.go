@@ -283,8 +283,11 @@ type Query struct {
 	Text           string // full-text search; ignores Sort
 	SubscriptionID int64
 	CategoryID     string
-	Sort           string // "title" (default) or "recent"
-	Section        string // live only: tv, sport, radio
+	// CategorySubscription is the subscription of CategoryID (two
+	// providers, or two local collections, use the same ids); 0 any.
+	CategorySubscription int64
+	Sort                 string // "title" (default) or "recent"
+	Section              string // live only: tv, sport, radio
 	// All lists every available variant, including what the user's
 	// selection hides (for the selection editor).
 	All       bool
@@ -367,9 +370,11 @@ func (s *Store) Catalog(ctx context.Context, q Query) (Page, error) {
 	if q.CategoryID != "" {
 		// A title is in a category if any of its versions is.
 		// One indexed lookup per title (item_variants: kind, group_key).
-		where = append(where, `(i.category_id = ? OR (i.group_key <> '' AND EXISTS
-			(SELECT 1 FROM item v WHERE v.kind = ? AND v.group_key = i.group_key AND v.category_id = ? AND v.available = 1)))`)
-		args = append(args, q.CategoryID, q.Kind, q.CategoryID)
+		sub := q.CategorySubscription
+		where = append(where, `((i.category_id = ? AND (? = 0 OR i.subscription_id = ?)) OR (i.group_key <> '' AND EXISTS
+			(SELECT 1 FROM item v WHERE v.kind = ? AND v.group_key = i.group_key AND v.category_id = ? AND (? = 0 OR v.subscription_id = ?)
+				AND v.available = 1)))`)
+		args = append(args, q.CategoryID, sub, sub, q.Kind, q.CategoryID, sub, sub)
 	}
 	if q.MinRating > 0 {
 		where, args = append(where, "i.rating >= ?"), append(args, q.MinRating)
@@ -515,19 +520,20 @@ func (s *Store) PlaybackItem(ctx context.Context, id int64) (PlaybackItem, error
 
 // BrowseCategory is a category with how many titles it shows.
 type BrowseCategory struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Titles int    `json:"titles"`
+	ID           string `json:"id"`
+	Subscription int64  `json:"subscription"` // category ids repeat across subscriptions
+	Name         string `json:"name"`
+	Titles       int    `json:"titles"`
 }
 
 // BrowseCategories lists the categories that have visible titles (a title
 // counts once, in every category one of its versions is in).
 func (s *Store) BrowseCategories(ctx context.Context, kind string, noAdult bool) ([]BrowseCategory, error) {
 	rows, err := s.r.QueryContext(ctx, `
-		SELECT c.source_id, min(c.name), count(DISTINCT CASE WHEN v.group_key <> '' THEN v.group_key ELSE CAST(v.id AS TEXT) END)
+		SELECT c.source_id, c.subscription_id, c.name, count(DISTINCT CASE WHEN v.group_key <> '' THEN v.group_key ELSE CAST(v.id AS TEXT) END)
 		FROM item v JOIN category c ON c.subscription_id = v.subscription_id AND c.kind = v.kind AND c.source_id = v.category_id
 		WHERE v.kind = ? AND v.available = 1 AND v.visible = 1 AND (? = 0 OR v.adult = 0)
-		GROUP BY c.source_id ORDER BY min(c.name) COLLATE NOCASE`, kind, noAdult)
+		GROUP BY c.subscription_id, c.source_id ORDER BY c.name COLLATE NOCASE, c.subscription_id`, kind, noAdult)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +541,7 @@ func (s *Store) BrowseCategories(ctx context.Context, kind string, noAdult bool)
 	out := []BrowseCategory{}
 	for rows.Next() {
 		var c BrowseCategory
-		if err := rows.Scan(&c.ID, &c.Name, &c.Titles); err != nil {
+		if err := rows.Scan(&c.ID, &c.Subscription, &c.Name, &c.Titles); err != nil {
 			return nil, err
 		}
 		out = append(out, c)

@@ -309,8 +309,11 @@ func TestBrowseByRatingAndCategory(t *testing.T) {
 	if got := titles("category=10"); got != "1408,Psycho" {
 		t.Fatalf("horror: %s", got)
 	}
+	if got := titles("category=10&category_subscription=2"); got != "" {
+		t.Fatalf("horror of another subscription: %s", got)
+	}
 	_, body = e.do(t, "GET", "/api/v1/browse/movie/categories", nil, true)
-	if string(bytes.TrimSpace(body)) != `[{"id":"10","name":"Horror","titles":2},{"id":"11","name":"Thriller","titles":1}]` {
+	if string(bytes.TrimSpace(body)) != `[{"id":"10","subscription":1,"name":"Horror","titles":2},{"id":"11","subscription":1,"name":"Thriller","titles":1}]` {
 		t.Fatalf("categories: %s", body)
 	}
 }

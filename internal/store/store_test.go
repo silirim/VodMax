@@ -492,3 +492,35 @@ func TestNewTitlesHiddenUntilSelection(t *testing.T) {
 		t.Fatalf("titles already shown: %d", len(page.Items))
 	}
 }
+
+// Two providers can use the same category id for different categories:
+// each is its own entry and lists only its own titles.
+func TestCategoriesOfTwoSubscriptions(t *testing.T) {
+	st, a := openTest(t)
+	ctx := context.Background()
+	vpn, _ := st.AddVPN(ctx, "altra", "wireguard", func(int64) []byte { return []byte("sealed") })
+	b, err := st.AddSubscription(ctx, Subscription{Name: "C", Kind: "xtream", VPNID: vpn, Settings: json.RawMessage(`{}`)},
+		func(int64) []byte { return []byte("sealed") })
+	if err != nil {
+		t.Fatal(err)
+	}
+	for sub, c := range map[int64][2]string{a: {"Azione", "Heat"}, b: {"Horror", "Saw"}} {
+		cats := []Category{{Kind: "movie", SourceID: "5", Name: c[0]}}
+		items := []Item{{Kind: "movie", SourceID: "1", Title: c[1], DisplayTitle: c[1], CategoryID: "5", GroupKey: c[1]}}
+		if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, cats, items, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	selectAll(st)
+	browse, err := st.BrowseCategories(ctx, "movie", false)
+	if err != nil || len(browse) != 2 || browse[0].Name != "Azione" || browse[0].Subscription != a || browse[1].Subscription != b {
+		t.Fatalf("browse: %+v %v", browse, err)
+	}
+	page, err := st.Catalog(ctx, Query{Kind: "movie", CategoryID: "5", CategorySubscription: b})
+	if err != nil || len(page.Items) != 1 || page.Items[0].Title != "Saw" {
+		t.Fatalf("category of the second provider: %+v %v", page.Items, err)
+	}
+	if page, _ := st.Catalog(ctx, Query{Kind: "movie", CategoryID: "5"}); len(page.Items) != 2 {
+		t.Fatalf("without the subscription (older clients): %d", len(page.Items))
+	}
+}
