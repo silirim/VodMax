@@ -34,6 +34,7 @@ import org.json.JSONObject;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Locale;
 
 /**
  * The VodMax app: the server's interface in a WebView (the same one as in
@@ -79,6 +80,7 @@ public class MainActivity extends Activity {
         pipAvailable = Pip.available(this);
         if (pipAvailable) pipToggle = Pip.listen(this, () -> page("window.VodMaxNativePipToggle && window.VodMaxNativePipToggle()"));
         server = prefs().getString(KEY_SERVER, null);
+        if (server != null) server = normalize(server); // saved by older versions as typed
         if (prefs().getBoolean(KEY_LOCAL, false)) openLocal();
         else if (server == null) showSetup(null);
         else open("/");
@@ -134,14 +136,25 @@ public class MainActivity extends Activity {
         field.requestFocus();
     }
 
-    /** "192.168.1.10:8095" → "http://192.168.1.10:8095"; null if not an address. */
+    /**
+     * "192.168.1.10:8095" → "http://192.168.1.10:8095"; null if not an
+     * address. In the form the WebView reports URLs in (lower-case scheme
+     * and host, no default port): navigations are told apart from other
+     * sites by comparing with it, and "http://NAS:80" would match nothing.
+     */
     static String normalize(String s) {
         s = s.trim();
         if (s.isEmpty()) return null;
-        if (!s.startsWith("http://") && !s.startsWith("https://")) s = "http://" + s;
-        while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
+        String lower = s.toLowerCase(Locale.ROOT);
+        if (!lower.startsWith("http://") && !lower.startsWith("https://")) s = "http://" + s;
         Uri u = Uri.parse(s);
-        return u.getHost() == null || u.getHost().isEmpty() ? null : s;
+        String scheme = u.getScheme().toLowerCase(Locale.ROOT), host = u.getHost();
+        if (host == null || host.isEmpty()) return null;
+        int port = u.getPort();
+        boolean defaultPort = port == -1 || (port == 80 && scheme.equals("http")) || (port == 443 && scheme.equals("https"));
+        String path = u.getEncodedPath() == null ? "" : u.getEncodedPath();
+        while (path.endsWith("/")) path = path.substring(0, path.length() - 1);
+        return scheme + "://" + host.toLowerCase(Locale.ROOT) + (defaultPort ? "" : ":" + port) + path;
     }
 
     private static boolean reachable(String base) {
