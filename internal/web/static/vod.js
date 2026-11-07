@@ -361,8 +361,9 @@
   // the picture turns transparent over the ambient (common.js): no seam
   // where it ends. CSS could only do it with mask-image, which webOS 22 has
   // only prefixed (and old WebViews not at all). The shade behind the text
-  // and the header is in the picture too, so it fades with it.
-  function fadedArt(url, box, fadeTop) {
+  // and the header is in the picture too, so it fades with it. A detail
+  // page has more text, wider and longer, than a hero: its shade is deeper.
+  function fadedArt(url, box, fadeTop, detail) {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -374,19 +375,21 @@
         const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
         g.drawImage(img, (w - img.naturalWidth * s) / 2, (h - img.naturalHeight * s) * 0.2, img.naturalWidth * s, img.naturalHeight * s);
         const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg-rgb").trim() || "11, 12, 16";
-        const shade = (x1, y1, a) => {
+        const shade = (x1, y1, a, hold) => {
           const gr = g.createLinearGradient(0, 0, x1, y1);
           gr.addColorStop(0, "rgba(" + bg + "," + a + ")");
+          if (hold) gr.addColorStop(hold, "rgba(" + bg + "," + a + ")");
           gr.addColorStop(1, "rgba(" + bg + ",0)");
           g.fillStyle = gr;
           g.fillRect(0, 0, w, h);
         };
-        shade(w * 0.72, 0, 0.9);
+        if (detail) shade(w * 0.85, 0, 0.92, 0.55);
+        else shade(w * 0.72, 0, 0.9);
         shade(0, h * 0.3, 0.55);
         if (w < h * 1.3) { // a phone: the text spans the width, so the shade goes down, not across
-          const down = g.createLinearGradient(0, h * 0.2, 0, h * 0.65);
+          const down = detail ? g.createLinearGradient(0, h * 0.12, 0, h * 0.42) : g.createLinearGradient(0, h * 0.2, 0, h * 0.65);
           down.addColorStop(0, "rgba(" + bg + ",0)");
-          down.addColorStop(1, "rgba(" + bg + ",0.75)");
+          down.addColorStop(1, "rgba(" + bg + "," + (detail ? 0.88 : 0.75) + ")");
           g.fillStyle = down;
           g.fillRect(0, 0, w, h);
         }
@@ -1084,7 +1087,7 @@
     $("detail-meta").replaceChildren(...detailMeta(item, d));
     $("detail-plot").textContent = d.plot || "";
     const people = (d.people || []).slice(0, 12);
-    const rows = [[t("Regia"), d.director], [t("Cast"), people.length ? "" : d.cast], [t("Uscita"), d.released], [t("Paese"), d.country],
+    const rows = [[t("Regia"), d.director], [t("Cast"), people.length ? "" : d.cast], [t("Uscita"), released(d.released)], [t("Paese"), d.country],
       [t("Titolo originale"), d.original_title && d.original_title !== item.display_title ? d.original_title : ""]];
     for (const [k, v] of rows) if (v) $("detail-credits").append(el("dt", {}, k), el("dd", {}, v));
     // The cast with TMDB's photos, initials without one. Not focusable:
@@ -1109,10 +1112,14 @@
     panel.classList.toggle("with-backdrop", Boolean(d.backdrop));
     if (d.backdrop) {
       window.VodMax.setAmbient(d.backdrop);
-      const art = await fadedArt(d.backdrop, $("detail-art"));
+      const art = await fadedArt(d.backdrop, $("detail-art"), false, true);
       if (state.detail === item) setArt($("detail-art"), art);
     }
   }
+
+  // TMDB's ISO date in words ("1 gennaio 2010"); a provider's free text as it is.
+  const released = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || "")
+    ? new Date(s + "T00:00").toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" }) : s;
 
   // Year, duration, genres, versions as text; rating and quality as pills.
   function detailMeta(item, d = {}) {
@@ -1188,6 +1195,7 @@
     showSimilar(item);
     $("seasons").replaceChildren();
     $("episodes").replaceChildren();
+    $("episodes-title").hidden = item.kind !== "series";
     const actions = $("detail-actions");
     actions.replaceChildren();
     $("detail").hidden = false;
@@ -1259,12 +1267,13 @@
       $("episodes").replaceChildren(...eps.filter((e) => e.season === season).map((e) => {
         const pct = e.progress ? (e.progress.completed ? 100 : (e.progress.position / (e.progress.duration || 1)) * 100) : 0;
         const thumb = el("span", { className: "ep-thumb" }, el("span", { className: "ep-num" }, e.number));
+        // The badge only over a picture: without one the big number says it.
         if (e.thumb) {
           const img = el("img", { src: e.thumb, alt: "", loading: "lazy" });
-          img.onerror = () => img.remove();
-          thumb.append(img);
+          const badge = el("span", { className: "badge" }, "E" + e.number);
+          img.onerror = () => { img.remove(); badge.remove(); };
+          thumb.append(img, badge);
         }
-        thumb.append(el("span", { className: "badge" }, "E" + e.number));
         if (pct) thumb.append(el("span", { className: "bar" }, el("div", { style: "width:" + pct + "%" })));
         const p = e.progress;
         const info = [e.duration ? Math.round(e.duration / 60) + " min" : "",

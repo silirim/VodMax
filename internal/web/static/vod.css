@@ -25,7 +25,7 @@ body.with-detail main, body.with-detail header.top { visibility: hidden; }
 .detail h1 { margin: 0 0 var(--s3); font-size: clamp(2rem, 3.4vw, var(--t-3xl)); line-height: 1.05; text-shadow: var(--text-shadow); }
 .detail .title-logo { max-height: 9rem; }
 .actions { margin-top: var(--s5); }
-.detail .plot { color: rgba(255, 255, 255, 0.88); text-shadow: var(--text-shadow); }
+.detail .plot { max-width: 42rem; color: rgba(255, 255, 255, 0.88); text-shadow: var(--text-shadow); } /* as wide as the hero's: within the shade */
 
 /* Cast: round photos (initials without one), name and role. */
 .cast-list { display: flex; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; }
@@ -35,7 +35,8 @@ body.with-detail main, body.with-detail header.top { visibility: hidden; }
 .cast-list strong { font-size: var(--t-s); line-height: 1.25; }
 .cast-list span { color: var(--soft); font-size: var(--t-xs); }
 
-.seasons { margin: var(--s6) 0 var(--s2); }
+#episodes-title { margin-top: var(--s6); }
+.seasons { margin: var(--s2) 0; }
 .seasons:empty { display: none; }
 /* "Altre versioni": a plain list. */
 .episodes { list-style: none; margin: 0; padding: 0; }
@@ -60,7 +61,8 @@ body.with-detail main, body.with-detail header.top { visibility: hidden; }
    duration and plot on the right, in a row that scrolls on TV and a
    column on the phone. Written for the older browsers of TVs too: no
    aspect-ratio, inset or flex gap here. */
-.episodes.ep-row { display: flex; padding: 0.9rem 1rem 1.2rem; margin: 0 -1rem; overflow-x: auto; scrollbar-width: none; }
+/* The row runs to the screen's right edge: the next card shows cut by it. */
+.episodes.ep-row { display: flex; padding: 0.9rem var(--safe) 1.2rem 1rem; margin: 0 calc(-1 * var(--safe)) 0 -1rem; overflow-x: auto; scrollbar-width: none; }
 .episodes.ep-row::-webkit-scrollbar { display: none; }
 .episodes.ep-row li { flex: none; width: 34vw; min-width: 24rem; max-width: 40rem; margin-right: var(--gap); }
 .episodes .ep-card {
@@ -156,7 +158,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 
 /* Detail page: plot and credits. */
 .plot { max-width: 48rem; line-height: 1.5; margin: 1rem 0; }
-.credits { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; max-width: 48rem; margin: 0.5rem 0; color: var(--soft); }
+.credits { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; max-width: 48rem; margin: var(--s5) 0 0.5rem; color: var(--soft); }
 .credits dt { color: var(--soft); }
 .credits dd { margin: 0; color: var(--text); }
 
