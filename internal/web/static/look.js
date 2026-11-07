@@ -9,7 +9,9 @@
 window.VodMaxLook = (() => {
   const KEY = "vodmax.look";
   const ACCENTS = ["aurora", "oceano", "tramonto", "lavanda", "menta", "rubino", "grafite"];
-  const DEFAULTS = { accent: "aurora", oled: false, nofx: false, fontScale: 1, screensaver: true, screensaverMinutes: 5 };
+  // The screensaver starts off on touch screens: a phone locks itself.
+  const touch = Boolean(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  const DEFAULTS = { accent: "aurora", oled: false, nofx: false, fontScale: 1, screensaver: !touch, screensaverMinutes: 5 };
 
   function get() {
     try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY)) || {}); }

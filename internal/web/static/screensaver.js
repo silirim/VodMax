@@ -5,8 +5,9 @@
 // TV pages (tv.html, multiview.html) do not load it, and it never starts
 // while a video plays. Settings → Aspetto turns it off or changes the
 // minutes (VodMax.look: screensaver, screensaverMinutes).
-// Styles go through the CSSOM: the CSP allows no inline <style>, and an
-// important inline transition is the only one html.nofx does not cancel.
+// Styles go through the CSSOM: the CSP allows no inline <style>. They are
+// important so no page rule changes them; under html.nofx or reduced
+// motion every transition is "none" (fade() below): an instant swap.
 "use strict";
 
 (() => {
@@ -23,6 +24,7 @@
   const css = (el, props) => { for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v, "important"); return el; };
   const div = (props) => css(document.createElement("div"), Object.assign({ position: "absolute" }, props));
   const still = () => document.documentElement.classList.contains("nofx") || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fade = (transition) => (still() ? "none" : transition);
   const busy = () => {
     const player = document.getElementById("player"); // index.html: the films' and series' player
     return document.hidden || (player && !player.hidden) || [...document.querySelectorAll("video")].some((v) => !v.paused && !v.ended);
@@ -50,7 +52,7 @@
     // Something happened while the backdrops were coming, or nothing to show.
     if (!list.length || layer || busy() || Date.now() - last < minutes() * 60000) return;
     layer = css(document.createElement("div"), { position: "fixed", top: "0", left: "0", width: "100%", height: "100%", "z-index": "2000",
-      overflow: "hidden", background: "#000", cursor: "none", opacity: "0", transition: "opacity 1s ease" });
+      overflow: "hidden", background: "#000", cursor: "none", opacity: "0", transition: fade("opacity 1s ease") });
     layer.setAttribute("aria-hidden", "true");
     for (const type of ["touchstart", "touchmove", "wheel"]) layer.addEventListener(type, (e) => { e.preventDefault(); close(); }, { passive: false });
     const pictures = [0, 1].map(() => div({ top: "0", left: "0", width: "100%", height: "100%", "background-size": "cover",
@@ -58,7 +60,7 @@
     // Dark corner behind the title, dark top-right behind the clock.
     const scrim = div({ top: "0", left: "0", width: "100%", height: "100%",
       "background-image": "linear-gradient(to top right, rgba(0,0,0,.72), rgba(0,0,0,0) 55%), linear-gradient(to bottom left, rgba(0,0,0,.5), rgba(0,0,0,0) 30%)" });
-    const caption = div({ left: "var(--safe, 5vw)", bottom: "8vh", "max-width": innerWidth < 800 ? "80vw" : "40vw", color: "#fff", transition: "opacity " + FADE / 2 + "ms ease" });
+    const caption = div({ left: "var(--safe, 5vw)", bottom: "8vh", "max-width": innerWidth < 800 ? "80vw" : "40vw", color: "#fff", transition: fade("opacity " + FADE / 2 + "ms ease") });
     const clock = div({ top: "6vh", right: "var(--safe, 5vw)", color: "#fff", "font-size": "var(--t-2xl, 2.2rem)", "font-weight": "600",
       "font-variant-numeric": "tabular-nums", "letter-spacing": "-0.02em", "text-shadow": "0 1px 3px rgba(0,0,0,.6)" });
     // The pictures stack inside their own layer, under the text.
@@ -90,7 +92,7 @@
         css(pic, { transition: "none", "background-image": "url(" + JSON.stringify(s.src) + ")", "z-index": String(n),
           transform: move ? "scale(1.06) translate(" + dx + "%, " + dy + "%)" : "none" });
         void pic.offsetWidth; // the start position is laid out before the transition
-        css(pic, { transition: "opacity " + FADE + "ms ease" + (move ? ", transform " + (SLIDE + 2 * FADE) + "ms linear" : ""), opacity: "1",
+        css(pic, { transition: fade("opacity " + FADE + "ms ease" + (move ? ", transform " + (SLIDE + 2 * FADE) + "ms linear" : "")), opacity: "1",
           transform: move ? "scale(1.16) translate(" + -dx + "%, " + -dy + "%)" : "none" });
         timers.push(setTimeout(() => { if (layer) css(other, { opacity: "0" }); }, FADE));
         css(caption, { opacity: "0" });
@@ -123,7 +125,7 @@
     for (const t of timers) { clearTimeout(t); clearInterval(t); }
     timers = [];
     l.restoreBack();
-    css(l, { opacity: "0", transition: "opacity .3s ease" });
+    css(l, { opacity: "0", transition: fade("opacity .3s ease") });
     setTimeout(() => { l.remove(); if (closing === l) closing = null; }, 350);
   }
 
