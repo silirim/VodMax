@@ -84,6 +84,19 @@ body.guide-page .programme-panel { margin: 0 var(--safe); }
 .prog.past:focus, .prog.past.focus { opacity: 1; }
 .now-line { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; }
 
+/* Loading: rows of placeholders in the shape of the grid. */
+.guide-skeleton { padding-top: 2.6rem; }
+.guide-skeleton .name .skeleton { width: 75%; height: 1.2rem; border-radius: var(--r-xs); }
+.guide-skeleton .line { display: flex; gap: 0.2rem; padding: 0.2rem 0; }
+.guide-skeleton .line .skeleton { flex: 1 1 0; border-radius: var(--r-xs); }
+.guide-skeleton .guide-row:nth-child(odd) .line .skeleton:first-child { flex-grow: 2; }
+.guide-skeleton .guide-row:nth-child(3n) .line .skeleton:last-child { flex-grow: 3; }
+.guide-skeleton .guide-row:nth-child(even) .line .skeleton:nth-child(2) { flex-grow: 2.5; }
+/* Nothing in this window: icon, one sentence, "Adesso". */
+.guide-empty { display: flex; flex-direction: column; align-items: center; gap: var(--s4); padding: var(--s7) var(--s4); text-align: center; }
+.guide-empty p { margin: 0; }
+.guide-empty .icon { margin: 0; }
+
 /* The programme in focus, above the grid: reading it costs nothing, OK
    adds the actions in the same place. Glass from guide-grid.js: strong on
    the guide page, dark over the video. */

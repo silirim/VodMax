@@ -50,6 +50,10 @@ window.GuideGrid = (() => {
     ["kids", /kids|bambin|cartoon|cartoni|children|ragazzi|animazion|anime/i],
   ];
   const genre = (category) => { const g = GENRES.find(([, re]) => re.test(category)); return g ? g[0] : "other"; };
+  // Rows of rounded placeholders while the first window loads.
+  const skeleton = () => el("div", { className: "guide-skeleton" }, ...Array.from({ length: 8 }, () =>
+    el("div", { className: "guide-row" }, el("div", { className: "name" }, el("span", { className: "skeleton" })),
+      el("div", { className: "line" }, el("span", { className: "skeleton" }), el("span", { className: "skeleton" }), el("span", { className: "skeleton" })))));
   // Icons from the bundled set: the symbols ⏺ ⏮ are missing from the
   // fonts of some TVs (an empty box).
   function iconButton(className, icon, text, onclick) {
@@ -82,6 +86,7 @@ window.GuideGrid = (() => {
         const when = toolbar.querySelector(".guide-when");
         if (when) when.textContent = dayName(state.from) + " " + hhmm(state.from) + "–" + hhmm(state.from + HOURS * 3600);
       }
+      if (!container.firstElementChild) container.replaceChildren(skeleton());
       let rows;
       try { rows = (await api("GET", "/api/v1/guide?" + q)).filter((r) => r.programmes.length > 0); }
       catch (e) { if (!e.handled && seq === state.seq) flash(e.message); }
@@ -154,8 +159,11 @@ window.GuideGrid = (() => {
         return el("div", { className: "guide-row" }, name, line);
       });
       // The time scale stays at the top; the rows scroll under it.
-      container.replaceChildren(el("div", { className: "guide-head" }, times), ...(rows.length ? rows : [el("p", { className: "empty" },
-        state.list === "favorites" ? t("Nessun preferito con la guida in questo orario.") : t("Nessun programma in guida in questo orario."))]));
+      // Nothing in this window: a sentence and the way back to now.
+      container.replaceChildren(el("div", { className: "guide-head" }, times), ...(rows.length ? rows : [el("div", { className: "empty guide-empty" },
+        window.VodMaxIcons.icon("calendar-days"),
+        el("p", {}, state.list === "favorites" ? t("Nessun preferito con la guida in questo orario.") : t("Nessun programma in guida in questo orario.")),
+        el("button", { className: "button focusable", onclick: () => jump("now") }, t("Adesso")))]));
       // focusKey: a programme ("channel:start"), a channel ({channel}: its
       // programme on air), or the row and the side the window moved to
       // ({row, dir}: the same channel, at the new edge).
@@ -172,7 +180,8 @@ window.GuideGrid = (() => {
       target = target || firstCell() || (toolbar && toolbar.querySelector('[data-move="now"]'));
       if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: "nearest" }); }
     }
-    const firstCell = () => container.querySelector(".prog.on-air") || container.querySelector(".prog");
+    // A programme, or in an empty window its "Adesso".
+    const firstCell = () => container.querySelector(".prog.on-air") || container.querySelector(".prog") || container.querySelector(".guide-empty .button");
     const cellOf = (row, p) => container.querySelector('.prog[data-key="' + row.channel.id + ":" + p.start + '"]');
 
     // ---- The programme in the panel ----
@@ -312,6 +321,15 @@ window.GuideGrid = (() => {
       // Focus lost (the grid was redrawn): any arrow brings it back.
       const lost = !active || active === document.body;
       const inGrid = Boolean(active && active.classList.contains("prog"));
+      // The empty state's button: Up goes back to the toolbar.
+      if (!inGrid && !lost && container.contains(active)) {
+        if (k === "OK") { active.click(); return true; }
+        if (k.startsWith("Arrow")) {
+          const b = k === "ArrowUp" && toolbar && (toolbar.querySelector("[data-move]") || toolbar.querySelector(".focusable"));
+          if (b) b.focus();
+          return true;
+        }
+      }
       if (k.startsWith("Arrow") && (lost || inGrid || k === "ArrowDown")) {
         if (!inGrid) { const f = firstCell() || (toolbar && toolbar.querySelector('[data-move="now"]')); if (f) f.focus(); }
         else move(k);
