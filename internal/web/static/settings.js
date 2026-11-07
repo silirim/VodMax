@@ -68,6 +68,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       ["profiles", "user", t("Profili"), t("Chi guarda, profili bambini")],
       ["devices", "tv", t("Dispositivi"), t("TV, telefoni e PC abbinati")],
       ["language", "info", t("Lingua"), t("Lingua dell'interfaccia su questo dispositivo")],
+      ["look", "palette", t("Aspetto"), t("Colore, nero OLED, effetti, testo")],
     ]],
     ["Server", [
       ["assistant", "sparkles", t("Assistente"), t("Regole a parole, consigli per la sera")],
@@ -209,7 +210,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     // meanwhile: a slow answer must not cover the section picked after it.
     const next = el("div");
     try {
-      await ({ subscriptions: renderSubscriptions, libraries: renderLibraries, vpn: renderVPN, rules: renderRules, categories: renderCategories, system: renderSystem, assistant: renderAssistant, profiles: renderProfiles, devices: renderDevices, guide: renderGuideSources, language: renderLanguage })[state.view](next);
+      await ({ subscriptions: renderSubscriptions, libraries: renderLibraries, vpn: renderVPN, rules: renderRules, categories: renderCategories, system: renderSystem, assistant: renderAssistant, profiles: renderProfiles, devices: renderDevices, guide: renderGuideSources, language: renderLanguage, look: renderLook })[state.view](next);
       if (my !== renderSeq) return;
       cards(next);
       main.replaceChildren(...next.childNodes);
@@ -1495,6 +1496,54 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     main.replaceChildren(...languageSection());
   }
 
+  // ---- Aspetto (this device only, decision 0054; open to every profile):
+  // VodMax.look applies each change at once, nothing goes to the server. ----
+  const ACCENT_NAMES = { aurora: t("Aurora"), oceano: t("Oceano"), tramonto: t("Tramonto"), lavanda: t("Lavanda"), menta: t("Menta"), rubino: t("Rubino"), grafite: t("Grafite") };
+  function lookSection() {
+    const look = window.VodMax.look;
+    const icon = window.VodMaxIcons.icon;
+    const row = (title, hint, control) => el("div", { className: "look-row" },
+      el("div", { className: "look-text" }, el("b", {}, title), el("span", {}, hint)), control);
+    // A group of buttons, the chosen one pressed: the accent swatches and
+    // the segmented controls.
+    const choice = (className, key, options) => {
+      const group = el("div", { className });
+      const show = () => { for (const b of group.children) b.setAttribute("aria-pressed", String(b.dataset.value === String(look.get()[key]))); };
+      group.append(...options.map(([value, label, ...content]) => {
+        const b = el("button", { type: "button", className: "focusable", onclick: () => { look.set({ [key]: value }); show(); } }, ...content);
+        b.dataset.value = String(value);
+        b.setAttribute("aria-label", label);
+        return b;
+      }));
+      show();
+      return group;
+    };
+    // An on/off choice: the whole row is the button (a remote reaches it
+    // from anywhere above, a finger anywhere on it), the switch shows it.
+    const toggle = (key, title, hint) => {
+      const b = el("button", { type: "button", className: "look-row look-toggle focusable" },
+        el("span", { className: "look-text" }, el("b", {}, title), el("span", {}, hint)), el("span", { className: "switch" }));
+      const show = () => b.setAttribute("aria-checked", String(Boolean(look.get()[key])));
+      b.setAttribute("role", "switch");
+      b.onclick = () => { look.set({ [key]: !look.get()[key] }); show(); };
+      show();
+      return b;
+    };
+    const swatches = choice("swatches", "accent", look.ACCENTS.map((a) => [a, ACCENT_NAMES[a] || a,
+      el("span", { className: "swatch-dot" }, icon("check")), el("span", { className: "swatch-name" }, ACCENT_NAMES[a] || a)]));
+    for (const b of swatches.children) { b.classList.add("swatch"); b.dataset.accent = b.dataset.value; }
+    const size = choice("segmented", "fontScale", [[0.9, t("Piccolo")], [1, t("Normale")], [1.15, t("Grande")]].map(([v, text]) => [v, text, text]));
+    return [el("h2", {}, t("Aspetto")),
+      el("p", { className: "note" }, t("Le scelte valgono per questo dispositivo, per tutti i profili.")),
+      row(t("Colore d'accento"), t("Usato per avanzamento, ora attuale e scelte attive"), swatches),
+      toggle("oled", t("Nero OLED"), t("Sfondo nero puro, per gli schermi OLED")),
+      toggle("nofx", t("Effetti ridotti"), t("Niente sfocature né animazioni, consigliato sulle TV lente. Si attiva da solo se il sistema chiede meno movimento.")),
+      row(t("Dimensione testo"), t("Per tutto VodMax su questo dispositivo"), size)];
+  }
+  async function renderLook(main) {
+    main.replaceChildren(...lookSection());
+  }
+
   buildSections();
   phone.addEventListener("change", () => { if (!phone.matches && !state.view) open(store.get("settingsView", "subscriptions")); });
   // ---- Remote control: arrows move among everything that takes focus,
@@ -1516,6 +1565,10 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     }
     const a = current.getBoundingClientRect();
     const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+    // Up and Down stay in their column (the list or the section): a list
+    // row on the left is not "below" a control of the section.
+    const vertical = dir === "ArrowUp" || dir === "ArrowDown";
+    const inSide = $("side").contains(current);
     let best = null, bestScore = Infinity;
     for (const e of all) {
       if (e === current) continue;
@@ -1525,6 +1578,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       if (!ok) continue;
       const along = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dx) : Math.abs(dy);
       const across = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dy) : Math.abs(dx);
+      if (vertical && $("side").contains(e) !== inSide) continue;
       const score = along + across * 3;
       if (score < bestScore) { bestScore = score; best = e; }
     }
@@ -1568,7 +1622,8 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       $("content").replaceChildren(el("h2", {}, t("Impostazioni")),
         el("p", { className: "note" }, t("Le impostazioni sono riservate ai profili amministratore.")),
         button(t("Cambia profilo"), () => { store.set("profile", ""); window.VodMax.showProfiles(); }, "primary"),
-        ...languageSection());
+        ...languageSection(), ...lookSection());
+      cards($("content"));
       $("sections").hidden = true;
       document.body.classList.remove("at-list");
       return;
