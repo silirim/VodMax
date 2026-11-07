@@ -11,7 +11,12 @@ window.VodMaxLook = (() => {
   const ACCENTS = ["aurora", "oceano", "tramonto", "lavanda", "menta", "rubino", "grafite"];
   // The screensaver starts off on touch screens: a phone locks itself.
   const touch = Boolean(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
-  const DEFAULTS = { accent: "aurora", oled: false, nofx: false, fontScale: 1, screensaver: !touch, screensaverMinutes: 5 };
+  // TVs (LG webOS, other smart TVs, the Android app without a touch screen)
+  // start with reduced effects: blur over moving video costs frames on
+  // their graphics chips. A choice made in Aspetto wins.
+  const ua = navigator.userAgent || "";
+  const tv = /Web0S|webOS|SmartTV|SMART-TV|Tizen|NetCast/i.test(ua) || (/VodMaxAndroid/.test(ua) && !touch);
+  const DEFAULTS = { accent: "aurora", oled: false, nofx: tv, fontScale: 1, screensaver: !touch, screensaverMinutes: 5 };
 
   function get() {
     try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY)) || {}); }

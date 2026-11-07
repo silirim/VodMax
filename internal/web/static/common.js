@@ -463,9 +463,14 @@ window.VodMax = (() => {
   }
 
   // ---- Ambient background (decision 0051): the current title's backdrop,
-  // blurred and darkened by ui.css, under the whole page. Two layers swap,
-  // so the new picture fades over the old one. ----
-  const ambient = el("div", { id: "ambient" }, el("div", { className: "ambient-img" }), el("div", { className: "ambient-img" }));
+  // blurred and darkened under the whole page. Two layers swap, so the new
+  // picture fades over the old one. The blur is drawn once into a small
+  // canvas that the screen only scales up: a 48px CSS blur over the whole
+  // page is the costliest effect on TVs (ui.css keeps it only where canvas
+  // filters are missing). ----
+  const AMB_W = 160, AMB_H = 90;
+  const ambLayer = () => { const c = el("canvas", { className: "ambient-img" }); c.width = AMB_W; c.height = AMB_H; return c; };
+  const ambient = el("div", { id: "ambient" }, ambLayer(), ambLayer());
   ambient.setAttribute("aria-hidden", "true");
   document.body.prepend(ambient);
   let ambientURL = "";
@@ -479,7 +484,13 @@ window.VodMax = (() => {
     const img = new Image();
     img.onload = () => {
       if (ambientURL !== url) return; // another title came first
-      next.style.backgroundImage = "url(" + JSON.stringify(url) + ")";
+      const ctx = next.getContext("2d");
+      const baked = "filter" in ctx;
+      if (baked) ctx.filter = "blur(6px) brightness(0.42) saturate(1.3)";
+      const s = Math.max(AMB_W / img.naturalWidth, AMB_H / img.naturalHeight);
+      ctx.clearRect(0, 0, AMB_W, AMB_H);
+      ctx.drawImage(img, (AMB_W - img.naturalWidth * s) / 2, (AMB_H - img.naturalHeight * s) / 2, img.naturalWidth * s, img.naturalHeight * s);
+      next.classList.toggle("baked", baked);
       next.classList.add("on");
       shown.classList.remove("on");
     };
