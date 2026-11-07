@@ -155,9 +155,10 @@
     close.setAttribute("aria-label", t("Chiudi"));
     $("mv-pick-title").replaceChildren(close, t("Canale per il riquadro {n}", { n: i + 1 }));
     $("mv-pick").hidden = false;
+    $("mv-bar").classList.add("picking");
     renderPick();
   }
-  function closePick() { state.pick = null; $("mv-pick").hidden = true; }
+  function closePick() { state.pick = null; $("mv-pick").hidden = true; $("mv-bar").classList.remove("picking"); }
   function renderPick() {
     const p = state.pick;
     const rows = Math.max(6, Math.floor((window.innerHeight * 0.8) / 64)); // rows with a logo tile: about 64 px on a 1080p TV
