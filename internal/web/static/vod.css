@@ -433,7 +433,9 @@ body.over-hero .top::after { opacity: 0; }
 .pick-art.backdrop::before { top: 0; right: 0; bottom: 0; left: 0; filter: none; }
 
 /* Empty lists: icon, one sentence, the button that fills them. */
-.empty-state { display: flex; flex-direction: column; align-items: center; max-width: 36rem; margin: var(--s7) auto; text-align: center; }
+/* Not .empty: its icon rule (ui.css) would also size the button's icon. */
+.empty-state { display: flex; flex-direction: column; align-items: center; max-width: 36rem; margin: var(--s7) auto; color: var(--soft); line-height: 1.5; text-align: center; }
+.empty-state > .icon { display: block; width: 2.4em; height: 2.4em; margin: 0 auto 0.6em; color: var(--faint); }
 .empty-state p { margin: 0 0 var(--s5); }
 /* Loading lists: rows with the radius of the real ones. */
 .skeleton-list { display: grid; gap: var(--s2); margin-top: var(--s6); }

@@ -152,7 +152,7 @@
 
   // An empty list: an icon, one sentence, the way to fill it.
   function emptyState(icon, text, action) {
-    const box = el("div", { className: "empty empty-state" }, window.VodMaxIcons ? window.VodMaxIcons.icon(icon) : null, el("p", {}, text));
+    const box = el("div", { className: "empty-state" }, window.VodMaxIcons ? window.VodMaxIcons.icon(icon) : null, el("p", {}, text));
     if (action) {
       const b = el("button", { className: "button focusable", type: "button" });
       window.VodMax.label(b, action[0], action[1]);
