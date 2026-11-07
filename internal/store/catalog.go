@@ -706,16 +706,23 @@ func (s *Store) InMyList(ctx context.Context, profileID, itemID int64) (bool, er
 // another version of it.
 // shortcut: genres are not stored per item, so the provider's categories stand in for them; switch to genres if the catalogue ever keeps them.
 func (s *Store) Similar(ctx context.Context, itemID int64, limit int, noAdult bool) ([]CatalogItem, error) {
+	// Every step is an index lookup (item_by_category, item_variants): an OR
+	// in a join condition made SQLite rescan the whole catalogue for each
+	// title of the category, minutes on a real subscription.
 	rows, err := s.r.QueryContext(ctx, `WITH ref AS (SELECT id, kind, group_key FROM item WHERE id = ? AND kind IN ('movie', 'series')),
-		refcat AS (SELECT DISTINCT v.subscription_id, v.category_id FROM item v, ref
-			WHERE v.kind = ref.kind AND v.available = 1 AND v.category_id <> '' AND (v.id = ref.id OR (ref.group_key <> '' AND v.group_key = ref.group_key)))
-		SELECT `+itemColumns+` FROM refcat rc
-		JOIN item v ON v.subscription_id = rc.subscription_id AND v.category_id = rc.category_id AND v.available = 1
-		JOIN item i ON i.kind = v.kind AND (i.id = v.id OR (v.group_key <> '' AND i.group_key = v.group_key)), ref
-		WHERE i.kind = ref.kind AND i.available = 1 AND i.visible = 1 AND i.primary_variant = 1 AND (? = 0 OR i.adult = 0)
+		refv AS (SELECT ref.id FROM ref
+			UNION SELECT v.id FROM ref JOIN item v ON v.kind = ref.kind AND v.group_key = ref.group_key WHERE ref.group_key <> ''),
+		refcat AS (SELECT DISTINCT v.subscription_id, v.category_id FROM refv JOIN item v ON v.id = refv.id, ref
+			WHERE v.kind = ref.kind AND v.available = 1 AND v.category_id <> ''),
+		hit AS (SELECT v.id, v.group_key, rc.subscription_id || ':' || rc.category_id AS cat FROM refcat rc, ref
+			JOIN item v ON v.subscription_id = rc.subscription_id AND v.kind = ref.kind AND v.category_id = rc.category_id AND v.available = 1),
+		cand AS (SELECT id, cat FROM hit
+			UNION ALL SELECT o.id, h.cat FROM hit h, ref JOIN item o ON o.kind = ref.kind AND o.group_key = h.group_key WHERE h.group_key <> '')
+		SELECT `+itemColumns+` FROM cand c JOIN item i ON i.id = c.id, ref
+		WHERE i.available = 1 AND i.visible = 1 AND i.primary_variant = 1 AND (? = 0 OR i.adult = 0)
 			AND i.id <> ref.id AND (ref.group_key = '' OR i.group_key <> ref.group_key)
 		GROUP BY i.id
-		ORDER BY count(DISTINCT rc.subscription_id || ':' || rc.category_id) DESC, coalesce(i.rating, 0) DESC, coalesce(i.year, 0) DESC, i.first_seen_at DESC, i.id
+		ORDER BY count(DISTINCT c.cat) DESC, coalesce(i.rating, 0) DESC, coalesce(i.year, 0) DESC, i.first_seen_at DESC, i.id
 		LIMIT ?`, itemID, noAdult, limit)
 	if err != nil {
 		return nil, err
