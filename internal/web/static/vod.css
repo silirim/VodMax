@@ -263,6 +263,23 @@ body.over-hero .top::after { opacity: 0; }
 @media (max-width: 480px) { .hero-meta .badge.hd { display: none; } } /* the quality goes first when space is short */
 
 /* Channel and recording cards */
+/* "In onda sui tuoi canali": a dark tile tinted with the channel's colour
+   (--tint from vod.js, at most 35% over the surface). */
+.card .ch-tile {
+  flex-direction: column; align-items: stretch; justify-content: space-between; gap: var(--s1);
+  padding: var(--s3) var(--s4) var(--s3);
+  background: linear-gradient(160deg, var(--tint, transparent), rgba(0, 0, 0, 0) 85%), var(--surface);
+}
+.ch-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s2); }
+.ch-tile .ch-art { width: 3.4rem; height: 2.2rem; object-position: left center; }
+.ch-tile .ch-art.mono { width: 2.6rem; height: 2.6rem; font-size: var(--t-s); }
+.ch-num { color: var(--soft); font-size: var(--t-s); font-weight: 600; }
+.ch-tile .eyebrow { margin: auto 0 0; color: var(--soft); font-size: var(--t-xs); }
+.ch-now { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--t-m); }
+.ch-bar { display: block; height: 4px; background: rgba(255, 255, 255, 0.2); border-radius: var(--r-pill); overflow: hidden; }
+.ch-bar span { display: block; height: 100%; background: var(--accent-grad); border-radius: var(--r-pill); }
+.ch-next { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--soft); font-size: var(--t-xs); font-weight: 500; }
+@media (max-width: 700px) { .ch-head .ch-art, .ch-head .ch-art.mono { height: 1.8rem; } .ch-head .ch-art.mono { width: 1.8rem; } }
 .channel-art { align-items: center; justify-content: center; background: linear-gradient(160deg, #1f222b, #15171d); }
 .channel-art .ch-art { max-width: 60%; max-height: 60%; }
 .channel-art .ch-art.mono { width: 60%; height: 60%; font-size: 1.6rem; }

@@ -39,21 +39,37 @@
     const card = el("button", { className: "card focusable" }, poster(item, title),
       el("span", { className: "label" }, title),
       el("span", { className: "sub" }, [item.year, item.variant_count > 1 ? t("{n} versioni", { n: item.variant_count }) : ""].filter(Boolean).join(" · ")));
-    const q = { 4: "4K", 3: "FHD" }[item.quality];
-    if (q) card.append(el("span", { className: "badge" }, q));
+    // Badges from what the catalogue already says: new this week on the
+    // left; 4K, else the rating, else the quality on the right.
+    const fresh = item.first_seen_at && Date.now() / 1000 - item.first_seen_at < 7 * 86400;
+    const q = { 4: "4K", 3: "FHD", 2: "HD" }[item.quality];
+    const right = item.quality === 4 || (!item.rating && q) ? el("span", { className: "badge hd right" }, q)
+      : item.rating ? el("span", { className: "badge rating right" }, rating(item.rating)) : null;
+    if (fresh || right) card.append(el("span", { className: "card-badges" }, fresh ? el("span", { className: "badge new" }, t("Nuovo")) : null, right));
     card.onclick = () => openDetail(item);
     card.hero = heroFromItem(item);
     return card;
   }
 
   function continueCard(c) {
-    const title = c.media === "episode" ? c.series_title : c.title;
+    const episode = c.media === "episode";
+    const title = episode ? c.series_title : c.title;
     const ep = "S" + c.season + "E" + c.number + " · " + c.title;
-    const sub = c.next ? t("Prossima puntata") + " · " + ep : c.media === "episode" ? ep : t("Mancano {time}", { time: clock(c.progress.duration - c.progress.position) });
+    const sub = [c.next ? t("Prossima puntata") : "", episode ? c.title : "",
+      c.next ? "" : t("Mancano {time}", { time: clock(c.progress.duration - c.progress.position) })].filter(Boolean).join(" · ");
     const pct = c.next ? 0 : c.progress.duration ? (c.progress.position / c.progress.duration) * 100 : 0;
-    const card = el("button", { className: "card wide focusable" }, poster({ logo: c.image }, title),
-      el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })),
-      el("span", { className: "label" }, title), el("span", { className: "sub" }, sub));
+    const art = poster({ logo: c.image }, title);
+    const card = el("button", { className: "card wide focusable" }, art,
+      episode ? el("span", { className: "card-badges" }, el("span", { className: "badge" }, "S" + c.season + " · E" + c.number)) : null,
+      pct ? el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })) : null,
+      el("span", { className: "label" }, title), el("span", { className: "sub tnum" }, sub));
+    // The title's backdrop fits a wide card better than its poster.
+    detailsOf(episode ? c.series_id : c.id).then((d) => {
+      if (!d.backdrop) return;
+      const img = el("img", { className: "poster", alt: "" });
+      img.onload = () => { if (art.isConnected) art.replaceWith(img); };
+      img.src = d.backdrop;
+    });
     card.onclick = () => play(c.media, c.id, title + (c.media === "episode" ? " · " + ep : ""), c.next ? 0 : c.progress.position);
     card.hero = heroFromContinue(c);
     // Off the row: the × on the card, the red key (Canc), or a long press.
@@ -192,6 +208,19 @@
       el("div", { className: "poster skeleton" }))));
   }
 
+  // A row's title, with "Vedi tutti ›" when the row has a page of its own.
+  function section(title, view, before) {
+    const h = el("h2", { className: "section" }, el("span", {}, title));
+    if (view) {
+      const all = el("button", { className: "see-all focusable", type: "button" }, t("Vedi tutti"));
+      all.setAttribute("aria-label", t("Vedi tutti") + ": " + title);
+      all.onclick = () => { if (before) before(); state.view = view; state.query = ""; $("search").value = ""; window.scrollTo(0, 0); render(); };
+      h.append(all);
+    }
+    return h;
+  }
+  const newest = (kind) => () => store.set("browse." + kind, { ...browseState(kind), sort: "recent" });
+
   async function renderHome(main) {
     main.replaceChildren(el("section", { className: "hero under" }), el("h2", { className: "section" }, t("Continua a guardare")), skeletonRow(true),
       el("h2", { className: "section" }, t("Nuovi film")), skeletonRow(false));
@@ -213,14 +242,14 @@
     parts.push(el("h2", { className: "section" }, t("Continua a guardare")));
     parts.push(cont.length ? el("div", { className: "row" }, ...cont.map(continueCard))
       : el("p", { className: "empty" }, t("Qui compaiono i film e gli episodi iniziati e la prossima puntata delle serie che stai seguendo.")));
-    if (mine.length) parts.push(el("h2", { className: "section" }, t("La mia lista")), el("div", { className: "row" }, ...mine.slice(0, 24).map(itemCard)));
+    if (mine.length) parts.push(section(t("La mia lista"), "mylist"), el("div", { className: "row" }, ...mine.slice(0, 24).map(itemCard)));
     // TMDB's week, among the titles you have (with a TMDB key).
-    if (trending.length) parts.push(el("h2", { className: "section" }, t("Di tendenza questa settimana")), el("div", { className: "row" }, ...trending.map(itemCard)));
-    if (favorites.length) parts.push(el("h2", { className: "section" }, t("In onda sui tuoi canali")), el("div", { className: "row" }, ...favorites.slice(0, 20).map(channelCard)));
-    parts.push(el("h2", { className: "section" }, t("Nuovi film")), el("div", { className: "row" }, ...films.items.map(itemCard)));
-    parts.push(el("h2", { className: "section" }, t("Nuove serie")), el("div", { className: "row" }, ...series.items.map(itemCard)));
+    if (trending.length) parts.push(section(t("Di tendenza questa settimana")), el("div", { className: "row" }, ...trending.map(itemCard)));
+    if (favorites.length) parts.push(section(t("In onda sui tuoi canali"), "tv", () => store.set("tvList", "favorites")), el("div", { className: "row" }, ...favorites.slice(0, 20).map(channelCard)));
+    parts.push(section(t("Nuovi film"), "movie", newest("movie")), el("div", { className: "row" }, ...films.items.map(itemCard)));
+    parts.push(section(t("Nuove serie"), "series", newest("series")), el("div", { className: "row" }, ...series.items.map(itemCard)));
     const done = recordings.filter((r) => r.status === "completed").slice(0, 12);
-    if (done.length) parts.push(el("h2", { className: "section" }, t("Registrazioni recenti")), el("div", { className: "row" }, ...done.map(recordingCard)));
+    if (done.length) parts.push(section(t("Registrazioni recenti"), "recordings"), el("div", { className: "row" }, ...done.map(recordingCard)));
     main.replaceChildren(...parts);
     // The featured title: the first thing to continue, else the newest film.
     const first = cont[0] ? heroFromContinue(cont[0]) : films.items[0] ? heroFromItem(films.items[0]) : null;
@@ -365,13 +394,27 @@
   window.addEventListener("scroll", heroTop, { passive: true });
   window.addEventListener("resize", heroTop);
 
+  // The hue of a channel's initials tile (common.js channelArt), to tint
+  // its tile on Home whether it shows the logo or the initials.
+  function channelHue(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return (Math.imul(h, 2654435761) >>> 0) % 360;
+  }
+  const onAir = (p, now = Date.now() / 1000) => (p ? Math.min(100, Math.max(0, ((now - p.start) / (p.stop - p.start)) * 100)) : 0);
+
+  // "In onda sui tuoi canali": a dark tile tinted with the channel's colour,
+  // its logo, what is on with its progress, what follows.
   function channelCard(c) {
     const p = c.now;
-    const pct = p ? Math.min(100, Math.max(0, ((Date.now() / 1000 - p.start) / (p.stop - p.start)) * 100)) : 0;
-    const art = el("div", { className: "poster channel-art" }, window.VodMax.channelArt(c));
-    const card = el("button", { className: "card wide focusable" }, art,
-      p ? el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })) : null,
-      el("span", { className: "label" }, c.number + " · " + c.name), el("span", { className: "sub" }, p ? p.title : t("Nessuna informazione")));
+    const tile = el("div", { className: "poster ch-tile" },
+      el("span", { className: "ch-head" }, window.VodMax.channelArt(c), el("span", { className: "ch-num tnum" }, c.number || "")),
+      el("span", { className: "eyebrow tnum" }, p ? t("In onda") + " · " + hhmm(p.start) + " – " + hhmm(p.stop) : c.name),
+      el("strong", { className: "ch-now" }, p ? p.title : t("Nessuna informazione")),
+      p ? el("span", { className: "ch-bar" }, el("span", { style: "width:" + onAir(p) + "%" })) : null,
+      c.next ? el("span", { className: "ch-next" }, t("A seguire") + " · " + c.next.title) : null);
+    tile.style.setProperty("--tint", "hsla(" + channelHue(String(c.name || "")) + ", 45%, 34%, 0.35)");
+    const card = el("button", { className: "card wide focusable" }, tile, el("span", { className: "label" }, c.name));
     card.onclick = () => { location.href = "/tv.html?channel=" + c.id; };
     return card;
   }
@@ -1931,6 +1974,8 @@
       const dx = bx - ax, dy = by - ay;
       const ok = { ArrowLeft: dx < -4, ArrowRight: dx > 4, ArrowUp: dy < -4, ArrowDown: dy > 4 }[dir];
       if (!ok) continue;
+      // Down goes from row to row: "Vedi tutti" is on the way only going up.
+      if (dir === "ArrowDown" && e.classList.contains("see-all")) continue;
       // Across: the gap between the two boxes (0 when they line up), so a
       // field to the side of its label is not skipped for a button below.
       const along = horizontal ? Math.abs(dx) : Math.abs(dy);
