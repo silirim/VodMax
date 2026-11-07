@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_title">VodMax</string>
+    <string name="setup_text">Adres domowego serwera VodMax (na przykład http://192.168.1.10:8095).</string>
+    <string name="setup_hint">http://adres:8095</string>
+    <string name="setup_connect">Połącz</string>
+    <string name="setup_checking">Sprawdzam serwer…</string>
+    <string name="setup_unreachable">Serwer nie odpowiada pod tym adresem: sprawdź, czy jest włączony i w tej samej sieci.</string>
+    <string name="error_title">Serwer niedostępny</string>
+    <string name="reconnecting">Ponowne łączenie z serwerem…</string>
+    <string name="error_retry">Spróbuj ponownie</string>
+    <string name="error_change">Zmień adres</string>
+    <string name="local_text">Nie masz serwera w domu? VodMax może działać tylko na tym urządzeniu: dodaj subskrypcję i VPN w Ustawieniach. Bez nagrywania i pauzowania telewizji na żywo.</string>
+    <string name="local_button">Używaj tylko tego urządzenia</string>
+    <string name="local_starting">Uruchamianie VodMax…</string>
+    <string name="local_failed">Nie udało się uruchomić VodMax na tym urządzeniu</string>
+    <string name="local_exited">wbudowany serwer się zatrzymał (kod %1$d)</string>
+    <string name="local_no_answer">wbudowany serwer nie odpowiada</string>
+    <string name="update_no_permission_screen">to urządzenie nie ma ekranu, na którym można zezwolić na instalowanie aplikacji: zainstaluj plik APK ręcznie</string>
+    <string name="update_allow_installs">zezwól VodMax na instalowanie aplikacji, a potem wróć tutaj: aktualizacja będzie kontynuowana</string>
+    <string name="update_no_installer">to urządzenie nie ma instalatora aplikacji: zainstaluj plik APK ręcznie</string>
+    <string name="local_port_busy">port 8095 jest zajęty przez inną aplikację: zamknij ją lub uruchom ponownie urządzenie</string>
+    <string name="save_unavailable">to urządzenie nie pozwala wybrać, gdzie zapisać plik</string>
+    <string name="save_cancelled">zapisywanie anulowane</string>
+    <string name="save_failed">plik nie został zapisany</string>
+    <string name="update_refused">aktualizacja odrzucona: nie pochodzi z wydań VodMax</string>
+    <string name="update_not_vodmax">aktualizacja odrzucona: plik nie jest aplikacją VodMax</string>
+    <string name="update_bad_checksum">pobrany plik nie zgadza się z wydaniem (inna suma kontrolna)</string>
+    <string name="pip_play">Odtwórz</string>
+    <string name="pip_pause">Wstrzymaj</string>
+    <string name="skip_intro">Pomiń czołówkę</string>
+    <string name="next_episode">Następny odcinek</string>
+    <string name="next_in">za %1$d s</string>
+    <string name="watch_now">Oglądaj teraz</string>
+    <string name="cancel">Anuluj</string>
+</resources>

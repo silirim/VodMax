@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_title">VodMax</string>
+    <string name="setup_text">Adresse du serveur VodMax de la maison (par exemple http://192.168.1.10:8095).</string>
+    <string name="setup_hint">http://adresse:8095</string>
+    <string name="setup_connect">Connecter</string>
+    <string name="setup_checking">Vérification du serveur…</string>
+    <string name="setup_unreachable">Le serveur ne répond pas à cette adresse : vérifiez qu\'il est allumé et sur le même réseau.</string>
+    <string name="error_title">Serveur injoignable</string>
+    <string name="reconnecting">Reconnexion au serveur…</string>
+    <string name="error_retry">Réessayer</string>
+    <string name="error_change">Changer d\'adresse</string>
+    <string name="local_text">Pas de serveur à la maison ? VodMax peut fonctionner uniquement sur cet appareil : ajoutez un abonnement et un VPN dans les Réglages. Sans enregistrements ni pause du direct.</string>
+    <string name="local_button">Utiliser cet appareil seul</string>
+    <string name="local_starting">Démarrage de VodMax…</string>
+    <string name="local_failed">VodMax n\'a pas pu démarrer sur cet appareil</string>
+    <string name="local_exited">le serveur intégré s\'est arrêté (code %1$d)</string>
+    <string name="local_no_answer">le serveur intégré ne répond pas</string>
+    <string name="update_no_permission_screen">cet appareil n\'a pas d\'écran pour autoriser l\'installation d\'apps : installez l\'APK manuellement</string>
+    <string name="update_allow_installs">autorisez VodMax à installer des apps, puis revenez ici : la mise à jour continuera</string>
+    <string name="update_no_installer">cet appareil n\'a pas de programme d\'installation d\'apps : installez l\'APK manuellement</string>
+    <string name="local_port_busy">le port 8095 est occupé par une autre app : fermez-la ou redémarrez l\'appareil</string>
+    <string name="save_unavailable">cet appareil ne permet pas de choisir où enregistrer le fichier</string>
+    <string name="save_cancelled">enregistrement du fichier annulé</string>
+    <string name="save_failed">fichier non enregistré</string>
+    <string name="update_refused">mise à jour refusée : elle ne provient pas des versions publiées de VodMax</string>
+    <string name="update_not_vodmax">mise à jour refusée : le fichier n\'est pas l\'app VodMax</string>
+    <string name="update_bad_checksum">le fichier téléchargé ne correspond pas à la version publiée (somme de contrôle différente)</string>
+    <string name="pip_play">Lire</string>
+    <string name="pip_pause">Pause</string>
+    <string name="skip_intro">Passer l\'intro</string>
+    <string name="next_episode">Épisode suivant</string>
+    <string name="next_in">dans %1$d s</string>
+    <string name="watch_now">Regarder maintenant</string>
+    <string name="cancel">Annuler</string>
+</resources>
