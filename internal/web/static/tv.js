@@ -76,6 +76,7 @@
     state.current = channel;
     store.set("last", channel.id);
     showBanner(channel, false);
+    guideLabel();
     stopPlayer();
     if (await tuneTimeshift(channel, force, gen)) return;
     let url;
@@ -449,7 +450,15 @@
     hideControls();
     $("guide-overlay").hidden = false;
     document.body.classList.add("guide-on");
+    guideLabel();
     guide.show(state.current && state.current.id);
+  }
+  function guideLabel() {
+    const c = state.current;
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = c ? " · " + c.name : "";
+    $("guide-video-label").replaceChildren(c ? String(c.number) : "", name);
   }
   function closeGuide() {
     if (!guideOpen()) return;

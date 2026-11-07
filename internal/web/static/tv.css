@@ -319,33 +319,68 @@ body.controls-on .banner { display: none; }
   .banner .side { flex-basis: 100%; }
 }
 
-/* The guide over the video (decision 0053): the picture shrinks into a
-   window at the top right and keeps playing; the toolbar and the
-   programme panel sit on its left, the grid scrolls below. */
+/* The guide over the video (decision 0053): a dark glass toolbar across
+   the top; below it the programme panel on the left and the picture, still
+   playing, in a window on the right; the grid scrolls underneath. The
+   panel and the grid are guide.css's; this is only the frame. --gbar is
+   the toolbar's height, which the video window sits under. */
+body.guide-on { --gbar: 2.75rem; }
 .guide-overlay { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; display: flex; flex-direction: column; background: var(--bg); }
 .guide-top {
-  flex: none; display: grid; grid-template-columns: minmax(0, 1fr) 28vw; column-gap: 1.5rem;
-  min-height: calc(15.75vw + 1.6rem); /* the right column is under the video window */
-  padding: 0.8rem var(--safe) 0;
+  flex: none; display: grid; grid-template-columns: minmax(0, 1fr) 28vw; grid-template-rows: auto minmax(15.75vw, auto);
+  gap: var(--s4) var(--s5);
+  padding: var(--s4) var(--safe) var(--s3);
 }
 .guide-top > * { grid-column: 1; }
-.guide-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; min-width: 0; }
-.guide-bar .guide-nav { flex: 1 1 auto; justify-content: flex-end; }
-.guide-bar .guide-when { min-width: 0; flex: 1 1 auto; }
-.guide-bar .guide-close { margin-left: auto; }
-.guide-overlay .programme-panel { align-self: end; }
+.guide-bar {
+  grid-column: 1 / -1; display: flex; flex-wrap: nowrap; align-items: center; gap: var(--s1);
+  min-width: 0; height: var(--gbar); padding: 0 var(--s1); overflow-x: auto; scrollbar-width: none;
+  font-size: var(--t-s); border-radius: var(--r-pill);
+}
+.guide-bar::-webkit-scrollbar { display: none; }
+.guide-bar .tab { color: var(--text); font-weight: 600; white-space: nowrap; }
+.guide-bar .guide-nav { flex: 1 1 auto; flex-wrap: nowrap; justify-content: flex-end; gap: var(--s1); }
+.guide-bar .guide-when { flex: 1 1 auto; min-width: 0; padding: 0 var(--s3); color: var(--soft); font-weight: 600; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.guide-bar .guide-close { margin-left: var(--s2); }
+.guide-overlay .programme-panel { align-self: stretch; }
 .guide-overlay .guide { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 var(--safe) 1rem; }
-body.guide-on #video { top: 0.8rem; right: var(--safe); bottom: auto; left: auto; width: 28vw; height: 15.75vw; z-index: 6; border-radius: 8px; }
+body.guide-on #video {
+  top: calc(var(--s4) + var(--gbar) + var(--s4)); right: var(--safe); bottom: auto; left: auto; width: 28vw; height: 15.75vw; z-index: 6;
+  border: 1px solid var(--glass-line); border-radius: var(--r-s); box-shadow: var(--shadow);
+}
+/* "● 12 · Cinema Club" on the window's bottom left, like the mockup's live tag. */
+.guide-video-label { display: none; }
+body.guide-on .guide-video-label {
+  position: absolute; z-index: 7; display: block;
+  left: calc(100% - var(--safe) - 28vw + var(--s3));
+  bottom: calc(100% - var(--s4) - var(--gbar) - var(--s4) - 15.75vw + var(--s3));
+  max-width: calc(28vw - 2 * var(--s3)); padding: 0.25em 0.75em;
+  font-size: var(--t-xs); font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: rgba(8, 9, 12, 0.72); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--r-xs);
+  pointer-events: none;
+}
+body.guide-on .guide-video-label::before { content: ""; display: inline-block; width: 0.55em; height: 0.55em; margin-right: 0.5em; border-radius: 50%; background: var(--rec); vertical-align: 0.05em; }
+body.guide-on .guide-video-label:empty { display: none; }
 body.guide-on .banner, body.guide-on .controls, body.guide-on .timeline, body.guide-on .list { display: none !important; }
+body.guide-on .digits { z-index: 7; }
 @media (prefers-reduced-motion: no-preference) {
   #video { transition: top 0.25s var(--ease), right 0.25s var(--ease), width 0.25s var(--ease), height 0.25s var(--ease); }
 }
-/* Phones: a smaller window, the toolbar wraps on its left, the panel
-   below takes the whole width. */
+/* Phones: the toolbar one row that scrolls sideways, the panel (two lines)
+   beside a smaller window. */
 @media (max-width: 600px) {
-  .guide-top { grid-template-columns: minmax(0, 1fr) 40vw; column-gap: 0.6rem; min-height: 0; padding-top: 0.5rem; }
-  .guide-top .programme-panel { grid-column: 1 / -1; }
-  .guide-bar .guide-nav { justify-content: flex-start; }
-  .guide-bar .guide-when { flex: none; }
-  body.guide-on #video { top: 0.5rem; width: 40vw; height: 22.5vw; }
+  body.guide-on { --gbar: calc(44px + 2 * var(--s1)); }
+  .guide-top { grid-template-columns: minmax(0, 1fr) 40vw; grid-template-rows: auto minmax(22.5vw, auto); gap: var(--s3); padding: var(--s3) var(--s4) var(--s2); }
+  .guide-bar { padding: 0 var(--s1); }
+  .guide-bar .tab { padding-left: 0.85em; padding-right: 0.85em; }
+  .guide-bar .guide-nav { flex: none; }
+  .guide-bar .guide-when { flex: none; padding: 0 var(--s2); }
+  .guide-overlay .guide { padding: 0 var(--s4) 1rem; }
+  body.guide-on #video { top: calc(var(--s3) + var(--gbar) + var(--s3)); right: var(--s4); width: 40vw; height: 22.5vw; }
+  body.guide-on .guide-video-label {
+    left: calc(100% - var(--s4) - 40vw + var(--s2));
+    bottom: calc(100% - var(--s3) - var(--gbar) - var(--s3) - 22.5vw + var(--s2));
+    max-width: calc(40vw - 2 * var(--s2));
+  }
+  .guide-video-label .name { display: none; } /* the number is enough on a window this small */
 }

@@ -70,11 +70,12 @@
     <p class="hint" data-i18n>OK guarda · ◀ ▶ cambia elenco · Giallo preferito · Blu registra · Indietro chiude</p>
   </section>
 
-  <!-- The guide over the video (decision 0053): the picture keeps playing
-       in a window at the top right, the grid of guide-grid.js below. -->
+  <!-- The guide over the video (decision 0053): the toolbar on top, the
+       programme on the left and the picture still playing in a window on
+       the right, the grid of guide-grid.js below. -->
   <section id="guide-overlay" class="guide-overlay" hidden>
     <div class="guide-top">
-      <nav id="guide-bar" class="guide-bar">
+      <nav id="guide-bar" class="guide-bar glass-dark">
         <button class="tab focusable" data-list="all" data-i18n>Tutti</button>
         <button class="tab focusable" data-list="favorites" data-i18n>Preferiti</button>
         <button class="tab focusable" data-list="sport" data-i18n>Sport</button>
@@ -91,6 +92,8 @@
     </div>
     <div id="guide-grid" class="guide"></div>
   </section>
+  <!-- Over the small video window (tv.css): which channel it is. -->
+  <div id="guide-video-label" class="guide-video-label tnum"></div>
 
   <div id="digits" class="digits glass-dark tnum" hidden></div>
   <div id="status" class="status" hidden></div>
