@@ -125,20 +125,22 @@ func (s *Service) SetTMDBKey(ctx context.Context, key string) error {
 
 // ItemDetails is the detail page of a film or series.
 type ItemDetails struct {
-	Title         string   `json:"title,omitempty"` // Italian title from TMDB
-	OriginalTitle string   `json:"original_title,omitempty"`
-	Plot          string   `json:"plot,omitempty"`
-	Cast          string   `json:"cast,omitempty"`
-	Director      string   `json:"director,omitempty"`
-	Genre         string   `json:"genre,omitempty"`
-	Released      string   `json:"released,omitempty"`
-	Country       string   `json:"country,omitempty"`
-	Rating        float64  `json:"rating,omitempty"`
-	Duration      int      `json:"duration,omitempty"` // seconds
-	Trailer       string   `json:"trailer,omitempty"`  // YouTube id
-	Backdrop      string   `json:"backdrop,omitempty"` // signed local URL
-	Sources       []string `json:"sources"`
-	Local         bool     `json:"local,omitempty"` // a file of a collection (nothing to download)
+	Title         string        `json:"title,omitempty"` // Italian title from TMDB
+	OriginalTitle string        `json:"original_title,omitempty"`
+	Plot          string        `json:"plot,omitempty"`
+	Cast          string        `json:"cast,omitempty"`
+	Director      string        `json:"director,omitempty"`
+	Genre         string        `json:"genre,omitempty"`
+	Released      string        `json:"released,omitempty"`
+	Country       string        `json:"country,omitempty"`
+	Rating        float64       `json:"rating,omitempty"`
+	Duration      int           `json:"duration,omitempty"` // seconds
+	Trailer       string        `json:"trailer,omitempty"`  // YouTube id
+	Backdrop      string        `json:"backdrop,omitempty"` // signed local URL
+	Logo          string        `json:"logo,omitempty"`     // title logo, signed local URL
+	People        []tmdb.Person `json:"people,omitempty"`   // cast with photos as signed local URLs
+	Sources       []string      `json:"sources"`
+	Local         bool          `json:"local,omitempty"` // a file of a collection (nothing to download)
 }
 
 func (s *Service) Details(ctx context.Context, itemID int64) (ItemDetails, error) {
@@ -176,7 +178,16 @@ func (s *Service) itemDetails(ctx context.Context, m store.MetaItem) (ItemDetail
 		d.Duration = t.Runtime * 60
 	}
 	if (len(p.Backdrops) > 0 && (imageURL(p.Backdrops[0]) || strings.HasPrefix(p.Backdrops[0], library.ImageScheme))) || t.Backdrop != "" {
-		d.Backdrop = "/img/meta/" + strconv.FormatInt(m.ID, 10) + "/backdrop?s=" + s.metaSignature(m.ID, "backdrop")
+		d.Backdrop = s.metaImageURL(m.ID, "backdrop")
+	}
+	if t.Logo != "" {
+		d.Logo = s.metaImageURL(m.ID, "logo")
+	}
+	for i, person := range t.People {
+		if person.Photo != "" {
+			person.Photo = s.metaImageURL(m.ID, "cast"+strconv.Itoa(i))
+		}
+		d.People = append(d.People, person)
 	}
 	if p.Plot != "" || p.Cast != "" || p.Genre != "" || len(p.Backdrops) > 0 {
 		d.Sources = append(d.Sources, "provider")
@@ -251,7 +262,10 @@ func (s *Service) tmdbTitle(ctx context.Context, m store.MetaItem, fallbackID st
 		return tmdb.Title{}
 	}
 	kind := map[string]string{"movie": "movie", "series": "tv"}[m.Kind]
-	key := "t:" + kind + ":" + id
+	// "t2": entries saved before logo and people existed lack them with no
+	// way to tell from an empty answer; a new key prefix makes them refetch
+	// once, like an expired entry, and the old rows just sit unused.
+	key := "t2:" + kind + ":" + id
 	var t tmdb.Title
 	if data, at, ok, _ := s.st.Meta(ctx, key); ok {
 		json.Unmarshal([]byte(data), &t)
@@ -295,9 +309,15 @@ func (s *Service) metaSignature(itemID int64, which string) string {
 	return hex.EncodeToString(mac.Sum(nil)[:16])
 }
 
-// MetaImage serves the backdrop of a detail page.
+func (s *Service) metaImageURL(itemID int64, which string) string {
+	return "/img/meta/" + strconv.FormatInt(itemID, 10) + "/" + which + "?s=" + s.metaSignature(itemID, which)
+}
+
+// MetaImage serves the images of a detail page: "backdrop", "logo" and
+// "castN" (the photo of the N-th person). Only URLs this server signed
+// are answered, so an unknown name never gets this far.
 func (s *Service) MetaImage(ctx context.Context, itemID int64, which, sig string) (store.CachedImage, error) {
-	if which != "backdrop" || !hmac.Equal([]byte(sig), []byte(s.metaSignature(itemID, which))) {
+	if !hmac.Equal([]byte(sig), []byte(s.metaSignature(itemID, which))) {
 		return store.CachedImage{}, ErrBadSignature
 	}
 	m, err := s.st.MetaItem(ctx, itemID)
@@ -305,22 +325,34 @@ func (s *Service) MetaImage(ctx context.Context, itemID int64, which, sig string
 		return store.CachedImage{}, err
 	}
 	p := s.providerDetails(ctx, m)
-	if len(p.Backdrops) > 0 && strings.HasPrefix(p.Backdrops[0], library.ImageScheme) {
+	if which == "backdrop" && len(p.Backdrops) > 0 && strings.HasPrefix(p.Backdrops[0], library.ImageScheme) {
 		if img, err := s.localImage(ctx, m.SubscriptionID, p.Backdrops[0]); err == nil {
 			return img, nil
 		}
 	}
-	if len(p.Backdrops) > 0 && imageURL(p.Backdrops[0]) {
+	if which == "backdrop" && len(p.Backdrops) > 0 && imageURL(p.Backdrops[0]) {
 		src := p.Backdrops[0]
 		img, err := s.cachedImage(ctx, src, func(ctx context.Context) (store.CachedImage, error) { return s.fetchImage(ctx, m.SubscriptionID, src) })
 		if !errors.Is(err, ErrNoImage) {
 			return img, err
 		}
 	}
-	if t := s.tmdbTitle(ctx, m, p.TMDB); t.Backdrop != "" {
-		return s.cachedImage(ctx, t.Backdrop, func(ctx context.Context) (store.CachedImage, error) { return s.fetchDirect(ctx, t.Backdrop) })
+	t := s.tmdbTitle(ctx, m, p.TMDB)
+	var src string
+	switch {
+	case which == "backdrop":
+		src = t.Backdrop
+	case which == "logo":
+		src = t.Logo
+	case strings.HasPrefix(which, "cast"):
+		if n, err := strconv.Atoi(which[4:]); err == nil && n >= 0 && n < len(t.People) {
+			src = t.People[n].Photo
+		}
 	}
-	return store.CachedImage{}, ErrNoImage
+	if src == "" {
+		return store.CachedImage{}, ErrNoImage
+	}
+	return s.cachedImage(ctx, src, func(ctx context.Context) (store.CachedImage, error) { return s.fetchDirect(ctx, src) })
 }
 
 // ---- Trending: TMDB's week, as far as the catalog has it ----

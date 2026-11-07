@@ -28,7 +28,9 @@ func fakeTMDB(t *testing.T) (*httptest.Server, *atomic.Int32) {
 			w.Write([]byte(`{}`))
 		case "/movie/539":
 			w.Write([]byte(`{"title":"Psyco","original_title":"Psycho","overview":"Marion Crane fugge...","poster_path":"/psycho.jpg",
-				"backdrop_path":"/psycho-b.jpg","release_date":"1960-06-16","runtime":109,"vote_average":8.4,"genres":[{"name":"Horror"}]}`))
+				"backdrop_path":"/psycho-b.jpg","release_date":"1960-06-16","runtime":109,"vote_average":8.4,"genres":[{"name":"Horror"}],
+				"credits":{"cast":[{"name":"Anthony Perkins","character":"Norman Bates","profile_path":"/perkins.jpg"},{"name":"Janet Leigh","character":"Marion Crane"}]},
+				"images":{"logos":[{"file_path":"/psycho-en.png","iso_639_1":"en"}]}}`))
 		case "/trending/movie/week":
 			if r.URL.Query().Get("page") == "1" {
 				w.Write([]byte(`{"results":[{"id":539,"title":"Psyco","original_title":"Psycho","release_date":"1960-06-16"},
@@ -64,9 +66,10 @@ func get(t *testing.T, e *env, path string) (int, string, []byte) {
 }
 
 type details struct {
-	Title, Plot, Cast, Director, Trailer, Backdrop string
-	Sources                                        []string
-	Duration                                       int
+	Title, Plot, Cast, Director, Trailer, Backdrop, Logo string
+	People                                               []struct{ Name, Role, Photo string }
+	Sources                                              []string
+	Duration                                             int
 }
 
 func readDetails(t *testing.T, e *env, id string) details {
@@ -135,6 +138,20 @@ func TestDetailsAndTMDBFallback(t *testing.T) {
 	}
 	if code, ctype, _ := get(t, e, d.Backdrop); code != 200 || ctype != "image/jpeg" {
 		t.Fatalf("TMDB backdrop: %d %s", code, ctype)
+	}
+	// Title logo and cast photos, through the server like the backdrop
+	// (the page's CSP allows no other image host).
+	if d.Logo == "" || len(d.People) != 2 || d.People[0].Name != "Anthony Perkins" || d.People[0].Role != "Norman Bates" ||
+		d.People[0].Photo == "" || d.People[1].Photo != "" {
+		t.Fatalf("logo and people: %+v", d)
+	}
+	for _, u := range []string{d.Logo, d.People[0].Photo} {
+		if code, ctype, _ := get(t, e, u); code != 200 || ctype != "image/jpeg" {
+			t.Fatalf("meta image %s: %d %s", u, code, ctype)
+		}
+		if code, _, _ := get(t, e, strings.Replace(u, "?s=", "?s=00", 1)); code != 403 {
+			t.Fatalf("forged signature accepted: %s", u)
+		}
 	}
 	// The provider's plot wins (it is the one in Italian for this panel).
 	if d := readDetails(t, e, film); d.Plot != "Uno scrittore scettico..." || len(d.Sources) != 2 {
