@@ -338,6 +338,12 @@ h2.section { display: flex; align-items: baseline; justify-content: space-betwee
   gap: var(--gap);
   padding: 1.2rem 1rem 1rem;
   margin: 0 -1rem;
+  /* Never wider than the page margin: with "Grande" text 1rem is more
+     than a phone's 16 px and the page would scroll sideways. */
+  padding-left: min(1rem, var(--safe));
+  padding-right: min(1rem, var(--safe));
+  margin-left: calc(-1 * min(1rem, var(--safe)));
+  margin-right: calc(-1 * min(1rem, var(--safe)));
   overflow-x: auto;
   scroll-behavior: smooth;
   scrollbar-width: none;
