@@ -298,19 +298,43 @@
   // With the remote a window of rows moves with the selection; on touch
   // screens the whole list scrolls and a tap picks the channel.
   const touch = window.matchMedia("(pointer: coarse), (max-width: 800px)");
+  // The search field on top filters the list as you type (name or number);
+  // switching list keeps the words.
   async function openList(listIndex) {
     hideControls();
     const list = LISTS[listIndex];
     let channels;
     try { channels = await load(list); } catch (e) { flash(e.message); return; }
-    let selected = channels.findIndex((c) => state.current && c.id === state.current.id);
-    state.overlay = { listIndex, channels, selected: selected < 0 ? 0 : selected };
+    const query = state.overlay ? state.overlay.query : "";
+    if (!state.overlay) $("list-search").value = "";
+    state.overlay = { listIndex, all: channels, channels, selected: 0, query };
+    filterList();
+    const selected = state.overlay.channels.findIndex((c) => state.current && c.id === state.current.id);
+    state.overlay.selected = selected < 0 ? 0 : selected;
+    $("list").hidden = false; // first, so renderList can measure the rows
     renderList();
-    $("list").hidden = false;
     $("banner").hidden = true;
     const sel = $("list-items").querySelector(".selected");
     if (touch.matches && sel) sel.scrollIntoView({ block: "center" });
   }
+
+  const fold = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  function filterList() {
+    const o = state.overlay, q = fold(o.query.trim());
+    o.channels = q ? o.all.filter((c) => fold(c.name).includes(q) || String(c.number).startsWith(q)) : o.all;
+  }
+  const search = $("list-search");
+  search.addEventListener("input", () => {
+    const o = state.overlay;
+    if (!o) return;
+    o.query = search.value;
+    filterList();
+    o.selected = 0;
+    renderList();
+  });
+  // While the field has the focus no row is selected: Down (or OK) goes to
+  // the first one.
+  search.addEventListener("focus", () => { if (state.overlay) renderList(); });
 
   // The selected channel of the list: watch it, and zap in that list.
   function pickFromList() {
@@ -346,6 +370,7 @@
     const ol = $("list-items");
     if (o.channels.length === 0) {
       const li = document.createElement("li");
+      li.className = "none";
       li.textContent = o.listIndex === 1 ? t("Nessun preferito: premi Giallo su un canale per aggiungerlo.") : t("Nessun canale.");
       ol.replaceChildren(li);
       return;
@@ -357,7 +382,7 @@
     const items = o.channels.slice(start, start + rows).map((c, k) => {
       const li = document.createElement("li");
       li.onclick = () => { o.selected = start + k; pickFromList(); };
-      if (start + k === o.selected) li.classList.add("selected");
+      if (start + k === o.selected && document.activeElement !== search) li.classList.add("selected");
       if (state.current && c.id === state.current.id) li.classList.add("current");
       const n = document.createElement("span"); n.className = "n"; n.textContent = c.number;
       const logo = window.VodMax.channelArt(c);
@@ -384,6 +409,7 @@
   }
 
   function closeList() {
+    if (document.activeElement === search) search.blur();
     state.overlay = null;
     $("list").hidden = true;
   }
@@ -450,7 +476,8 @@
     await refreshChannels();
     if (state.overlay) {
       const keep = state.overlay.channels[state.overlay.selected];
-      state.overlay.channels = await load(LISTS[state.overlay.listIndex]);
+      state.overlay.all = await load(LISTS[state.overlay.listIndex]);
+      filterList();
       const i = state.overlay.channels.findIndex((c) => keep && c.id === keep.id);
       state.overlay.selected = Math.max(0, Math.min(i < 0 ? state.overlay.selected : i, state.overlay.channels.length - 1));
       renderList();
@@ -745,6 +772,14 @@
       return;
     }
 
+    // Typing in the channel search: letters, digits and Backspace stay in
+    // the field; Down or OK go to the first row, Back closes the list.
+    if (document.activeElement === search) {
+      if (key === "ArrowDown" || key === "OK") { search.blur(); state.overlay.selected = 0; renderList(); e.preventDefault(); }
+      else if (key === "Back" && e.key !== "Backspace") { closeList(); e.preventDefault(); }
+      return;
+    }
+
     // The guide over the video: the grid takes the arrows, OK and Back;
     // P+/P- and the digits zap the small window; Guide closes it again.
     if (guideOpen()) {
@@ -801,7 +836,7 @@
     const o = state.overlay;
     if (o) {
       switch (key) {
-        case "ArrowUp": o.selected = Math.max(0, o.selected - 1); renderList(); break;
+        case "ArrowUp": if (o.selected > 0) { o.selected--; renderList(); } else search.focus(); break;
         case "ArrowDown": o.selected = Math.min(o.channels.length - 1, o.selected + 1); renderList(); break;
         case "ChannelUp": o.selected = Math.max(0, o.selected - 10); renderList(); break;
         case "ChannelDown": o.selected = Math.min(o.channels.length - 1, o.selected + 10); renderList(); break;
