@@ -40,6 +40,16 @@ window.GuideGrid = (() => {
     const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 864e5);
     return diff === 0 ? t("Oggi") : diff === 1 ? t("Domani") : d.toLocaleDateString(window.VodMaxI18n.locale, { weekday: "long", day: "numeric", month: "short" });
   };
+  // A tint per genre (data-genre on the cell), from the words of the
+  // category: XMLTV guides write it in any language, so only the broad
+  // families are recognised.
+  const GENRES = [
+    ["film", /film|movie|cinema|fiction|serie|series|drama|comed|thriller/i],
+    ["sport", /sport|calcio|football|soccer|tennis|basket|motor|rugby|golf|cicl|cycl|volley|formula/i],
+    ["news", /news|notiz|telegiornale|\btg\b|informazion|attualit|current affairs|weather|meteo/i],
+    ["kids", /kids|bambin|cartoon|cartoni|children|ragazzi|animazion|anime/i],
+  ];
+  const genre = (category) => { const g = GENRES.find(([, re]) => re.test(category)); return g ? g[0] : "other"; };
   // Icons from the bundled set: the symbols ⏺ ⏮ are missing from the
   // fonts of some TVs (an empty box).
   function iconButton(className, icon, text, onclick) {
@@ -94,10 +104,14 @@ window.GuideGrid = (() => {
       const rows = state.rows.map((r, ri) => {
         const line = el("div", { className: "line" });
         r.programmes.forEach((p, pi) => {
-          const replay = p.stop <= now && r.channel.catchup_days;
+          // The states are classes for the theme: .on-air, .past, .can-replay
+          // (in the provider's archive), .recording; .focus follows the focus.
+          const replay = p.stop <= now && r.channel.catchup_days && p.start >= now - r.channel.catchup_days * 86400;
           const b = el("button", { className: "prog focusable" + (p.start <= now && p.stop > now ? " on-air" : "") + (p.stop <= now ? " past" : "") +
-            (p.recording ? " rec" : "") + (replay ? " replay" : "") },
-            p.title, el("small", {}, hhmm(p.start) + "–" + hhmm(p.stop) + (replay ? " · ↺ " + t("riguarda") : "")));
+            (p.recording ? " recording" : "") + (replay ? " can-replay" : "") },
+            replay ? el("span", { className: "mark" }, "↺") : null,
+            p.title, el("small", {}, hhmm(p.start) + "–" + hhmm(p.stop) + (replay ? " · " + t("riguarda") : "")));
+          if (p.category) b.dataset.genre = genre(p.category);
           // Provider guides overlap at times: drawn up to the next start, so
           // no programme hides another.
           const next = r.programmes[pi + 1];
@@ -149,9 +163,12 @@ window.GuideGrid = (() => {
 
     // ---- The programme in the panel ----
     // The cell in focus is described; OK adds its actions (open).
+    container.addEventListener("focusout", (e) => { if (e.target.classList) e.target.classList.remove("focus"); });
     container.addEventListener("focusin", (e) => {
       const b = e.target.closest(".prog");
-      if (!b || state.open) return;
+      if (!b) return;
+      b.classList.add("focus");
+      if (state.open) return;
       const row = state.rows[Number(b.dataset.row)];
       if (row) describe(row, row.programmes[Number(b.dataset.i)], false);
     });

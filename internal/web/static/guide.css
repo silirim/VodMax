@@ -29,7 +29,9 @@ body.guide-page .guide { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .prog small { display: block; color: var(--soft); font-size: 0.78rem; }
 .prog.on-air { background: #24262e; }
 /* A red dot: the ⏺ symbol is missing from some TV fonts. */
-.prog.rec::before { content: ""; display: inline-block; width: 0.55em; height: 0.55em; margin-right: 0.35em; border-radius: 50%; background: var(--rec); vertical-align: 0.05em; }
+.prog.recording::before { content: ""; display: inline-block; width: 0.55em; height: 0.55em; margin-right: 0.35em; border-radius: 50%; background: var(--rec); vertical-align: 0.05em; }
+/* ↺ on a past programme still in the provider's archive. */
+.prog .mark { color: var(--soft); margin-right: 0.3em; }
 .prog:focus, .prog:hover { outline: none; border-color: var(--text); background: #2b2e37; z-index: 1; }
 .now-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); pointer-events: none; }
 
@@ -51,7 +53,7 @@ body.guide-page .guide { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 }
 .programme-panel .buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
 .prog.past { opacity: 0.55; }
-.prog.past.replay { opacity: 0.85; }
+.prog.past.can-replay { opacity: 0.85; }
 .guide-row .name .archive { color: var(--soft); margin-left: 0.3rem; }
 
 /* Phones: the channel column keeps number and logo, the names go; the
