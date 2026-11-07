@@ -2,14 +2,19 @@
 package web
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"mime"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
+	"time"
 )
 
 //go:embed static
@@ -32,19 +37,43 @@ func Handler() http.Handler {
 	if err != nil {
 		panic(err)
 	}
+	tags, err := contentTags(root, langs)
+	if err != nil {
+		panic(err)
+	}
+	pages, err := taggedPages(root, tags)
+	if err != nil {
+		panic(err)
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; media-src 'self' blob:; "+
 			"script-src 'self'; style-src 'self'; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'")
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
+		name := strings.TrimPrefix(r.URL.Path, "/")
 		if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, ".html") {
 			h.Set("Cache-Control", "no-store")
+			if r.URL.Path == "/" {
+				name = "index.html"
+			}
+			// /index.html itself still redirects to / (http.FileServer).
+			if page, ok := pages[name]; ok && r.URL.Path != "/index.html" {
+				h.Set("Content-Type", "text/html; charset=utf-8")
+				w.Write(page)
+				return
+			}
+		}
+		// The embedded files carry no dates, so without a tag a cache could
+		// only keep a file or fetch it again blindly: each one must be checked
+		// every time (a 304 when unchanged).
+		if tag, ok := tags[name]; ok {
+			h.Set("Cache-Control", "no-cache")
+			h.Set("ETag", tag)
 		}
 		if r.URL.Path == "/i18n/languages.js" {
 			h.Set("Content-Type", "text/javascript; charset=utf-8")
-			h.Set("Cache-Control", "no-cache")
-			w.Write(langs)
+			http.ServeContent(w, r, "languages.js", time.Time{}, bytes.NewReader(langs))
 			return
 		}
 		files.ServeHTTP(w, r)
@@ -85,4 +114,50 @@ func languagesScript(root fs.FS) ([]byte, error) {
 		return nil, err
 	}
 	return append(append([]byte("window.VodMaxDicts = "), raw...), ";\n"...), nil
+}
+
+// contentTags gives every embedded file (and the generated languages.js)
+// an ETag made from its content.
+func contentTags(root fs.FS, langs []byte) (map[string]string, error) {
+	tag := func(b []byte) string { sum := sha256.Sum256(b); return `"` + hex.EncodeToString(sum[:8]) + `"` }
+	tags := map[string]string{"i18n/languages.js": tag(langs)}
+	err := fs.WalkDir(root, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := fs.ReadFile(root, p)
+		tags[p] = tag(b)
+		return err
+	})
+	return tags, err
+}
+
+// assetRef is a page's local script or style ("ui.css", "i18n/languages.js").
+var assetRef = regexp.MustCompile(`((?:src|href)=")([^"/:][^":?]*\.(?:css|js))"`)
+
+// taggedPages are the pages with their scripts and styles named by content
+// (ui.css?v=…): a proxy that keeps files for hours whatever the server says
+// (Cloudflare gives CSS and JS its own browser lifetime) still hands out a
+// new version on the day of an update, since the pages are never cached.
+func taggedPages(root fs.FS, tags map[string]string) (map[string][]byte, error) {
+	names, err := fs.Glob(root, "*.html")
+	if err != nil {
+		return nil, err
+	}
+	pages := map[string][]byte{}
+	for _, n := range names {
+		b, err := fs.ReadFile(root, n)
+		if err != nil {
+			return nil, err
+		}
+		pages[n] = assetRef.ReplaceAllFunc(b, func(m []byte) []byte {
+			s := assetRef.FindSubmatch(m)
+			tag, ok := tags[string(s[2])]
+			if !ok {
+				return m
+			}
+			return []byte(string(s[1]) + string(s[2]) + "?v=" + strings.Trim(tag, `"`) + `"`)
+		})
+	}
+	return pages, nil
 }

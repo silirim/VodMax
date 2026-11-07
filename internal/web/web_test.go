@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -120,5 +121,50 @@ func TestLanguagesScript(t *testing.T) {
 	}
 	if _, it := dicts["it"]; it || dicts["en"]["Continua"] != "Continue" {
 		t.Fatalf("languages: %d, it present: %v", len(dicts), it)
+	}
+}
+
+// The pages name their scripts and styles by content and every file must be
+// revalidated, so an update reaches browsers behind a caching proxy at once.
+func TestStaticFilesRevalidated(t *testing.T) {
+	srv := httptest.NewServer(Handler())
+	defer srv.Close()
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	get := func(p, etag string) (*http.Response, string) {
+		req, _ := http.NewRequest("GET", srv.URL+p, nil)
+		if etag != "" {
+			req.Header.Set("If-None-Match", etag)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp, string(b)
+	}
+	resp, page := get("/", "")
+	if resp.Header.Get("Cache-Control") != "no-store" {
+		t.Errorf("/: Cache-Control %q", resp.Header.Get("Cache-Control"))
+	}
+	m := regexp.MustCompile(`href="ui\.css\?v=([0-9a-f]{16})"`).FindStringSubmatch(page)
+	if m == nil || !strings.Contains(page, `src="i18n/languages.js?v=`) {
+		t.Fatalf("the page does not name its files by content:\n%s", page[:min(len(page), 600)])
+	}
+	for _, p := range []string{"/ui.css?v=" + m[1], "/i18n/languages.js"} {
+		resp, _ := get(p, "")
+		tag := resp.Header.Get("ETag")
+		if resp.StatusCode != 200 || resp.Header.Get("Cache-Control") != "no-cache" || tag == "" {
+			t.Fatalf("%s: %d, Cache-Control %q, ETag %q", p, resp.StatusCode, resp.Header.Get("Cache-Control"), tag)
+		}
+		if strings.HasPrefix(p, "/ui.css") && tag != `"`+m[1]+`"` {
+			t.Errorf("ui.css: ETag %s, page names v=%s", tag, m[1])
+		}
+		if resp, _ := get(p, tag); resp.StatusCode != http.StatusNotModified {
+			t.Errorf("%s with its ETag: %d, want 304", p, resp.StatusCode)
+		}
+	}
+	if resp, _ := get("/index.html", ""); resp.StatusCode != http.StatusMovedPermanently {
+		t.Errorf("/index.html: %d, want the redirect to /", resp.StatusCode)
 	}
 }
