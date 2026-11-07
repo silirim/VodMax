@@ -2,25 +2,42 @@
 
 .more { margin: 1.2rem 0; }
 
-/* Detail */
+/* Detail: translucent over the ambient (common.js), the page below hidden
+   while it is open; the backdrop (a canvas, vod.js fadedArt) across the
+   top of the page, scrolling with it and fading into the ambient. */
 .detail {
   position: fixed;
   top: 0; right: 0; bottom: 0; left: 0;
   z-index: 6; /* above the sticky header */
   overflow-y: auto;
-  padding: 4vh 6vw;
-  background: var(--bg); /* opaque: the page below must not show through */
+  padding: 4vh var(--safe) 6vh;
+  isolation: isolate;
 }
+body.with-detail main, body.with-detail header.top { visibility: hidden; }
+.detail-art { position: absolute; top: 0; left: 0; right: 0; z-index: -1; height: min(92vh, 64rem); overflow: hidden; pointer-events: none; }
+.back-button { margin: 0 0 var(--s4); }
 
-.detail-head { display: flex; gap: 2rem; align-items: flex-start; }
-.detail-head > div { flex: 1; min-width: 0; } /* the text never runs off the screen */
-.detail-head img { width: 14rem; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 12px; background: var(--raised); }
-@supports not (aspect-ratio: 2 / 3) { .detail-head img { height: 21rem; } }
-.detail h1 { margin: 0 0 0.5rem; font-size: 2rem; }
-.meta { color: var(--soft); }
-.actions { margin-top: 1.4rem; }
+.detail-head { display: flex; gap: var(--s6); align-items: flex-end; }
+.detail.with-backdrop .detail-head { min-height: 56vh; } /* the picture shows above the title */
+.detail-head > div { flex: 1; min-width: 0; max-width: 56rem; } /* the text never runs off the screen */
+#detail-image { flex: none; width: 14rem; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--r-s); border: 1px solid var(--line); background: var(--raised); box-shadow: var(--shadow-s); }
+@supports not (aspect-ratio: 2 / 3) { #detail-image { height: 21rem; } }
+.detail h1 { margin: 0 0 var(--s3); font-size: clamp(2rem, 3.4vw, var(--t-3xl)); line-height: 1.05; text-shadow: var(--text-shadow); }
+.detail .title-logo { max-height: 9rem; }
+.actions { margin-top: var(--s5); }
+.detail .plot { color: rgba(255, 255, 255, 0.88); text-shadow: var(--text-shadow); }
 
-.seasons { display: flex; gap: 0.5rem; margin: 2rem 0 1rem; flex-wrap: wrap; }
+/* Cast: round photos (initials without one), name and role. */
+.cast-list { display: flex; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; }
+.cast-list li { display: flex; flex-direction: column; align-items: center; width: 8.5rem; margin: 0 var(--s4) var(--s4) 0; text-align: center; }
+.cast-photo { display: flex; align-items: center; justify-content: center; width: 6rem; height: 6rem; margin-bottom: var(--s2); object-fit: cover;
+  font-size: var(--t-l); font-weight: 700; color: var(--soft); background: var(--raised); border: 1px solid var(--glass-line); border-radius: 50%; box-shadow: var(--shadow-s); }
+.cast-list strong { font-size: var(--t-s); line-height: 1.25; }
+.cast-list span { color: var(--soft); font-size: var(--t-xs); }
+
+.seasons { margin: var(--s6) 0 var(--s2); }
+.seasons:empty { display: none; }
+/* "Altre versioni": a plain list. */
 .episodes { list-style: none; margin: 0; padding: 0; }
 .episodes li button {
   display: grid;
@@ -33,36 +50,39 @@
   text-align: left;
   background: none;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--r-s);
   cursor: pointer;
 }
 .episodes li button:focus { background: var(--raised); outline: 2px solid var(--text); }
 .episodes .n { color: var(--soft); }
-.episodes .bar { align-self: center; height: 4px; background: var(--raised); border-radius: 2px; overflow: hidden; }
-.episodes .bar div { height: 100%; background: var(--accent-grad); }
 
-/* Episodes of a series: a row of cards, picture above, title and plot. */
-/* Written for the older browsers of TVs too: no aspect-ratio, inset or
-   flex gap here. */
-.episodes.ep-row { display: flex; padding: 0.7rem 0.8rem 1rem; margin: 0 -0.8rem; overflow-x: auto; scrollbar-width: none; }
+/* Episodes of a series: cards with the picture on the left, title,
+   duration and plot on the right, in a row that scrolls on TV and a
+   column on the phone. Written for the older browsers of TVs too: no
+   aspect-ratio, inset or flex gap here. */
+.episodes.ep-row { display: flex; padding: 0.9rem 1rem 1.2rem; margin: 0 -1rem; overflow-x: auto; scrollbar-width: none; }
 .episodes.ep-row::-webkit-scrollbar { display: none; }
-.episodes.ep-row li { flex: none; width: 22vw; min-width: 15rem; max-width: 24rem; margin-right: var(--gap); }
+.episodes.ep-row li { flex: none; width: 34vw; min-width: 24rem; max-width: 40rem; margin-right: var(--gap); }
 .episodes .ep-card {
-  display: flex; flex-direction: column; gap: 0; height: 100%; padding: 0;
-  overflow: hidden; background: var(--raised); border: 1px solid var(--line); border-radius: 14px;
-  transition: transform 0.15s var(--ease);
+  display: flex; align-items: stretch; height: 100%; padding: 0;
+  overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow-s);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur), border-color var(--dur);
 }
-.episodes .ep-card:focus { outline: 3px solid var(--focus); outline-offset: 2px; background: var(--raised); transform: scale(1.03); }
-.ep-thumb { position: relative; display: block; height: 0; padding-top: 56.25%; overflow: hidden; background: linear-gradient(160deg, #262a35, #15171d); }
+.episodes .ep-card:focus { outline: none; background: var(--raised); border-color: var(--focus); box-shadow: var(--glow); transform: scale(1.03); }
+@media (hover: hover) and (pointer: fine) { .episodes .ep-card:hover { border-color: rgba(255, 255, 255, 0.55); } }
+.ep-thumb { position: relative; flex: none; display: block; width: 52%; height: 0; padding-top: 29.25%; overflow: hidden; background: linear-gradient(160deg, var(--raised), var(--surface)); }
 .ep-thumb img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
 .ep-num { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.6rem; font-weight: 800; color: rgba(255, 255, 255, 0.18); }
-.ep-dur { position: absolute; right: 0.5rem; top: 0.5rem; padding: 0.1rem 0.45rem; font-size: 0.78rem; color: var(--text); background: rgba(8, 9, 11, 0.75); border-radius: 6px; }
-.ep-thumb .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; border-radius: 0; background: rgba(0, 0, 0, 0.5); }
-.ep-text { display: block; padding: 0.8rem 0.9rem 0.95rem; }
-.ep-text strong { display: block; margin-bottom: 0.35rem; }
-.ep-text strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.ep-plot { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--soft); font-size: 0.88rem; line-height: 1.4; }
-.ep-card.next .ep-num { color: rgba(0, 214, 202, 0.45); }
+.ep-thumb .badge { right: auto; left: var(--s2); }
+.ep-thumb .bar { position: absolute; left: var(--s2); right: var(--s2); bottom: var(--s2); height: 4px; background: rgba(255, 255, 255, 0.3); border-radius: var(--r-pill); overflow: hidden; }
+.ep-thumb .bar div { height: 100%; background: var(--accent-grad); border-radius: var(--r-pill); }
+.ep-text { display: block; flex: 1; min-width: 0; padding: var(--s3) var(--s4); }
+.ep-text strong { display: block; margin-bottom: var(--s1); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ep-info { display: block; margin-bottom: var(--s1); color: var(--soft); font-size: var(--t-xs); }
+.ep-plot { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--soft); font-size: var(--t-s); line-height: 1.4; }
+.ep-card.next .ep-num { color: var(--accent); opacity: 0.5; }
+#similar { margin-top: var(--s4); }
 /* The arrows scroll a card into view with room for its focus ring and
    zoom (the row clips them otherwise, and the screen's edge cuts them). */
 .card, .card-x, .episodes .ep-card { scroll-margin: 1rem; }
@@ -145,11 +165,7 @@ html { scroll-padding-top: 6.5rem; }
 .player-menu button:focus { outline: none; color: #0b0c10; background: var(--focus); border-color: var(--focus); }
 video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 
-/* Detail page: backdrop behind a dark gradient, plot and credits. */
-.detail.with-backdrop { background-size: cover; background-position: center top; }
-.detail.with-backdrop::before { content: ""; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: -1;
-  background: linear-gradient(90deg, rgba(8, 9, 11, 0.97) 35%, rgba(8, 9, 11, 0.7) 70%, rgba(8, 9, 11, 0.5)); }
-.detail { isolation: isolate; }
+/* Detail page: plot and credits. */
 .plot { max-width: 48rem; line-height: 1.5; margin: 1rem 0; }
 .credits { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; max-width: 48rem; margin: 0.5rem 0; color: var(--soft); }
 .credits dt { color: var(--soft); }
@@ -190,10 +206,6 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .rule-form .check input { width: 1.3rem; height: 1.3rem; accent-color: var(--accent); }
 .recs .tag { color: var(--soft); }
 
-/* Back button of the detail page */
-.back-button { margin: 0 0 1.2rem; padding: 0.5em 1em; font: inherit; color: var(--text); background: var(--raised);
-  border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
-.back-button:focus, .back-button:hover { border-color: var(--text); outline: none; }
 
 /* TV landing page: channel list */
 .tv-tools { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.5rem 0 1rem; }
@@ -330,17 +342,28 @@ body.over-hero .top::after { opacity: 0; }
 .dl-state { align-self: center; }
 @media (max-width: 700px) { .downloads li { flex-direction: column; align-items: stretch; } }
 
-/* Phone: the poster above, the text below at full width. */
+/* Phone: the poster above, the text below at full width; the episodes
+   in a column, the cast in a row that scrolls. */
 @media (max-width: 700px) {
-  .detail { padding: 1rem 1rem calc(2rem + env(safe-area-inset-bottom)); }
-  .detail-head { flex-direction: column; gap: 1rem; }
-  .detail-head img { width: 9rem; }
-  .detail h1 { font-size: 1.6rem; overflow-wrap: anywhere; word-break: break-word; }
+  .detail { padding: 1rem var(--safe) calc(2rem + env(safe-area-inset-bottom)); }
+  .detail.with-backdrop .detail-head { min-height: 46vh; }
+  .detail-head { flex-direction: column; align-items: flex-start; gap: 1rem; }
+  #detail-image { width: 9rem; }
+  .detail h1 { font-size: 1.9rem; overflow-wrap: anywhere; word-break: break-word; }
+  .detail .title-logo { max-height: 5.5rem; max-width: 80%; }
+  .detail .plot { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .detail .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .detail .actions .button { margin: 0; }
-  .seasons { margin: 1.4rem 0 0.6rem; }
+  .cast-list { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: calc(-1 * var(--safe)); }
+  .cast-list::-webkit-scrollbar { display: none; }
+  .cast-list li { flex: none; width: 6.5rem; }
+  .cast-photo { width: 4.8rem; height: 4.8rem; }
   .episodes li button { grid-template-columns: 2rem minmax(0, 1fr) 3.5rem; gap: 0.6rem; padding: 0.6rem 0.4rem; }
-  .episodes.ep-row li { width: 72vw; }
+  .episodes.ep-row { display: block; margin: 0; padding: var(--s2) 0; overflow: visible; }
+  .episodes.ep-row li { width: auto; min-width: 0; max-width: none; margin: 0 0 var(--s3); }
+  .ep-thumb { width: 42%; padding-top: 23.6%; }
+  .ep-text { padding: var(--s2) var(--s3); }
+  .ep-plot { -webkit-line-clamp: 2; }
 }
 
 /* Phone: recordings and rules in one column. */

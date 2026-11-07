@@ -352,6 +352,13 @@
         };
         shade(w * 0.72, 0, 0.9);
         shade(0, h * 0.3, 0.55);
+        if (w < h * 1.3) { // a phone: the text spans the width, so the shade goes down, not across
+          const down = g.createLinearGradient(0, h * 0.2, 0, h * 0.65);
+          down.addColorStop(0, "rgba(" + bg + ",0)");
+          down.addColorStop(1, "rgba(" + bg + ",0.75)");
+          g.fillStyle = down;
+          g.fillRect(0, 0, w, h);
+        }
         g.globalCompositeOperation = "destination-in";
         const fade = g.createLinearGradient(0, h * 0.5, 0, h);
         fade.addColorStop(0, "rgba(0,0,0,1)");
@@ -1035,19 +1042,29 @@
     const panel = $("detail");
     $("detail-plot").textContent = "";
     $("detail-credits").replaceChildren();
-    panel.classList.remove("with-backdrop");
-    panel.style.backgroundImage = "";
+    $("cast").hidden = true;
+    $("detail-image").hidden = true;
+    setArt($("detail-art"), null);
     let d;
-    try { d = await api("GET", "/api/v1/items/" + item.id + "/details"); } catch { return; }
+    try { d = await api("GET", "/api/v1/items/" + item.id + "/details"); } catch { $("detail-image").hidden = !item.logo; return; }
     if (state.detail !== item) return;
     if (d.title && d.title.toLowerCase() !== item.display_title.toLowerCase()) $("detail-title").textContent = d.title;
-    const meta = $("detail-meta").textContent;
-    const extra = [d.duration ? Math.round(d.duration / 60) + " min" : "", d.genre].filter(Boolean).join(" · ");
-    if (extra) $("detail-meta").textContent = [meta, extra].filter(Boolean).join(" · ");
+    if (d.logo) titleLogo($("detail-title"), d.logo, $("detail-title").textContent);
+    $("detail-meta").replaceChildren(...detailMeta(item, d));
     $("detail-plot").textContent = d.plot || "";
-    const rows = [[t("Regia"), d.director], [t("Cast"), d.cast], [t("Uscita"), d.released], [t("Paese"), d.country],
+    const people = (d.people || []).slice(0, 12);
+    const rows = [[t("Regia"), d.director], [t("Cast"), people.length ? "" : d.cast], [t("Uscita"), d.released], [t("Paese"), d.country],
       [t("Titolo originale"), d.original_title && d.original_title !== item.display_title ? d.original_title : ""]];
     for (const [k, v] of rows) if (v) $("detail-credits").append(el("dt", {}, k), el("dd", {}, v));
+    // The cast with TMDB's photos, initials without one. Not focusable:
+    // there is no search by person to open.
+    $("cast-list").replaceChildren(...people.map((p) => {
+      const initials = el("span", { className: "cast-photo" }, p.name.split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase());
+      const face = p.photo ? el("img", { className: "cast-photo", src: p.photo, alt: "", loading: "lazy" }) : initials;
+      if (p.photo) face.onerror = () => face.replaceWith(initials);
+      return el("li", {}, face, el("strong", {}, p.name), p.role ? el("span", {}, p.role) : null);
+    }));
+    $("cast").hidden = !people.length;
     if (!d.local && item.kind === "movie") addDownloadButtons(item);
     if (d.trailer) {
       const a = el("a", { className: "button focusable trailer", href: "https://www.youtube.com/watch?v=" + encodeURIComponent(d.trailer),
@@ -1055,16 +1072,31 @@
       window.VodMax.label(a, "circle-play", "Trailer");
       $("detail-actions").append(a);
     }
+    // The backdrop over the whole top of the page, fading into the ambient;
+    // the poster only when there is none.
+    $("detail-image").hidden = Boolean(d.backdrop) || !item.logo;
+    panel.classList.toggle("with-backdrop", Boolean(d.backdrop));
     if (d.backdrop) {
-      const img = new Image();
-      img.onload = () => {
-        if (state.detail !== item) return;
-        panel.style.backgroundImage = "url(" + JSON.stringify(d.backdrop) + ")";
-        panel.classList.add("with-backdrop");
-        window.VodMax.setAmbient(d.backdrop);
-      };
-      img.src = d.backdrop;
+      window.VodMax.setAmbient(d.backdrop);
+      const art = await fadedArt(d.backdrop, $("detail-art"));
+      if (state.detail === item) setArt($("detail-art"), art);
     }
+  }
+
+  // Year, duration, genres, versions as text; rating and quality as pills.
+  function detailMeta(item, d = {}) {
+    return metaLine({ year: item.year, quality: item.quality, rating: item.rating || d.rating,
+      text: [d.duration ? Math.round(d.duration / 60) + " min" : "", d.genre, item.variant_count > 1 ? t("{n} versioni", { n: item.variant_count }) : ""] });
+  }
+
+  // "Titoli simili": titles of the catalogue sharing genres, as cards.
+  async function showSimilar(item) {
+    $("similar").hidden = true;
+    $("similar-row").replaceChildren();
+    const list = await api("GET", "/api/v1/items/" + item.id + "/similar").catch(() => []);
+    if (state.detail !== item || !list.length) return;
+    $("similar-row").replaceChildren(...list.map(itemCard));
+    $("similar").hidden = false;
   }
 
   // ---- Downloads to the server's disk ----
@@ -1116,14 +1148,13 @@
     if (!state.detail) state.detailFrom = document.activeElement;
     state.detail = item;
     $("detail-title").textContent = item.display_title;
-    $("detail-meta").textContent = [item.year, { 4: "4K", 3: "Full HD", 2: "HD", 1: "SD" }[item.quality],
-      item.variant_count > 1 ? t("{n} versioni", { n: item.variant_count }) : "",
-      item.rating ? "★ " + Number(item.rating).toLocaleString(locale, { maximumFractionDigits: 1 }) : ""].filter(Boolean).join(" · ");
-    $("detail-image").hidden = !item.logo;
+    $("detail-meta").replaceChildren(...detailMeta(item));
     if (item.logo) $("detail-image").src = item.logo;
+    $("detail").scrollTop = 0; // a similar title opens at its top
     // A poster the server cannot fetch (404, 502) leaves no broken-image box.
     $("detail-image").onerror = () => { $("detail-image").hidden = true; };
     showDetails(item);
+    showSimilar(item);
     $("seasons").replaceChildren();
     $("episodes").replaceChildren();
     const actions = $("detail-actions");
@@ -1202,10 +1233,14 @@
           img.onerror = () => img.remove();
           thumb.append(img);
         }
-        if (e.duration) thumb.append(el("span", { className: "ep-dur" }, Math.round(e.duration / 60) + " min"));
+        thumb.append(el("span", { className: "badge" }, "E" + e.number));
         if (pct) thumb.append(el("span", { className: "bar" }, el("div", { style: "width:" + pct + "%" })));
+        const p = e.progress;
+        const info = [e.duration ? Math.round(e.duration / 60) + " min" : "",
+          p && p.completed ? t("Visto") : p && p.duration ? t("Mancano {time}", { time: clock(p.duration - p.position) }) : ""].filter(Boolean).join(" · ");
         const b = el("button", { className: "focusable ep-card" + (e === next ? " next" : "") }, thumb,
-          el("span", { className: "ep-text" }, el("strong", {}, e.number + ". " + (e.title || t("Episodio {n}", { n: e.number }))),
+          el("span", { className: "ep-text" }, el("strong", {}, e.title || t("Episodio {n}", { n: e.number })),
+            info ? el("span", { className: "ep-info tnum" }, info) : null,
             e.plot ? el("span", { className: "ep-plot" }, e.plot) : null));
         b.title = e.plot || "";
         b.onclick = () => play("episode", e.id, item.display_title + " · S" + e.season + "E" + e.number + " " + e.title,
@@ -1219,15 +1254,15 @@
       if (cur) row.scrollLeft = Math.max(0, cur.parentElement.getBoundingClientRect().left - row.getBoundingClientRect().left - 8);
     };
     $("seasons").replaceChildren(...seasons.map((s) => {
-      const b = el("button", { className: "tab focusable" }, t("Stagione {n}", { n: s }));
+      const b = el("button", { className: "chip focusable" }, t("Stagione {n}", { n: s }));
       b.dataset.season = s;
       b.onclick = () => showSeason(s);
       return b;
     }));
     if (next) {
       const code = { episode: "S" + next.season + "E" + next.number };
-      const go = el("button", { className: "button focusable" },
-        next.progress && !next.progress.completed ? t("Riprendi {episode}", code) : t("Guarda {episode}", code));
+      const go = el("button", { className: "button primary focusable" });
+      window.VodMax.label(go, "play", next.progress && !next.progress.completed ? t("Riprendi {episode}", code) : t("Guarda {episode}", code));
       go.onclick = () => play("episode", next.id, item.display_title + " · S" + next.season + "E" + next.number + " " + next.title,
         next.progress && !next.progress.completed ? next.progress.position : 0);
       $("detail-actions").prepend(go);
@@ -1240,6 +1275,7 @@
   $("detail-back").onclick = () => closeDetail();
   function closeDetail() {
     $("detail").hidden = true;
+    document.body.classList.remove("with-detail"); // the page below is hidden until then, and hidden things take no focus
     state.detail = null;
     const from = state.detailFrom;
     state.detailFrom = null;
