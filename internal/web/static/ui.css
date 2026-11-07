@@ -162,7 +162,7 @@ html.nofx #ambient .ambient-img.on { opacity: 0.2; }
    .glass-dark (over video). The shared bars, pickers and dialogs are in
    these lists; a page adds the class to its own floating surfaces. */
 .glass, .glass-strong, .glass-dark,
-#tabs, .picker, .sheet, .bnav, #my-profile, #admin-pin.modal, #country-pick, #update-banner, .panel, .status {
+#tabs, .picker, .sheet, .bnav, #my-profile, #admin-pin.modal, #country-pick, #update-banner, .panel, .status, #server-problems {
   background-color: var(--glass);
   background-image: var(--glass-sheen), var(--glass-base);
   border: 1px solid var(--glass-line);
@@ -172,7 +172,7 @@ html.nofx #ambient .ambient-img.on { opacity: 0.2; }
   backdrop-filter: var(--bf);
 }
 .glass-strong, .picker, .sheet, #my-profile, #admin-pin.modal, #country-pick, #update-banner, .panel { background-color: var(--glass-strong); }
-.glass-dark, .dialog, .status, .bnav { background-color: var(--glass-dark); border-color: rgba(255, 255, 255, 0.14); }
+.glass-dark, .dialog, .status, .bnav, #server-problems { background-color: var(--glass-dark); border-color: rgba(255, 255, 255, 0.14); }
 
 /* ---- Focus: visible from across the room ---- */
 :focus { outline: none; }
@@ -523,12 +523,34 @@ a.chip { text-decoration: none; }
   left: 50%;
   z-index: 20;
   transform: translateX(-50%);
+  /* max-content: with left: 50% the box would otherwise wrap at half
+     the screen (a two-line pill on a phone). */
+  width: max-content;
+  max-width: 92vw;
   max-width: min(92vw, 40rem);
   padding: 0.7em 1.3em;
   font-weight: 600;
   text-align: center;
   border-radius: var(--r-pill);
 }
+
+/* The server's problems (common.js watchStatus): a dark glass notice in
+   the bottom-right corner that folds to a ⚠ after a few seconds. Under
+   the toast, which is newer. */
+#server-problems {
+  position: fixed;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 19;
+  max-width: min(36rem, 80vw);
+  padding: 0.6em 1.1em;
+  color: var(--text);
+  text-decoration: none;
+  border-color: rgba(242, 200, 121, 0.7); /* --fav */
+  border-radius: var(--r-s);
+}
+#server-problems.error { border-color: var(--rec); }
+#server-problems.compact { max-width: 2.6rem; max-height: 2.6rem; overflow: hidden; white-space: nowrap; padding-left: 0.75rem; padding-right: 0.75rem; }
 
 /* ---- Inputs: a dark field with a hairline, white when focused ---- */
 input[type="text"], input[type="search"], input[type="password"], input[type="number"], input[type="email"], input[type="url"], input[type="tel"], input:not([type]), select, textarea {
