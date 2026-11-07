@@ -1,5 +1,9 @@
-.guide-nav { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-.guide-when { min-width: 12rem; text-align: center; color: var(--soft); }
+/* The time controls: shared chips in one row, the window's day and hours
+   first (it changes length: the chips after it stay where they are). */
+.guide-nav { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.guide-nav .chip { flex: none; }
+.guide-nav .chip .icon { width: 1.1em; height: 1.1em; }
+.guide-when { flex: none; margin-right: var(--s2); color: var(--soft); font-weight: 600; white-space: nowrap; }
 
 /* The guide page scrolls inside the grid, so the programme panel (above
    it) and the time scale (sticky at its top) stay in sight. */
@@ -136,4 +140,10 @@ body.guide-page .programme-panel { margin: 0 var(--safe); }
 @media (min-width: 801px) {
   .top #tabs.keep { flex: 0 0 auto; }
   .guide-nav { flex: 1 1 auto; justify-content: flex-end; }
+}
+/* Narrow screens (the guide page): one row that scrolls sideways, from edge to edge, with
+   room for the focused chip to grow. */
+@media (max-width: 800px) {
+  .top .guide-nav { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--safe)); padding: var(--s2) var(--safe); }
+  .top .guide-nav::-webkit-scrollbar { display: none; }
 }

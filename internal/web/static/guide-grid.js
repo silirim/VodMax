@@ -334,6 +334,10 @@ window.GuideGrid = (() => {
       load();
     }
     if (toolbar) {
+      // Chevrons instead of ◀ ▶: those glyphs are missing from some TV fonts.
+      const back = toolbar.querySelector('[data-move="-2"]'), ahead = toolbar.querySelector('[data-move="2"]');
+      if (back) { window.VodMax.label(back, "chevron-left", t("2 ore")); back.setAttribute("aria-label", t("2 ore prima")); }
+      if (ahead) { window.VodMax.label(ahead, "chevron-right", t("2 ore")); ahead.append(ahead.firstChild); ahead.setAttribute("aria-label", t("2 ore dopo")); }
       for (const b of toolbar.querySelectorAll("[data-list]")) b.onclick = () => setList(b.dataset.list);
       for (const b of toolbar.querySelectorAll("[data-move]")) b.onclick = () => jump(b.dataset.move);
       for (const b of toolbar.querySelectorAll("[data-close]")) b.onclick = () => o.onClose && o.onClose();

@@ -14,19 +14,21 @@
 <body class="guide-page">
 <header class="top">
   <nav id="tabs" class="keep">
-    <a class="tab focusable nav-link" href="/" data-i18n>← Menu</a>
+    <a class="tab focusable nav-link" href="/" data-icon="arrow-left" data-i18n>Menu</a>
     <a class="tab focusable nav-link" href="/tv.html">TV</a>
     <button class="tab focusable" data-list="all" data-i18n>Tutti</button>
     <button class="tab focusable" data-list="favorites" data-i18n>Preferiti</button>
     <button class="tab focusable" data-list="sport" data-i18n>Sport</button>
   </nav>
+  <!-- The window's day and hours, then the moves; the arrows of "2 ore"
+       are icons (guide-grid.js). -->
   <div class="guide-nav" data-i18n>
-    <button class="tab focusable" data-move="yesterday">Ieri sera</button>
-    <button class="tab focusable" data-move="-2">◀ 2 ore</button>
-    <span id="guide-when" class="guide-when"></span>
-    <button class="tab focusable" data-move="2">2 ore ▶</button>
-    <button class="tab focusable" data-move="now">Adesso</button>
-    <button class="tab focusable" data-move="day">Domani sera</button>
+    <span id="guide-when" class="guide-when tnum"></span>
+    <button class="chip focusable" data-move="yesterday">Ieri sera</button>
+    <button class="chip focusable" data-move="-2">◀ 2 ore</button>
+    <button class="chip focusable" data-move="now">Adesso</button>
+    <button class="chip focusable" data-move="2">2 ore ▶</button>
+    <button class="chip focusable" data-move="day">Domani sera</button>
   </div>
 </header>
 <section id="guide-panel" class="programme-panel" hidden></section>
