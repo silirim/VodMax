@@ -785,5 +785,6 @@
   "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?": "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?",
   "in onda": "in onda",
   "rivedibile": "rivedibile",
-  "Guida TV (Guida / E)": "Guida TV (Guida / E)"
+  "Guida TV (Guida / E)": "Guida TV (Guida / E)",
+  "Rimangono {n} min": "Rimangono {n} min"
 }

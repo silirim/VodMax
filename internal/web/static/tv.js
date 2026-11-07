@@ -243,27 +243,36 @@
     $("banner-number").textContent = channel.number;
     $("banner-name").textContent = channel.name;
     $("banner-logo").replaceChildren(window.VodMax.channelArt(channel));
+    const quality = { 4: "4K", 3: "FHD", 2: "HD", 1: "SD" }[channel.quality];
+    $("banner-quality").textContent = quality || "";
+    $("banner-quality").hidden = !quality;
     const badges = $("banner-badges");
     badges.replaceChildren();
-    const quality = { 4: "4K", 3: "FHD", 2: "HD", 1: "SD" }[channel.quality];
-    for (const [text, cls] of [[quality, ""], [channel.favorite ? "★ " + t("Preferito") : "", "fav"],
-      [channel.catchup_days ? t("Replay {days}g", { days: channel.catchup_days }) : "", ""]]) {
+    for (const [text, cls, icon] of [[channel.catchup_days ? t("Replay {days}g", { days: channel.catchup_days }) : "", "", "rotate-ccw"],
+      [channel.favorite ? t("Preferito") : "", "fav", "star"]]) {
       if (!text) continue;
       const span = document.createElement("span");
-      span.textContent = text;
-      if (cls) span.className = cls;
+      span.className = "badge " + cls;
+      span.append(window.VodMaxIcons.icon(icon), text);
       badges.append(span);
     }
     $("banner-mode").textContent = state.favoritesOnly ? t("Solo preferiti") : "";
     $("banner-mode").hidden = !state.favoritesOnly;
     const now = channel.now, next = channel.next;
+    const sec = Date.now() / 1000;
     $("banner-now").textContent = now ? now.title : t("Nessuna informazione sul programma");
-    $("banner-now-time").textContent = now ? hhmm(now.start) + " – " + hhmm(now.stop) : "";
-    const pct = now ? Math.min(100, Math.max(0, (Date.now() / 1000 - now.start) / (now.stop - now.start) * 100)) : 0;
+    $("banner-now-time").textContent = now ? hhmm(now.start) + " – " + hhmm(now.stop) + " · " + t("Rimangono {n} min", { n: Math.max(1, Math.ceil((now.stop - sec) / 60)) }) : "";
+    $("banner-now-time").hidden = !now;
+    $("banner-start").textContent = now ? hhmm(now.start) : "";
+    $("banner-stop").textContent = now ? hhmm(now.stop) : "";
+    $("banner-start").parentNode.hidden = !now;
+    const pct = now ? Math.min(100, Math.max(0, (sec - now.start) / (now.stop - now.start) * 100)) : 0;
     $("banner-progress").style.width = pct + "%";
     $("banner-next").textContent = next ? next.title : "";
-    $("banner-next-time").textContent = next ? hhmm(next.start) : "";
+    $("banner-next-time").textContent = next ? hhmm(next.start) + " – " + hhmm(next.stop) : "";
+    $("banner-next-row").hidden = !next;
     $("banner-hint").textContent = browsing ? t("OK per guardare · Indietro per tornare a {name}", { name: state.current.name }) : "";
+    $("banner-hint").hidden = !browsing;
     banner.hidden = false;
     clearTimeout(state.timers.banner);
     state.timers.banner = setTimeout(endBrowse, browsing ? 8000 : 5000);

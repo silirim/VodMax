@@ -26,7 +26,7 @@ video {
 /* Android's small window: the picture alone. */
 .pip > :not(#screen), .pip #screen > :not(video) { display: none !important; }
 
-.hint { color: var(--soft); font-size: 0.85rem; }
+.hint { color: var(--soft); font-size: var(--t-s); }
 
 .panel {
   position: absolute;
@@ -36,45 +36,48 @@ video {
   width: min(90vw, 34rem);
 }
 
-/* Banner: like a set-top box info bar. */
+/* Banner: the set-top box info bar, dark glass over the picture at the
+   bottom left: number, logo tile, what is on, how far it is, what follows. */
 .banner {
   position: absolute;
-  left: 4vw;
-  right: 4vw;
+  left: var(--safe);
   bottom: 5vh;
-  padding: 1.4rem 1.8rem;
-  background: rgba(19, 21, 27, 0.92);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  font-size: clamp(1rem, 1.6vw, 1.6rem);
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  width: 60vw;
+  max-width: calc(100vw - 2 * var(--safe));
+  padding: var(--s5) var(--s6) var(--s5) var(--s5);
 }
-
+/* Browsing other channels (not tuned yet): the accent says "not this one". */
 .banner.browsing { border-color: var(--accent); }
-
-.banner-head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 0.8rem; }
-.banner .number { font-size: 2.2em; font-weight: 700; color: var(--accent); min-width: 2.5ch; }
-.banner .logo { display: flex; height: 2.4em; align-self: center; }
-.banner .logo .ch-art { height: 100%; max-width: 6em; }
-.banner .logo .ch-art.mono { width: 3.6em; }
-.banner .name { font-size: 1.5em; font-weight: 600; flex: 1; }
-.badges span, .mode {
-  font-size: 0.7em;
-  padding: 0.15em 0.5em;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--soft);
-  margin-left: 0.4em;
+.banner .number { flex: none; min-width: 2ch; font-size: var(--t-3xl); font-weight: 800; line-height: 1; letter-spacing: -0.02em; text-align: center; }
+.banner .logo {
+  flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  width: 4rem; height: 4rem;
+  background: rgba(255, 255, 255, 0.08); border: 1px solid var(--glass-line); border-radius: var(--r-s);
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow-s);
 }
-.badges .fav { color: var(--fav); border-color: var(--fav); }
-
-.programme { display: flex; gap: 1rem; align-items: baseline; margin: 0.25rem 0; }
-.programme .label { color: var(--soft); width: 7.5em; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em; }
-.programme .title { flex: 1; font-weight: 600; }
-.programme.next .title { font-weight: 400; color: var(--soft); }
-.programme .time { color: var(--soft); font-variant-numeric: tabular-nums; }
-
-.progress { height: 4px; margin: 0.5rem 0 0.6rem 8.5em; background: var(--raised); border-radius: 2px; }
-.progress div { height: 100%; width: 0; background: var(--accent-grad); border-radius: 2px; }
+.banner .logo .ch-art { width: 100%; height: 100%; }
+.banner .logo img.ch-art { padding: var(--s2); }
+.banner .logo .ch-art.mono { font-size: var(--t-l); border-radius: 0; }
+.banner .info { flex: 1 1 auto; min-width: 0; }
+.banner .head { display: flex; align-items: center; gap: var(--s2); color: var(--soft); font-weight: 600; }
+.banner .head .name, .banner .title, .banner .next { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.banner .badge { position: static; }
+.banner .title { margin-top: 0.1em; font-size: var(--t-xl); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
+.banner .time { margin-top: var(--s1); color: var(--soft); }
+.banner .progress-row { display: flex; align-items: center; gap: var(--s3); margin: var(--s2) 0 var(--s1); color: var(--soft); font-size: var(--t-s); }
+.banner .progress { flex: 1 1 auto; height: 4px; overflow: hidden; background: rgba(255, 255, 255, 0.18); border-radius: var(--r-pill); }
+.banner .progress div { height: 100%; width: 0; background: var(--accent-grad); border-radius: inherit; }
+.banner .next { color: var(--soft); }
+.banner .next b { color: var(--text); font-weight: 600; }
+.banner .hint { margin-top: var(--s2); }
+.banner .side, .banner .badges { display: flex; flex-direction: column; align-items: flex-end; gap: var(--s2); }
+.banner .side { flex: none; align-self: center; }
+.banner .side .badge { padding: 0.3em 0.65em; font-size: var(--t-s); }
+.banner .side .badge.fav { color: var(--fav); border-color: rgba(242, 200, 121, 0.45); }
+.banner .side .badge.fav .icon { fill: currentColor; }
 
 /* Channel list overlay. */
 .list {
@@ -111,20 +114,27 @@ video {
 .list li.selected { background: var(--raised); outline: 2px solid var(--text); }
 .list li .star { color: var(--fav); margin-left: 0.4em; }
 
+/* The channel number being typed, top centre; under the controls bar
+   when that is on screen. */
 .digits {
   position: absolute;
-  top: 5vh;
-  right: 5vw;
-  font-size: 4rem;
-  font-weight: 700;
-  color: var(--accent);
-  background: var(--panel);
-  padding: 0.2em 0.6em;
-  border-radius: 12px;
-  font-variant-numeric: tabular-nums;
+  top: var(--s6);
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  min-width: 4ch;
+  padding: var(--s3) var(--s6);
+  font-size: var(--t-3xl);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  text-align: center;
 }
+.digits::after { content: "_"; color: var(--faint); }
+body.controls-on .digits { top: 6.5rem; }
 
-.dialog { text-align: center; font-size: 1.2rem; }
+#dialog-text { margin: 0 0 var(--s2); font-size: var(--t-l); font-weight: 600; white-space: pre-line; }
+.dialog .hint { margin: 0; }
 
 @media (prefers-reduced-motion: no-preference) {
   .banner, .list { transition: opacity 0.15s ease; }
@@ -253,18 +263,16 @@ body.controls-on .banner { display: none; }
 /* Watching: the server's warnings wait for the menu. */
 #server-problems { display: none; }
 
-/* Phone: the info bar in two columns, labels above the titles. */
+/* Phone: the info bar across the width, smaller number and tile, the
+   badges in a row under the text. */
 @media (max-width: 700px) {
-  .banner { left: 0.6rem; right: 0.6rem; bottom: calc(0.6rem + env(safe-area-inset-bottom)); padding: 1rem 1.1rem; font-size: 1rem; }
-  .banner-head { flex-wrap: wrap; align-items: center; gap: 0.3rem 0.7rem; }
-  .banner .number { font-size: 1.7em; min-width: 0; }
-  .banner .logo { height: 2em; }
-  .banner .name { font-size: 1.25em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .badges { flex-basis: 100%; }
-  .badges span:first-child, .mode { margin-left: 0; }
-  .programme { display: grid; grid-template-columns: 1fr auto; gap: 0 0.8rem; }
-  .programme .label { grid-column: 1 / -1; width: auto; font-size: 0.75em; }
-  .progress { margin-left: 0; }
+  .banner { left: var(--s4); right: var(--s4); bottom: calc(var(--s4) + env(safe-area-inset-bottom)); flex-wrap: wrap; gap: var(--s2) var(--s3); width: auto; max-width: none; padding: var(--s4); }
+  .banner .number { font-size: var(--t-xl); min-width: 0; }
+  .banner .logo { width: 3rem; height: 3rem; }
+  .banner .logo .ch-art.mono { font-size: var(--t-s); }
+  .banner .title { font-size: var(--t-l); }
+  .banner .side, .banner .badges { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .banner .side { flex-basis: 100%; }
 }
 
 /* The guide over the video (decision 0053): the picture shrinks into a
