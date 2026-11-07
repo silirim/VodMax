@@ -45,6 +45,9 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
   // An address or a command, wrapped on narrow screens, with its Copy button.
   const cmd = (text) => el("div", { className: "cmd-row" }, el("pre", { className: "cmd" }, text), button(t("Copia"), () => copyText(text)));
   const input = (props) => el("input", { className: "focusable", ...props });
+  // Counts as tiles: [[number, label], ...].
+  const stats = (pairs) => el("div", { className: "stats" }, ...pairs.map(([n, label]) =>
+    el("div", { className: "stat" }, el("b", {}, (n || 0).toLocaleString(locale)), el("span", {}, label))));
   const when = (ts) => {
     if (!ts) return t("mai");
     const d = new Date(typeof ts === "number" ? ts * 1000 : ts);
@@ -283,10 +286,9 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     const counts = s.counts || {};
     const sync = el("div", { className: "facts" },
       el("span", {}, t("Ultima sincronizzazione") + " ", el("b", { className: s.sync_status === "error" ? "bad" : "" }, when(s.synced_at) +
-        (s.sync_status === "error" ? " " + t("(errore)") : ""))),
-      el("span", {}, t("Canali") + " ", el("b", {}, counts.live || 0)), el("span", {}, t("Film") + " ", el("b", {}, counts.movie || 0)),
-      el("span", {}, t("Serie") + " ", el("b", {}, counts.series || 0)));
+        (s.sync_status === "error" ? " " + t("(errore)") : ""))));
     const box = el("section", { className: "box" }, el("h3", {}, s.name), facts, sync,
+      stats([[counts.live, t("Canali")], [counts.movie, t("Film")], [counts.series, t("Serie")]]),
       s.sync_error ? el("p", { className: "note bad" }, s.sync_error) : null);
     const syncButton = button(s.syncing ? t("Sincronizzazione in corso…") : t("Sincronizza ora"), async () => {
       syncButton.disabled = true;
