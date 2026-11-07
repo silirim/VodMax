@@ -781,8 +781,6 @@
   "Un momento…": "Un momento…",
   "Schermo intero": "Schermo intero",
   "Esci dallo schermo intero": "Esci dallo schermo intero",
-  "Indirizzi di VodMax": "Indirizzi di VodMax",
-  "Uno per riga, per esempio quello di casa e quello del tunnel: da altri indirizzi il pulsante non compare. Ognuno va registrato anche nel provider, come indirizzo di ritorno.": "Uno per riga, per esempio quello di casa e quello del tunnel: da altri indirizzi il pulsante non compare. Ognuno va registrato anche nel provider, come indirizzo di ritorno.",
   "Questo accesso con l'account di casa sostituisce il dispositivo «{current}» di questo browser. Continuare?": "Questo accesso con l'account di casa sostituisce il dispositivo «{current}» di questo browser. Continuare?",
   "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?": "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?"
 }

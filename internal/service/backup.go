@@ -217,10 +217,6 @@ func (s *Service) RestoreBackup(ctx context.Context, data []byte, password strin
 			delete(b.Settings, k) // sealed by another installation (older backups carried some so)
 		}
 	}
-	// Copies made before 0.6.7 have no address list for the home sign-in,
-	// which means any address: the list in force stays.
-	var prevSSO SSOSettings
-	s.st.Setting(ctx, ssoKey, &prevSSO)
 	err = s.st.ImportBackup(ctx, b,
 		func(id int64, plain []byte) []byte { return s.box.Seal(plain, vpnOwner(id)) },
 		func(id int64, plain []byte) []byte { return s.box.Seal(plain, subOwner(id)) },
@@ -233,13 +229,6 @@ func (s *Service) RestoreBackup(ctx context.Context, data []byte, password strin
 			if err := s.setSecretSetting(ctx, k, v); err != nil {
 				return err
 			}
-		}
-	}
-	var sso SSOSettings
-	if err := s.st.Setting(ctx, ssoKey, &sso); err == nil && sso.Enabled && len(sso.Addresses) == 0 && len(prevSSO.Addresses) > 0 {
-		sso.Addresses = prevSSO.Addresses
-		if err := s.st.SetSetting(ctx, ssoKey, sso); err != nil {
-			return err
 		}
 	}
 	go func() {

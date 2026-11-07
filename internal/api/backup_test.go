@@ -220,7 +220,7 @@ func TestRestoreReSealsTheHomeAccountSecret(t *testing.T) {
 	f := newFakeIdP(t)
 	e.svc.SetSSOClient(f.srv.Client())
 	cfg := map[string]any{"enabled": true, "issuer": f.srv.URL + "/", "client_id": "vodmax", "client_secret": "s3cret", "label": "Authelia",
-		"addresses": []string{e.srv.URL}, "accounts": []map[string]any{{"account": "a@example.org", "profile_id": 1}}}
+		"accounts": []map[string]any{{"account": "a@example.org", "profile_id": 1}}}
 	if code, body := e.do(t, "PUT", "/api/v1/settings/sso", cfg, true); code != 200 {
 		t.Fatalf("sso: %d %s", code, body)
 	}
@@ -234,7 +234,6 @@ func TestRestoreReSealsTheHomeAccountSecret(t *testing.T) {
 		t.Fatalf("settings after restore: %d %s", code, body)
 	}
 	cfg["client_secret"] = "nuovo"
-	cfg["addresses"] = []string{n.srv.URL}
 	if code, body := n.do(t, "PUT", "/api/v1/settings/sso", cfg, true); code != 200 {
 		t.Fatalf("new secret after restore: %d %s", code, body)
 	}

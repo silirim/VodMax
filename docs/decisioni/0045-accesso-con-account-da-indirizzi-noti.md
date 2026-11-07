@@ -1,6 +1,8 @@
 # 0045 — Accesso con account solo dagli indirizzi di VodMax elencati
 
-Stato: **Proposta** (6 novembre 2026, da una revisione di sicurezza)
+Stato: **Respinta** (7 novembre 2026: "No, la 45 non farla"). Il problema
+descritto qui resta aperto: l'indirizzo di ritorno si costruisce ancora
+dall'indirizzo della richiesta.
 
 ## Il problema
 

@@ -225,11 +225,10 @@ of the remote).
 
 If your home already has a sign-in provider (Authelia, Authentik, Keycloak or
 any OpenID Connect provider), browsers can enter with an account instead of a
-pairing code: Settings → Devices → *Sign-in with a home account*. List the
-addresses VodMax is opened from (the home one, a tunnel's), create a
-client in the provider with the redirect addresses shown there (scopes
+pairing code: Settings → Devices → *Sign-in with a home account*. Create a
+client in the provider with the redirect address shown there (scopes
 `openid email profile`), then link each account (e-mail or username) to a
-profile. From an address not in the list the button does not appear. Every account always enters only its own profile. The provider must
+profile. Every account always enters only its own profile. The provider must
 be reachable over `https://`.
 
 ### Android phone, tablet, Android TV, Google TV
