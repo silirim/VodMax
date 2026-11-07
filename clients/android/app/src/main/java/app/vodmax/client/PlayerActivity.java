@@ -69,7 +69,8 @@ public class PlayerActivity extends Activity {
     // The stream came to its end (not Back): a catch-up still on air goes on.
     static final String ENDED = "ended";
 
-    private static final int ACCENT = 0xFF00D6CA, PANEL = 0xEB13151B, LINE = 0x1FFFFFFF, TEXT = 0xFFF5F5F7, SOFT = 0xFFA9ABB5;
+    // The web tokens (ui.css): accent, dark glass over video (--glass-dark without blur) and its hairline, text.
+    private static final int ACCENT = 0xFF00D6CA, PANEL = 0xEB0E1016, LINE = 0x24FFFFFF, TEXT = 0xFFF5F5F7, SOFT = 0xFFA9ABB5;
 
     private ExoPlayer player;
     private PlayerView view;
