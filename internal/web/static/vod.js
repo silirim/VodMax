@@ -2070,8 +2070,9 @@
       const dx = bx - ax, dy = by - ay;
       const ok = { ArrowLeft: dx < -4, ArrowRight: dx > 4, ArrowUp: dy < -4, ArrowDown: dy > 4 }[dir];
       if (!ok) continue;
-      // Down goes from row to row: "Vedi tutti" is on the way only going up.
-      if (dir === "ArrowDown" && e.classList.contains("see-all")) continue;
+      // Up and Down go from row to row and keep the column: "Vedi tutti"
+      // is reached with Right from the row's last card (below).
+      if (!horizontal && e.classList.contains("see-all")) continue;
       // Across: the gap between the two boxes (0 when they line up), so a
       // field to the side of its label is not skipped for a button below.
       const along = horizontal ? Math.abs(dx) : Math.abs(dy);
@@ -2102,6 +2103,8 @@
     }
     let best = null, bestScore = Infinity;
     for (const c of found) if (c.score < bestScore) { bestScore = c.score; best = c.e; }
+    const row = current.closest(".row");
+    if (!best && dir === "ArrowRight" && row && row.previousElementSibling) best = row.previousElementSibling.querySelector(".see-all");
     if (!best) return;
     // Scrolled by the least that shows it whole (scroll-margin keeps the
     // focus ring in view): focus() alone centres a card that is off screen,
