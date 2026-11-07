@@ -598,7 +598,7 @@
       return card;
     }
     const now = Date.now() / 1000, onAir = p.start <= now && now < p.stop;
-    const art = el("div", { className: "poster channel-art" }, p.image ? el("img", { src: p.image, alt: "", loading: "lazy" }) : el("span", {}, p.channel));
+    const art = el("div", { className: "poster channel-art" }, window.VodMax.channelArt({ name: p.channel, logo: p.image }));
     const card = el("button", { className: "card wide focusable pick" }, art,
       el("span", { className: "label" }, p.title),
       el("span", { className: "sub" }, (onAir ? t("In onda ora") : hhmm(p.start)) + " · " + p.channel), why);
