@@ -6,6 +6,7 @@
 <title>VodMax · TV</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="guide.css">
 <link rel="stylesheet" href="tv.css">
 </head>
 <body>
@@ -37,6 +38,7 @@
   <section id="controls" class="controls" hidden>
     <button data-action="menu" data-i18n data-i18n-attr="title" data-icon="house" title="Torna al menu (Indietro)">Menu</button>
     <button data-action="list" data-i18n data-i18n-attr="title" data-icon="list" title="Elenco dei canali (OK)">Canali</button>
+    <button data-action="guide" data-i18n data-i18n-attr="title" data-icon="calendar-days" title="Guida TV (Guida / E)">Guida</button>
     <button data-action="startOver" data-i18n data-i18n-attr="title" data-icon="undo-2" title="Dall'inizio del programma">Dall'inizio</button>
     <button data-action="back10" data-i18n data-i18n-attr="title" data-icon="rotate-ccw" title="Indietro di 10 secondi (◀)">10 s</button>
     <button data-action="toggle" data-i18n data-i18n-attr="title" data-icon="pause" id="ctl-toggle" title="Pausa / riprendi (Spazio)">Pausa</button>
@@ -63,6 +65,28 @@
     <p class="hint" data-i18n>OK guarda · ◀ ▶ cambia elenco · Giallo preferito · Blu registra · Indietro chiude</p>
   </section>
 
+  <!-- The guide over the video (decision 0053): the picture keeps playing
+       in a window at the top right, the grid of guide-grid.js below. -->
+  <section id="guide-overlay" class="guide-overlay" hidden>
+    <div class="guide-top">
+      <nav id="guide-bar" class="guide-bar">
+        <button class="tab focusable" data-list="all" data-i18n>Tutti</button>
+        <button class="tab focusable" data-list="favorites" data-i18n>Preferiti</button>
+        <button class="tab focusable" data-list="sport" data-i18n>Sport</button>
+        <span class="guide-nav" data-i18n>
+          <button class="tab focusable" data-move="yesterday">Ieri sera</button>
+          <button class="tab focusable" data-move="-2">◀ 2 ore</button>
+          <span class="guide-when"></span>
+          <button class="tab focusable" data-move="2">2 ore ▶</button>
+          <button class="tab focusable" data-move="now">Adesso</button>
+          <button class="tab focusable" data-move="day">Domani sera</button>
+        </span>
+      </nav>
+      <section id="guide-panel" class="programme-panel" hidden></section>
+    </div>
+    <div id="guide-grid" class="guide"></div>
+  </section>
+
   <div id="digits" class="digits" hidden></div>
   <div id="status" class="status" hidden></div>
   <section id="dialog" class="panel dialog" hidden>
@@ -80,6 +104,7 @@
 <script src="i18n.js"></script>
 <script src="icons.js"></script>
 <script src="common.js"></script>
+<script src="guide-grid.js"></script>
 <script src="tv.js"></script>
 </body>
 </html>

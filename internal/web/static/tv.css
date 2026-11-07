@@ -76,9 +76,9 @@ video {
 .banner.browsing { border-color: var(--accent); }
 
 .banner-head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 0.8rem; }
-.number { font-size: 2.2em; font-weight: 700; color: var(--accent); min-width: 2.5ch; }
-.logo { height: 2.4em; max-width: 6em; object-fit: contain; align-self: center; }
-.name { font-size: 1.5em; font-weight: 600; flex: 1; }
+.banner .number { font-size: 2.2em; font-weight: 700; color: var(--accent); min-width: 2.5ch; }
+.banner .logo { height: 2.4em; max-width: 6em; object-fit: contain; align-self: center; }
+.banner .name { font-size: 1.5em; font-weight: 600; flex: 1; }
 .badges span, .mode {
   font-size: 0.7em;
   padding: 0.15em 0.5em;
@@ -336,12 +336,46 @@ body.controls-on .banner { display: none; }
 @media (max-width: 700px) {
   .banner { left: 0.6rem; right: 0.6rem; bottom: calc(0.6rem + env(safe-area-inset-bottom)); padding: 1rem 1.1rem; font-size: 1rem; }
   .banner-head { flex-wrap: wrap; align-items: center; gap: 0.3rem 0.7rem; }
-  .number { font-size: 1.7em; min-width: 0; }
-  .logo { height: 2em; }
-  .name { font-size: 1.25em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .banner .number { font-size: 1.7em; min-width: 0; }
+  .banner .logo { height: 2em; }
+  .banner .name { font-size: 1.25em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badges { flex-basis: 100%; }
   .badges span:first-child, .mode { margin-left: 0; }
   .programme { display: grid; grid-template-columns: 1fr auto; gap: 0 0.8rem; }
   .programme .label { grid-column: 1 / -1; width: auto; font-size: 0.75em; }
   .progress { margin-left: 0; }
+}
+
+/* The guide over the video (decision 0053): the picture shrinks into a
+   window at the top right and keeps playing; the toolbar and the
+   programme panel sit on its left, the grid scrolls below. */
+.guide-overlay { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 5; display: flex; flex-direction: column; background: var(--bg); }
+.guide-top {
+  flex: none; display: grid; grid-template-columns: minmax(0, 1fr) 28vw; column-gap: 1.5rem;
+  min-height: calc(15.75vw + 1.6rem); /* the right column is under the video window */
+  padding: 0.8rem var(--safe) 0;
+}
+.guide-top > * { grid-column: 1; }
+.guide-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; min-width: 0; }
+.guide-bar .guide-nav { flex: 1 1 auto; justify-content: flex-end; }
+.guide-bar .guide-when { min-width: 0; flex: 1 1 auto; }
+.guide-bar .guide-close { margin-left: auto; }
+.guide-overlay .programme-panel { align-self: end; }
+.guide-overlay .guide { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 var(--safe) 1rem; }
+body.guide-on #video { top: 0.8rem; right: var(--safe); bottom: auto; left: auto; width: 28vw; height: 15.75vw; z-index: 6; border-radius: 8px; }
+body.guide-on .banner, body.guide-on .controls, body.guide-on .timeline, body.guide-on .list { display: none !important; }
+@media (prefers-reduced-motion: no-preference) {
+  #video { transition: top 0.25s var(--ease), right 0.25s var(--ease), width 0.25s var(--ease), height 0.25s var(--ease); }
+}
+/* Phones: a smaller window, the toolbar wraps on its left, the panel
+   below takes the whole width. */
+@media (max-width: 600px) {
+  .guide-top { grid-template-columns: minmax(0, 1fr) 40vw; column-gap: 0.6rem; min-height: 0; padding-top: 0.5rem; }
+  .guide-top .programme-panel { grid-column: 1 / -1; }
+  .guide-bar .guide-nav { justify-content: flex-start; }
+  .guide-bar .guide-when { flex: none; }
+  body.guide-on #video { top: 0.5rem; width: 40vw; height: 22.5vw; }
+}
+@media (pointer: coarse), (max-width: 800px) {
+  .controls [data-action="guide"] { grid-area: 1 / 4 / 2 / 10; flex-direction: row; justify-self: center; padding: 0.5rem 0.8rem; }
 }

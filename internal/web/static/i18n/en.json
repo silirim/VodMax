@@ -784,5 +784,6 @@
   "Questo accesso con l'account di casa sostituisce il dispositivo «{current}» di questo browser. Continuare?": "This sign-in with the household account replaces the device “{current}” in this browser. Continue?",
   "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?": "This link pairs the browser with the device “{link}” instead of “{current}”. Replace it?",
   "in onda": "on air",
-  "rivedibile": "can be replayed"
+  "rivedibile": "can be replayed",
+  "Guida TV (Guida / E)": "TV guide (Guide / E)"
 }

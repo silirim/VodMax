@@ -9,7 +9,7 @@
 // Info / I        show the banner and the on-screen controls
 // Space, ◀ ▶      pause, 10 s back, 30 s forward (within the buffer)
 // Green / G       menu (films, series, recordings)
-// Guide / E       programme guide
+// Guide / E       programme guide over the video (OK tunes, Back closes)
 // Blue / R        record the programme on air
 // Back            close / cancel; with nothing open, back to the menu
 "use strict";
@@ -381,6 +381,57 @@
     $("list").hidden = true;
   }
 
+  // ---- The guide over the video (decision 0053) ----
+  // The grid of guide-grid.js covers the screen; the video shrinks into a
+  // window at the top right (tv.css, body.guide-on) and keeps playing. OK
+  // on a programme on air tunes its channel; Back closes and gives the
+  // focus back to what had it (the controls, or nothing).
+  let guide = null, guideBack = null;
+  const guideOpen = () => !$("guide-overlay").hidden;
+  function openGuide() {
+    if (!guide) {
+      const bar = $("guide-bar");
+      const close = document.createElement("button");
+      close.className = "tab focusable guide-close";
+      close.textContent = "✕";
+      close.setAttribute("aria-label", t("Chiudi"));
+      close.dataset.close = "";
+      bar.append(close);
+      guide = window.GuideGrid.create($("guide-grid"), {
+        toolbar: bar, panel: $("guide-panel"), flash,
+        onWatch: (c) => {
+          closeGuide();
+          if (!state.current || c.id !== state.current.id) tune(state.channels.find((x) => x.id === c.id) || c);
+        },
+        onFromStart: (c, p) => {
+          stopPlayer();
+          location.href = "/?" + new URLSearchParams({ catchup: c.id, start: p.start, stop: p.stop, title: p.title, back: "/tv.html?channel=" + c.id });
+        },
+        onClose: closeGuide,
+      });
+    }
+    guideBack = { focus: document.activeElement, controls: !$("controls").hidden };
+    closeList();
+    endBrowse();
+    hideControls();
+    $("guide-overlay").hidden = false;
+    document.body.classList.add("guide-on");
+    guide.show(state.current && state.current.id);
+  }
+  function closeGuide() {
+    if (!guideOpen()) return;
+    guide.close();
+    $("guide-overlay").hidden = true;
+    document.body.classList.remove("guide-on");
+    const back = guideBack;
+    guideBack = null;
+    if (document.activeElement) document.activeElement.blur();
+    if (back && back.controls) {
+      showControls();
+      if (back.focus && $("controls").contains(back.focus)) back.focus.focus();
+    }
+  }
+
   // ---- Favourites ----
   async function toggleFavorite(channel) {
     if (!channel) return;
@@ -423,6 +474,7 @@
 
   // ---- On-screen controls ----
   function showControls() {
+    if (guideOpen()) return; // the guide covers them
     const ctl = $("controls");
     const p = state.player;
     const c = state.current;
@@ -465,6 +517,7 @@
     toggle: () => { state.player && state.player.toggle(); showControls(); },
     live: () => { state.player && state.player.goLive(); showControls(); },
     startOver: () => startOver(),
+    guide: () => openGuide(),
     fav: () => toggleFavorite(state.current).then(showControls),
     rec: () => record(state.current),
     multiview: () => { stopPlayer(); location.href = "/multiview.html" + (state.current ? "?channel=" + state.current.id : ""); },
@@ -499,6 +552,7 @@
   document.addEventListener("pointerdown", (e) => { lastPointer = e.pointerType; }, true);
   $("screen").addEventListener("pointermove", (e) => { if (e.pointerType === "mouse" && !state.overlay) showControls(); });
   $("video").addEventListener("click", () => {
+    if (guideOpen()) { closeGuide(); return; } // the small window: back to full screen
     if (state.overlay) return;
     if (lastPointer === "mouse") actions.toggle();
     else if ($("controls").hidden) showControls();
@@ -682,6 +736,23 @@
       return;
     }
 
+    // The guide over the video: the grid takes the arrows, OK and Back;
+    // P+/P- and the digits zap the small window; Guide closes it again.
+    if (guideOpen()) {
+      if (guide.key(e)) { e.preventDefault(); return; }
+      if (/^[0-9]$/.test(key)) digit(key);
+      else if (state.digits && key === "OK") commitDigits();
+      else switch (key) {
+        case "ChannelUp": step(1); break;
+        case "ChannelDown": step(-1); break;
+        case "Guide": case "Back": closeGuide(); break;
+        case "OK": if (document.activeElement) document.activeElement.click(); break;
+        default: handled = false;
+      }
+      if (handled) e.preventDefault();
+      return;
+    }
+
     // In the controls bar (at the top): the arrows move along it, OK
     // presses, Down and Back leave it.
     const bar = $("controls");
@@ -757,7 +828,7 @@
         case "Yellow": toggleFavorite(state.browse !== null ? state.channels[state.browse] : state.current); break;
         case "Red": toggleFavoritesOnly(); break;
         case "Green": stopPlayer(); location.href = "/"; break;
-        case "Guide": stopPlayer(); location.href = "/guide.html"; break;
+        case "Guide": openGuide(); break;
         case "Blue": record(state.browse !== null ? state.channels[state.browse] : state.current); break;
         case "Info": showBanner(state.current, false); focusControls(); break;
         case " ": case "PlayPause": case "Play": case "Pause": playKey(key); break;
