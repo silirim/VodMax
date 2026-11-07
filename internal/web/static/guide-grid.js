@@ -10,8 +10,8 @@
 //   const grid = GuideGrid.create(container, {
 //     toolbar,   // element with the [data-list] tabs, [data-move] buttons,
 //                // a .guide-when label and an optional [data-close]
-//     panel,     // where the programme is described; default: a panel of
-//                // the grid's own, above the time scale
+//     panel,     // where the programme is described (outside the
+//                // container, which scrolls)
 //     hours,     // window width: 3 hours, 1.5 on phones
 //     list,      // "all" | "favorites" | "sport" (default: the last used)
 //     onWatch(channel, programme), onFromStart(channel, programme),
@@ -35,10 +35,13 @@ window.GuideGrid = (() => {
   };
   // Windows start on the half hour.
   const slot = (ts) => Math.floor(ts / 1800) * 1800;
-  const dayName = (ts) => {
+  // date: "Oggi, 7 nov" (the grid's corner) instead of "Oggi".
+  const dayName = (ts, date) => {
     const d = new Date(ts * 1000), today = new Date();
     const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 864e5);
-    return diff === 0 ? t("Oggi") : diff === 1 ? t("Domani") : d.toLocaleDateString(window.VodMaxI18n.locale, { weekday: "long", day: "numeric", month: "short" });
+    const near = diff === 0 ? t("Oggi") : diff === 1 ? t("Domani") : "";
+    if (near) return date ? near + ", " + d.toLocaleDateString(window.VodMaxI18n.locale, { day: "numeric", month: "short" }) : near;
+    return d.toLocaleDateString(window.VodMaxI18n.locale, { weekday: "long", day: "numeric", month: "short" });
   };
   // A tint per genre (data-genre on the cell), from the words of the
   // category: XMLTV guides write it in any language, so only the broad
@@ -50,6 +53,10 @@ window.GuideGrid = (() => {
     ["kids", /kids|bambin|cartoon|cartoni|children|ragazzi|animazion|anime/i],
   ];
   const genre = (category) => { const g = GENRES.find(([, re]) => re.test(category)); return g ? g[0] : "other"; };
+  // Rows of rounded placeholders while the first window loads.
+  const skeleton = () => el("div", { className: "guide-skeleton" }, el("div", { className: "guide-card" }, ...Array.from({ length: 8 }, () =>
+    el("div", { className: "guide-row" }, el("div", { className: "name" }, el("span", { className: "skeleton" })),
+      el("div", { className: "line" }, el("span", { className: "skeleton" }), el("span", { className: "skeleton" }), el("span", { className: "skeleton" }))))));
   // Icons from the bundled set: the symbols ⏺ ⏮ are missing from the
   // fonts of some TVs (an empty box).
   function iconButton(className, icon, text, onclick) {
@@ -59,11 +66,13 @@ window.GuideGrid = (() => {
   }
 
   function create(container, o) {
-    const HOURS = o.hours || (window.matchMedia("(max-width: 600px)").matches ? 1.5 : 3);
+    const phone = window.matchMedia("(max-width: 600px)").matches;
+    const HOURS = o.hours || (phone ? 1.5 : 3);
     const flash = o.flash || (() => {});
     const toolbar = o.toolbar || null;
-    const panel = o.panel || el("section", { className: "programme-panel", hidden: true });
-    const ownPanel = !o.panel;
+    const panel = o.panel;
+    // Dark glass over the video, the stronger light glass on the guide page.
+    panel.classList.add(container.closest(".guide-overlay") ? "glass-dark" : "glass-strong");
     // seq: windows asked, done: the last one answered (they can arrive out of
     // order). shown: the programme described in the panel, open: with its actions.
     const state = { from: slot(Date.now() / 1000), list: o.list || store.get("guideList", "all"), rows: [], kids: false, seq: 0, done: 0, shown: null, open: false };
@@ -81,6 +90,7 @@ window.GuideGrid = (() => {
         const when = toolbar.querySelector(".guide-when");
         if (when) when.textContent = dayName(state.from) + " " + hhmm(state.from) + "–" + hhmm(state.from + HOURS * 3600);
       }
+      if (!container.firstElementChild) container.replaceChildren(skeleton());
       let rows;
       try { rows = (await api("GET", "/api/v1/guide?" + q)).filter((r) => r.programmes.length > 0); }
       catch (e) { if (!e.handled && seq === state.seq) flash(e.message); }
@@ -96,28 +106,42 @@ window.GuideGrid = (() => {
       const pct = (ts) => Math.max(0, Math.min(100, ((ts - from) / span) * 100));
       const scale = el("div", { className: "scale" });
       for (let ts = from; ts < from + span; ts += 1800) {
-        const s = el("span", {}, hhmm(ts));
+        const s = el("span", { className: "tick tnum" }, hhmm(ts));
         s.style.left = pct(ts) + "%";
         scale.append(s);
       }
-      const times = el("div", { className: "guide-times" }, el("div", {}), scale);
+      // "Now" as a pill on the scale, above the line that crosses the rows.
+      if (now >= from && now < from + span) {
+        const pill = el("span", { className: "now-pill tnum" }, hhmm(now));
+        pill.style.left = pct(now) + "%";
+        pill.style.left = "max(" + pct(now) + "%, 1.8rem)"; // not cut by the channel column (ignored where max() is unknown)
+        scale.append(pill);
+      }
+      const times = el("div", { className: "guide-times" }, el("div", { className: "corner" }, window.VodMaxIcons.icon("calendar-days"), el("span", {}, dayName(from, true))), scale);
+      // Phones scroll the grid sideways: its width follows the half hours.
+      container.style.setProperty("--slots", span / 1800);
       const rows = state.rows.map((r, ri) => {
         const line = el("div", { className: "line" });
         r.programmes.forEach((p, pi) => {
           // The states are classes for the theme: .on-air, .past, .can-replay
           // (in the provider's archive), .recording; .focus follows the focus.
           const replay = p.stop <= now && r.channel.catchup_days && p.start >= now - r.channel.catchup_days * 86400;
+          // Title and time each on one line; ↺ (an icon: the glyph is missing
+          // from some TV fonts) leads the time of a programme to watch again,
+          // the word is for screen readers only (in the cell it cut the time).
           const b = el("button", { className: "prog focusable" + (p.start <= now && p.stop > now ? " on-air" : "") + (p.stop <= now ? " past" : "") +
             (p.recording ? " recording" : "") + (replay ? " can-replay" : "") },
-            replay ? el("span", { className: "mark" }, "↺") : null,
-            p.title, el("small", {}, hhmm(p.start) + "–" + hhmm(p.stop) + (replay ? " · " + t("riguarda") : "")));
+            el("span", { className: "t" }, p.title),
+            el("small", { className: "tnum" }, replay ? el("span", { className: "mark" }, window.VodMaxIcons.icon("rotate-ccw")) : null,
+              hhmm(p.start) + "–" + hhmm(p.stop)));
+          if (replay) b.setAttribute("aria-label", p.title + ", " + hhmm(p.start) + "–" + hhmm(p.stop) + ", " + t("riguarda"));
           if (p.category) b.dataset.genre = genre(p.category);
           // Provider guides overlap at times: drawn up to the next start, so
           // no programme hides another.
           const next = r.programmes[pi + 1];
           const end = next && next.start < p.stop && next.start > p.start ? next.start : p.stop;
           b.style.left = pct(p.start) + "%";
-          b.style.width = "calc(" + (pct(end) - pct(p.start)) + "% - 3px)";
+          b.style.width = "calc(" + (pct(end) - pct(p.start)) + "% - 0.2rem)";
           b.dataset.row = ri;
           b.dataset.i = pi;
           b.dataset.start = p.start;
@@ -129,18 +153,26 @@ window.GuideGrid = (() => {
           b.onpointerenter = () => { if (!state.open) b.focus({ preventScroll: true }); };
           line.append(b);
         });
+        // Under the cells: it shows through them without crossing their titles.
         if (now >= from && now < from + span) {
           const n = el("div", { className: "now-line" });
           n.style.left = pct(now) + "%";
-          line.append(n);
+          line.prepend(n);
         }
-        const name = el("div", { className: "name" }, el("b", {}, r.channel.number || ""), window.VodMax.channelArt(r.channel), r.channel.name,
+        const name = el("div", { className: "name" }, el("b", { className: "tnum" }, r.channel.number || ""), window.VodMax.channelArt(r.channel),
+          el("span", { className: "ch-name" }, r.channel.name),
           r.channel.catchup_days ? el("small", { className: "archive", title: t("Archivio di {days} giorni", { days: r.channel.catchup_days }) }, "↺") : null);
         return el("div", { className: "guide-row" }, name, line);
       });
-      // The panel and the time scale stay at the top; the rows scroll under them.
-      container.replaceChildren(el("div", { className: "guide-head" }, ownPanel ? panel : null, times), ...(rows.length ? rows : [el("p", { className: "empty" },
-        state.list === "favorites" ? t("Nessun preferito con la guida in questo orario.") : t("Nessun programma in guida in questo orario."))]));
+      // The time scale stays at the top; the rows scroll under it, on one
+      // surface. Nothing in this window: a sentence and the way out, all
+      // the channels or now (none when it already is all of them, now).
+      const exit = state.list !== "all" ? el("button", { className: "button focusable", onclick: () => setList("all") }, t("Tutti"))
+        : !(now >= from && now < from + span) ? el("button", { className: "button focusable", onclick: () => jump("now") }, t("Adesso")) : null;
+      container.replaceChildren(el("div", { className: "guide-head" }, times), el("div", { className: "guide-card" }, ...(rows.length ? rows : [el("div", { className: "empty guide-empty" },
+        window.VodMaxIcons.icon("calendar-days"),
+        el("p", {}, state.list === "favorites" ? t("Nessun preferito con la guida in questo orario.") : t("Nessun programma in guida in questo orario.")),
+        exit)])));
       // focusKey: a programme ("channel:start"), a channel ({channel}: its
       // programme on air), or the row and the side the window moved to
       // ({row, dir}: the same channel, at the new edge).
@@ -157,7 +189,8 @@ window.GuideGrid = (() => {
       target = target || firstCell() || (toolbar && toolbar.querySelector('[data-move="now"]'));
       if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: "nearest" }); }
     }
-    const firstCell = () => container.querySelector(".prog.on-air") || container.querySelector(".prog");
+    // A programme, or in an empty window its "Adesso".
+    const firstCell = () => container.querySelector(".prog.on-air") || container.querySelector(".prog") || container.querySelector(".guide-empty .button");
     const cellOf = (row, p) => container.querySelector('.prog[data-key="' + row.channel.id + ":" + p.start + '"]');
 
     // ---- The programme in the panel ----
@@ -177,31 +210,53 @@ window.GuideGrid = (() => {
       state.open = open;
       const archive = row.channel.catchup_days && p.start >= now - row.channel.catchup_days * 86400 && p.start < now;
       const onAir = p.start <= now && p.stop > now;
-      const status = p.recording ? "● " + t("in registrazione") : onAir ? t("in onda") : archive ? "↺ " + t("rivedibile") : "";
+      // The cell described keeps a white ring while its actions have the focus.
+      for (const c of $$(".prog.chosen")) c.classList.remove("chosen");
+      if (open) { const c = cellOf(row, p); if (c) c.classList.add("chosen"); }
+      // The states as pills after the time: on air, in the archive, recording.
+      const pills = [onAir && el("span", { className: "badge live" }, t("In onda")),
+        archive && el("span", { className: "badge replay", title: t("Rivedibile") }, window.VodMaxIcons.icon("rotate-ccw"), el("span", {}, t("Rivedibile"))),
+        p.recording && el("span", { className: "badge rec" }, t("In registrazione"))].filter(Boolean);
       const buttons = [];
+      const size = phone ? " small" : "";
       if (open) {
         const replay = () => o.onFromStart(row.channel, p);
         if (onAir) {
-          buttons.push(iconButton("button focusable", "play", t("Guarda"), () => o.onWatch(row.channel, p)));
-          if (archive) buttons.push(iconButton("button secondary focusable", "undo-2", t("Dall'inizio"), replay));
+          buttons.push(iconButton("button primary focusable" + size, "play", t("Guarda"), () => o.onWatch(row.channel, p)));
+          if (archive) buttons.push(iconButton("button secondary focusable" + size, "undo-2", t("Dall'inizio"), replay));
         } else if (archive) {
-          buttons.push(iconButton("button focusable", "play", t("Riguarda"), replay));
+          buttons.push(iconButton("button primary focusable" + size, "play", t("Riguarda"), replay));
         }
         if (p.recording && !state.kids) {
-          buttons.push(el("button", { className: "button secondary focusable", onclick: () => record(row, p) }, t("Annulla la registrazione")));
+          buttons.push(el("button", { className: "button secondary focusable" + size, onclick: () => record(row, p) }, t("Annulla la registrazione")));
         } else if (p.stop > now && !state.kids) {
-          buttons.push(iconButton("button focusable", "circle-dot", t("Registra"), () => record(row, p)));
+          buttons.push(iconButton("button rec focusable" + size, "circle-dot", t("Registra"), () => record(row, p)));
         }
-        buttons.push(el("button", { className: "button secondary focusable", onclick: () => close() }, t("Chiudi")));
+        buttons.push(el("button", { className: "button secondary focusable" + size, onclick: () => close() }, t("Chiudi")));
       }
-      panel.replaceChildren(...[
-        p.icon ? el("img", { className: "art", src: p.icon, alt: "", onerror() { this.remove(); } }) : null,
+      // The guide's picture, else the channel's logo on a tile tinted with
+      // the colour of its monogram (guide.css darkens it).
+      const tile = () => {
+        const art = window.VodMax.channelArt(row.channel), box = el("div", { className: "art tile" }, art);
+        // A logo that fails to load becomes the monogram after channelArt's own onerror.
+        const tint = () => { const a = box.firstElementChild; if (a && a.style.backgroundColor) box.style.backgroundColor = a.style.backgroundColor; };
+        tint();
+        art.addEventListener("error", tint);
+        return box;
+      };
+      const plot = [p.subtitle, p.description].filter(Boolean).join(" · ");
+      panel.replaceChildren(
+        p.icon ? el("img", { className: "art", src: p.icon, alt: "", onerror() { this.replaceWith(tile()); } }) : tile(),
         el("div", { className: "text" },
           el("h2", {}, p.title),
-          el("p", { className: "meta" }, row.channel.name + " · " + dayName(p.start) + " " + hhmm(p.start) + "–" + hhmm(p.stop) +
-            (p.category ? " · " + p.category : ""), status ? el("span", { className: "state" }, status) : null),
-          ...[p.subtitle, p.description].filter(Boolean).map((text) => el("p", { className: "plot" }, text)),
-          open ? el("div", { className: "buttons" }, ...buttons) : null)].filter(Boolean));
+          el("p", { className: "meta" }, el("b", {}, row.channel.name), " · ",
+            el("span", { className: "tnum" }, dayName(p.start) + " " + hhmm(p.start) + " – " + hhmm(p.stop)),
+            p.category ? el("span", { className: "cat" }, " · " + p.category) : null,
+            pills.length ? el("span", { className: "pills" }, ...pills) : null),
+          // The plot and the buttons keep their room when empty or closed (an
+          // invisible button), so OK does not push the grid down (guide.css).
+          el("p", { className: "plot" }, plot),
+          open ? el("div", { className: "buttons" }, ...buttons) : el("div", { className: "buttons ghost" }, el("span", { className: "button" + size }, t("Guarda")))));
       panel.classList.toggle("open", open);
       panel.hidden = false;
       if (open) buttons[0].focus();
@@ -239,7 +294,8 @@ window.GuideGrid = (() => {
       if (dir === "ArrowLeft" || dir === "ArrowRight") {
         const list = inRow(row);
         const i = list.indexOf(cur) + (dir === "ArrowRight" ? 1 : -1);
-        if (i >= 0 && i < list.length) { list[i].focus(); return; }
+        // On phones the grid scrolls sideways: the whole cell into view.
+        if (i >= 0 && i < list.length) { list[i].focus(); list[i].scrollIntoView({ block: "nearest", inline: "nearest" }); return; }
         // Past the edge of the window: move it, staying on the channel. Not
         // while the last move is loading: a held key would stack hours.
         if (state.done !== state.seq) return;
@@ -289,6 +345,15 @@ window.GuideGrid = (() => {
       // Focus lost (the grid was redrawn): any arrow brings it back.
       const lost = !active || active === document.body;
       const inGrid = Boolean(active && active.classList.contains("prog"));
+      // The empty state's button: Up goes back to the toolbar.
+      if (!inGrid && !lost && container.contains(active)) {
+        if (k === "OK") { active.click(); return true; }
+        if (k.startsWith("Arrow")) {
+          const b = k === "ArrowUp" && toolbar && (toolbar.querySelector("[data-move]") || toolbar.querySelector(".focusable"));
+          if (b) b.focus();
+          return true;
+        }
+      }
       if (k.startsWith("Arrow") && (lost || inGrid || k === "ArrowDown")) {
         if (!inGrid) { const f = firstCell() || (toolbar && toolbar.querySelector('[data-move="now"]')); if (f) f.focus(); }
         else move(k);
@@ -311,6 +376,10 @@ window.GuideGrid = (() => {
       load();
     }
     if (toolbar) {
+      // Chevrons instead of ◀ ▶: those glyphs are missing from some TV fonts.
+      const back = toolbar.querySelector('[data-move="-2"]'), ahead = toolbar.querySelector('[data-move="2"]');
+      if (back) { window.VodMax.label(back, "chevron-left", t("2 ore")); back.setAttribute("aria-label", t("2 ore prima")); }
+      if (ahead) { window.VodMax.label(ahead, "chevron-right", t("2 ore")); ahead.append(ahead.firstChild); ahead.setAttribute("aria-label", t("2 ore dopo")); }
       for (const b of toolbar.querySelectorAll("[data-list]")) b.onclick = () => setList(b.dataset.list);
       for (const b of toolbar.querySelectorAll("[data-move]")) b.onclick = () => jump(b.dataset.move);
       for (const b of toolbar.querySelectorAll("[data-close]")) b.onclick = () => o.onClose && o.onClose();
