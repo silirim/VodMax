@@ -140,109 +140,135 @@ body.controls-on .digits { top: 6.5rem; }
   .banner, .list { transition: opacity 0.15s ease; }
 }
 
-/* On-screen controls (mouse, touch and remote). */
+/* On-screen controls (mouse, touch and remote): one dark glass bar at the
+   top, labelled pills in three groups (where to go · playback · this
+   channel). Pills are the menu tabs of ui.css: clear, white when focused. */
 .controls {
   position: absolute;
-  top: 3vh;
-  left: 50%;
-  transform: translateX(-50%);
+  top: var(--s5);
+  left: calc(var(--safe) / 2);
+  right: calc(var(--safe) / 2);
   display: flex;
-  /* Never wider than the window: the buttons wrap to a second row. */
-  flex-wrap: wrap;
-  justify-content: center;
-  width: max-content;
-  max-width: calc(100vw - 1rem);
-  gap: 0.5rem;
-  padding: 0.7rem;
-  background: rgba(19, 21, 27, 0.92);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  font-size: clamp(0.9rem, 1.2vw, 1.2rem);
-}
-/* Rarely used: only the icon (the name is the tooltip). The bar grows with
-   the screen, so there is never room for these names. */
-.controls button.icon-only .txt { display: none; }
-/* Pills like the player of films and the small buttons of every page. */
-.controls button {
-  display: inline-flex;
   align-items: center;
-  gap: 0.45em;
-  padding: 0.55em 1.1em;
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  cursor: pointer;
-  white-space: nowrap;
+  justify-content: space-between;
+  /* One row on TV and PC screens; a second only with "Grande" text in a
+     small window, never overlapping. */
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s3);
+  padding: var(--s2);
+  font-size: var(--t-s);
 }
-.controls button:hover { border-color: var(--text); }
-.controls button:focus { outline: none; color: #0b0c10; background: var(--focus); border-color: var(--focus); }
-.controls #ctl-live.behind { color: var(--bg); background: var(--accent); }
+.ctl-group { display: flex; align-items: center; gap: var(--s1); }
+.controls button { padding: 0.6em 0.85em; color: var(--text); font-weight: 600; white-space: nowrap; }
+.controls button .icon { width: 1.35em; height: 1.35em; }
+/* Pause in the middle stands out a little, like the play key of a remote. */
+.controls #ctl-toggle { background: rgba(255, 255, 255, 0.12); }
+.controls #ctl-toggle:focus { background: var(--focus); }
+.controls #ctl-live.behind { color: var(--accent-ink); background: var(--accent); }
+.controls #ctl-live.behind:focus { color: var(--ink); background: var(--focus); }
 .controls #ctl-fav.on { color: var(--fav); }
+.controls #ctl-fav.on .icon { fill: currentColor; }
+.controls #ctl-fav.on:focus { color: var(--ink); }
+/* The rarer actions keep only their icon (the name is their tooltip and
+   accessible name); two more in narrow windows, and below full HD while
+   "Torna in diretta (−5:00)" needs the room. */
+.controls [data-action="multiview"] .txt, .controls [data-action="fullscreen"] .txt { display: none; }
+@media (max-width: 1400px) {
+  .controls [data-action="startOver"] .txt, .controls [data-action="rec"] .txt { display: none; }
+}
+@media (max-width: 1800px) {
+  .controls.behind [data-action="startOver"] .txt, .controls.behind [data-action="rec"] .txt { display: none; }
+}
 
 body.controls-on .banner { display: none; }
 
 /* The programme on air under the controls: what has aired, what can be
-   rewound, where the picture is. */
+   rewound, where the picture is. A pill track in layers: aired (faint),
+   in the buffer (lighter), watched up to here (accent), the white knob. */
 .timeline {
-  position: absolute; left: 50%; bottom: 4vh; transform: translateX(-50%);
-  width: min(92vw, 72rem); padding: 0.9rem 1.4rem 0.7rem;
-  font-size: clamp(0.9rem, 1.2vw, 1.2rem);
-  background: rgba(19, 21, 27, 0.92); border: 1px solid var(--line); border-radius: 16px;
+  position: absolute; left: calc(var(--safe) / 2); right: calc(var(--safe) / 2); bottom: 5vh;
+  padding: var(--s4) var(--s5) var(--s3);
 }
-.tl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
-.tl-title { min-width: 0; overflow: hidden; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
-.tl-state { flex: none; color: var(--soft); font-variant-numeric: tabular-nums; }
+.tl-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s4); }
+.tl-title { min-width: 0; overflow: hidden; font-size: var(--t-l); font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; text-overflow: ellipsis; }
+.tl-state { flex: none; display: inline-flex; align-items: center; gap: 0.45em; color: var(--soft); font-weight: 600; }
+/* Live: a red dot, as on the remote's record key. */
+.tl-state:not(.behind)::before { content: ""; width: 0.55em; height: 0.55em; border-radius: 50%; background: var(--rec); box-shadow: 0 0 0 3px rgba(255, 77, 79, 0.25); }
 .tl-state.behind { color: var(--accent); }
-.tl-bar { position: relative; padding: 0.7rem 0; cursor: pointer; touch-action: none; }
-.tl-track { position: relative; height: 6px; background: var(--raised); border-radius: 3px; }
-.tl-bar:hover .tl-track { height: 9px; margin-top: -1.5px; }
-.tl-track > div { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 3px; }
-#tl-aired { background: rgba(255, 255, 255, 0.18); }
-#tl-buffer { background: rgba(255, 255, 255, 0.32); }
+.tl-bar { position: relative; padding: var(--s3) 0; cursor: pointer; touch-action: none; }
+.tl-track { position: relative; height: 0.35rem; background: rgba(255, 255, 255, 0.12); border-radius: var(--r-pill); }
+.tl-bar:hover .tl-track { height: 0.55rem; margin-top: -0.1rem; }
+.tl-track > div { position: absolute; top: 0; bottom: 0; left: 0; border-radius: var(--r-pill); }
+#tl-aired { background: rgba(255, 255, 255, 0.2); }
+#tl-buffer { background: rgba(255, 255, 255, 0.36); }
 #tl-fill { background: var(--accent-grad); }
-#tl-pos { top: 50%; bottom: auto; width: 14px; height: 14px; margin: -7px 0 0 -7px; background: #fff; border-radius: 50%; box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35); }
-.tl-hover { position: absolute; bottom: 1.6rem; transform: translateX(-50%); padding: 0.15rem 0.5rem; font-size: 0.85em; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; pointer-events: none; }
-.tl-times { display: flex; justify-content: space-between; color: var(--soft); font-size: 0.85em; font-variant-numeric: tabular-nums; }
+#tl-pos { top: 50%; bottom: auto; width: 1rem; height: 1rem; margin: -0.5rem 0 0 -0.5rem; background: #fff; border-radius: 50%; box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.22), 0 2px 8px rgba(0, 0, 0, 0.5); }
+.tl-hover {
+  position: absolute; bottom: 2rem; transform: translateX(-50%); padding: 0.2em 0.7em;
+  font-size: var(--t-s); font-weight: 600; color: var(--ink); background: var(--focus);
+  border-radius: var(--r-pill); box-shadow: var(--shadow-s); pointer-events: none; white-space: nowrap;
+}
+.tl-times { display: flex; justify-content: space-between; color: var(--soft); font-size: var(--t-s); }
 
 /* Touch screens: controls over the whole picture, like the streaming
-   apps: Menu and Channels at the top, rewind / pause / forward large in
-   the middle, the other actions along the bottom. */
+   apps: Menu, Guide and Channels at the top, rewind / pause / forward large
+   in the middle, the other actions along the bottom. The bar is a shade
+   over the picture here, not glass: nothing to blur across the screen. */
 @media (pointer: coarse), (max-width: 800px) {
   .controls:not([hidden]) {
     top: 0; right: 0; bottom: 0; left: 0; transform: none; width: auto; max-width: none;
     display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: auto 1fr auto; align-items: center;
-    gap: 0; padding: calc(12px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));
-    font-size: 0.85rem;
+    gap: 0; padding: calc(var(--s3) + env(safe-area-inset-top)) var(--s3) calc(var(--s4) + env(safe-area-inset-bottom));
+    font-size: var(--t-s);
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.72) 0, rgba(0, 0, 0, 0) 22%, rgba(0, 0, 0, 0) 62%, rgba(0, 0, 0, 0.82) 100%);
-    border: 0; border-radius: 0;
+    border: 0; border-radius: 0; box-shadow: none;
+    -webkit-backdrop-filter: none; backdrop-filter: none;
   }
+  .ctl-group { display: contents; }
+  .controls [data-action] .txt { display: inline; }
+  .controls [data-action="multiview"] .txt, .controls [data-action="fullscreen"] .txt { display: none; }
   .controls button {
-    display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
-    padding: 0.5rem 0.2rem; color: #fff; background: none; border: 0; border-radius: 12px;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    display: flex; flex-direction: column; align-items: center; gap: var(--s1);
+    padding: var(--s2) var(--s1); color: #fff; font-weight: 600; background: none; border: 0; border-radius: var(--r-s);
+    text-shadow: var(--text-shadow);
   }
   .controls button .icon { width: 1.6rem; height: 1.6rem; }
-  .controls button:focus, .controls button:hover { color: #fff; background: rgba(255, 255, 255, 0.12); border-color: transparent; }
-  .controls [data-action="menu"] { grid-area: 1 / 1 / 2 / 4; flex-direction: row; justify-self: start; padding: 0.5rem 0.8rem; }
-  .controls [data-action="list"] { grid-area: 1 / 10 / 2 / 13; flex-direction: row; justify-self: end; padding: 0.5rem 0.8rem; }
+  .controls button:focus, .controls button:hover { color: #fff; background: rgba(255, 255, 255, 0.12); border-color: transparent; box-shadow: none; }
+  /* The top row: three small glass pills (no blur). */
+  .controls [data-action="menu"], .controls [data-action="guide"], .controls [data-action="list"] {
+    flex-direction: row; gap: var(--s2); padding: var(--s2) var(--s4); border-radius: var(--r-pill);
+    background-color: rgba(255, 255, 255, 0.1); background-image: var(--glass-sheen), var(--control-base);
+    border: 1px solid var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-hi); text-shadow: none;
+  }
+  .controls [data-action="menu"] .icon, .controls [data-action="guide"] .icon, .controls [data-action="list"] .icon { width: 1.25rem; height: 1.25rem; }
+  .controls [data-action="menu"] { grid-area: 1 / 1 / 2 / 5; justify-self: start; }
+  .controls [data-action="guide"] { grid-area: 1 / 5 / 2 / 9; justify-self: center; }
+  .controls [data-action="list"] { grid-area: 1 / 9 / 2 / 13; justify-self: end; }
   .controls [data-action="back10"] { grid-area: 2 / 2 / 3 / 5; justify-self: center; }
   .controls [data-action="toggle"] { grid-area: 2 / 5 / 3 / 9; justify-self: center; }
   .controls [data-action="fwd30"] { grid-area: 2 / 9 / 3 / 12; justify-self: center; }
   .controls [data-action="back10"] .icon, .controls [data-action="fwd30"] .icon { width: 2.4rem; height: 2.4rem; }
-  .controls #ctl-toggle { width: 4.6rem; height: 4.6rem; justify-content: center; padding: 0; background: rgba(255, 255, 255, 0.16); border-radius: 50%; }
-  .controls #ctl-toggle .icon { width: 2.4rem; height: 2.4rem; }
+  /* The big pause: a lit glass disc. */
+  .controls #ctl-toggle {
+    width: 4.8rem; height: 4.8rem; justify-content: center; padding: 0; border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.16); background-image: var(--glass-sheen), var(--control-base);
+    border: 1px solid var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow-s);
+  }
+  .controls #ctl-toggle:focus, .controls #ctl-toggle:hover { background-color: rgba(255, 255, 255, 0.24); }
+  .controls #ctl-toggle .icon { width: 2.2rem; height: 2.2rem; }
   .controls #ctl-toggle .lbl { display: none; }
   .controls [data-action="startOver"] { grid-area: 3 / 1 / 4 / 4; }
   .controls [data-action="live"] { grid-area: 3 / 4 / 4 / 7; }
   .controls [data-action="fav"] { grid-area: 3 / 7 / 4 / 10; }
   .controls [data-action="rec"] { grid-area: 3 / 10 / 4 / 13; }
-  .controls #ctl-live.behind { color: var(--bg); background: var(--accent); }
+  .controls #ctl-live.behind { color: var(--accent-ink); background: var(--accent); text-shadow: none; }
   .controls #ctl-live .lbl { max-width: 100%; white-space: normal; text-align: center; }
   /* The channel banner would sit under the bottom row. */
   body.controls-on .banner { display: none; }
-  .timeline:not([hidden]) { bottom: calc(5.6rem + env(safe-area-inset-bottom)); width: calc(100% - 24px); padding: 0.4rem 0.6rem; background: none; border: 0; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
+  .timeline:not([hidden]) {
+    left: var(--s4); right: var(--s4); bottom: calc(6rem + env(safe-area-inset-bottom)); padding: var(--s2) 0;
+    background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; text-shadow: var(--text-shadow);
+  }
 }
 
 /* Channel list on touch screens: full width, scrolls, tap to watch. */
@@ -304,7 +330,4 @@ body.guide-on .banner, body.guide-on .controls, body.guide-on .timeline, body.gu
   .guide-bar .guide-nav { justify-content: flex-start; }
   .guide-bar .guide-when { flex: none; }
   body.guide-on #video { top: 0.5rem; width: 40vw; height: 22.5vw; }
-}
-@media (pointer: coarse), (max-width: 800px) {
-  .controls [data-action="guide"] { grid-area: 1 / 4 / 2 / 10; flex-direction: row; justify-self: center; padding: 0.5rem 0.8rem; }
 }

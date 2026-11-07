@@ -489,6 +489,7 @@
     const behind = p ? p.behind() : 0;
     const live = $("ctl-live");
     live.classList.toggle("behind", behind > 12);
+    ctl.classList.toggle("behind", behind > 12); // the longer label needs room (tv.css)
     VodMax.label(live, behind > 12 ? "skip-forward" : "radio", behind > 12 ? t("Torna in diretta (−{time})", { time: VodMax.clock(behind) }) : t("In diretta"));
     const fav = $("ctl-fav");
     fav.classList.toggle("on", Boolean(c && c.favorite));
@@ -642,6 +643,7 @@
     updateTimeline();
     const p = state.player, behind = p ? p.behind() : 0;
     $("ctl-live").classList.toggle("behind", behind > 12);
+    $("controls").classList.toggle("behind", behind > 12);
     VodMax.label($("ctl-live"), behind > 12 ? "skip-forward" : "radio", behind > 12 ? t("Torna in diretta (−{time})", { time: VodMax.clock(behind) }) : t("In diretta"));
   } }, 1000);
 

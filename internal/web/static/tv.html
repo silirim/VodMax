@@ -32,28 +32,34 @@
     </div>
   </section>
 
-  <section id="controls" class="controls" hidden>
-    <button data-action="menu" data-i18n data-i18n-attr="title" data-icon="house" title="Torna al menu (Indietro)">Menu</button>
-    <button data-action="list" data-i18n data-i18n-attr="title" data-icon="list" title="Elenco dei canali (OK)">Canali</button>
-    <button data-action="guide" data-i18n data-i18n-attr="title" data-icon="calendar-days" title="Guida TV (Guida / E)">Guida</button>
-    <button data-action="startOver" data-i18n data-i18n-attr="title" data-icon="undo-2" title="Dall'inizio del programma">Dall'inizio</button>
-    <button data-action="back10" data-i18n data-i18n-attr="title" data-icon="rotate-ccw" title="Indietro di 10 secondi (◀)">10 s</button>
-    <button data-action="toggle" data-i18n data-i18n-attr="title" data-icon="pause" id="ctl-toggle" title="Pausa / riprendi (Spazio)">Pausa</button>
-    <button data-action="fwd30" data-i18n data-i18n-attr="title" data-icon="rotate-cw" title="Avanti di 30 secondi (▶)">30 s</button>
-    <button data-action="live" data-i18n data-i18n-attr="title" data-icon="radio" id="ctl-live" title="Torna al punto in diretta">In diretta</button>
-    <button data-action="fav" data-i18n data-i18n-attr="title" data-icon="star" id="ctl-fav" title="Preferito (Giallo / F)">Preferito</button>
-    <button data-action="rec" data-i18n data-i18n-attr="title" data-icon="circle-dot" title="Registra il programma in onda (Blu / R)">Registra</button>
-    <button data-action="multiview" data-i18n data-i18n-attr="title" data-icon="layout-grid" title="Più canali insieme" class="icon-only"><span class="txt">Multiview</span></button>
-    <button data-action="fullscreen" data-i18n data-i18n-attr="title" data-icon="maximize" id="ctl-full" title="Schermo intero" class="icon-only" hidden><span class="txt" data-i18n>Schermo intero</span></button>
+  <section id="controls" class="controls glass-dark" hidden>
+    <div class="ctl-group">
+      <button class="tab" data-action="menu" data-i18n data-i18n-attr="title" data-icon="house" title="Torna al menu (Indietro)">Menu</button>
+      <button class="tab" data-action="list" data-i18n data-i18n-attr="title" data-icon="list" title="Elenco dei canali (OK)">Canali</button>
+      <button class="tab" data-action="guide" data-i18n data-i18n-attr="title" data-icon="calendar-days" title="Guida TV (Guida / E)">Guida</button>
+    </div>
+    <div class="ctl-group">
+      <button class="tab" data-action="startOver" data-i18n-attr="title" data-icon="undo-2" title="Dall'inizio del programma"><span class="txt" data-i18n>Dall'inizio</span></button>
+      <button class="tab" data-action="back10" data-i18n data-i18n-attr="title" data-icon="rotate-ccw" title="Indietro di 10 secondi (◀)">10 s</button>
+      <button class="tab" data-action="toggle" data-i18n data-i18n-attr="title" data-icon="pause" id="ctl-toggle" title="Pausa / riprendi (Spazio)">Pausa</button>
+      <button class="tab" data-action="fwd30" data-i18n data-i18n-attr="title" data-icon="rotate-cw" title="Avanti di 30 secondi (▶)">30 s</button>
+      <button class="tab" data-action="live" data-i18n data-i18n-attr="title" data-icon="radio" id="ctl-live" title="Torna al punto in diretta">In diretta</button>
+    </div>
+    <div class="ctl-group">
+      <button class="tab" data-action="fav" data-i18n data-i18n-attr="title" data-icon="star" id="ctl-fav" title="Preferito (Giallo / F)">Preferito</button>
+      <button class="tab" data-action="rec" data-i18n-attr="title" data-icon="circle-dot" title="Registra il programma in onda (Blu / R)"><span class="txt" data-i18n>Registra</span></button>
+      <button class="tab" data-action="multiview" data-i18n data-i18n-attr="title" data-icon="layout-grid" title="Più canali insieme"><span class="txt">Multiview</span></button>
+      <button class="tab" data-action="fullscreen" data-i18n data-i18n-attr="title" data-icon="maximize" id="ctl-full" title="Schermo intero" hidden><span class="txt" data-i18n>Schermo intero</span></button>
+    </div>
   </section>
 
-  <section id="timeline" class="timeline" hidden>
-    <div class="tl-head"><span id="tl-title" class="tl-title"></span><span id="tl-state" class="tl-state"></span></div>
+  <section id="timeline" class="timeline glass-dark" hidden>
+    <div class="tl-head"><span id="tl-title" class="tl-title"></span><span id="tl-state" class="tl-state tnum"></span></div>
     <div id="tl-bar" class="tl-bar" role="slider" aria-label="Posizione nel programma" data-i18n-attr="aria-label">
       <div class="tl-track"><div id="tl-aired"></div><div id="tl-buffer"></div><div id="tl-fill"></div><div id="tl-pos"></div></div>
-      <span id="tl-hover" class="tl-hover" hidden></span>
+      <span id="tl-hover" class="tl-hover tnum" hidden></span>
     </div>
-    <div class="tl-times"><span id="tl-start"></span><span id="tl-end"></span></div>
+    <div class="tl-times tnum"><span id="tl-start"></span><span id="tl-end"></span></div>
   </section>
 
   <section id="list" class="list" hidden>
