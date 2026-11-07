@@ -45,6 +45,9 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
   // An address or a command, wrapped on narrow screens, with its Copy button.
   const cmd = (text) => el("div", { className: "cmd-row" }, el("pre", { className: "cmd" }, text), button(t("Copia"), () => copyText(text)));
   const input = (props) => el("input", { className: "focusable", ...props });
+  // Counts as tiles: [[number, label], ...].
+  const stats = (pairs) => el("div", { className: "stats" }, ...pairs.map(([n, label]) =>
+    el("div", { className: "stat" }, el("b", {}, (n || 0).toLocaleString(locale)), el("span", {}, label))));
   const when = (ts) => {
     if (!ts) return t("mai");
     const d = new Date(typeof ts === "number" ? ts * 1000 : ts);
@@ -65,6 +68,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       ["profiles", "user", t("Profili"), t("Chi guarda, profili bambini")],
       ["devices", "tv", t("Dispositivi"), t("TV, telefoni e PC abbinati")],
       ["language", "info", t("Lingua"), t("Lingua dell'interfaccia su questo dispositivo")],
+      ["look", "palette", t("Aspetto"), t("Colore, nero OLED, effetti, testo")],
     ]],
     ["Server", [
       ["assistant", "sparkles", t("Assistente"), t("Regole a parole, consigli per la sera")],
@@ -151,6 +155,10 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     // An open folder picker closes first; changes not saved are asked about.
     const picker = document.querySelector(".picker-panel");
     if (picker && picker.close) { picker.close(); return; }
+    // Two columns: from inside the section, back to its row in the list
+    // first; the page is left only from the list.
+    const row = document.querySelector(".item.active");
+    if (!phone.matches && row && $("content").contains(document.activeElement)) { row.focus(); return; }
     if (!leaveAsked()) return;
     if (phone.matches && state.view) {
       const was = state.view;
@@ -206,7 +214,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     // meanwhile: a slow answer must not cover the section picked after it.
     const next = el("div");
     try {
-      await ({ subscriptions: renderSubscriptions, libraries: renderLibraries, vpn: renderVPN, rules: renderRules, categories: renderCategories, system: renderSystem, assistant: renderAssistant, profiles: renderProfiles, devices: renderDevices, guide: renderGuideSources, language: renderLanguage })[state.view](next);
+      await ({ subscriptions: renderSubscriptions, libraries: renderLibraries, vpn: renderVPN, rules: renderRules, categories: renderCategories, system: renderSystem, assistant: renderAssistant, profiles: renderProfiles, devices: renderDevices, guide: renderGuideSources, language: renderLanguage, look: renderLook })[state.view](next);
       if (my !== renderSeq) return;
       cards(next);
       main.replaceChildren(...next.childNodes);
@@ -283,10 +291,9 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     const counts = s.counts || {};
     const sync = el("div", { className: "facts" },
       el("span", {}, t("Ultima sincronizzazione") + " ", el("b", { className: s.sync_status === "error" ? "bad" : "" }, when(s.synced_at) +
-        (s.sync_status === "error" ? " " + t("(errore)") : ""))),
-      el("span", {}, t("Canali") + " ", el("b", {}, counts.live || 0)), el("span", {}, t("Film") + " ", el("b", {}, counts.movie || 0)),
-      el("span", {}, t("Serie") + " ", el("b", {}, counts.series || 0)));
+        (s.sync_status === "error" ? " " + t("(errore)") : ""))));
     const box = el("section", { className: "box" }, el("h3", {}, s.name), facts, sync,
+      stats([[counts.live, t("Canali")], [counts.movie, t("Film")], [counts.series, t("Serie")]]),
       s.sync_error ? el("p", { className: "note bad" }, s.sync_error) : null);
     const syncButton = button(s.syncing ? t("Sincronizzazione in corso…") : t("Sincronizza ora"), async () => {
       syncButton.disabled = true;
@@ -670,8 +677,8 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       t("Includi o escludi le categorie una per una e scegli in quale sezione della TV vanno i canali. “Automatico” segue le regole della scheda Selezione."));
     if (!sub) return;
     const kinds = el("div", { className: "toolbar" }, ...[["live", t("Canali")], ["movie", t("Film")], ["series", t("Serie")]].map(([k, label]) => {
-      const b = button(label, () => { state.kind = k; render(); }, state.kind === k ? "primary" : "");
-      return b;
+      // Chips, the chosen one .active: a white button would read as the focus.
+      return el("button", { type: "button", className: "chip focusable" + (state.kind === k ? " active" : ""), onclick: () => { state.kind = k; render(); } }, label);
     }));
     const filter = input({ type: "search", placeholder: t("Filtra per nome"), className: "pick focusable" });
     kinds.append(filter);
@@ -1493,6 +1500,65 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     main.replaceChildren(...languageSection());
   }
 
+  // ---- Aspetto (this device only, decision 0054; open to every profile):
+  // VodMax.look applies each change at once, nothing goes to the server. ----
+  const ACCENT_NAMES = { aurora: t("Aurora"), oceano: t("Oceano"), tramonto: t("Tramonto"), lavanda: t("Lavanda"), menta: t("Menta"), rubino: t("Rubino"), grafite: t("Grafite") };
+  function lookSection() {
+    const look = window.VodMax.look;
+    const icon = window.VodMaxIcons.icon;
+    const row = (title, hint, control) => el("div", { className: "look-row" },
+      el("div", { className: "look-text" }, el("b", {}, title), el("span", {}, hint)), control);
+    // A group of buttons, the chosen one pressed: the accent swatches and
+    // the segmented controls.
+    const choice = (className, key, options, buttonClass = "") => {
+      const group = el("div", { className });
+      const show = () => {
+        for (const b of group.children) {
+          const on = b.dataset.value === String(look.get()[key]);
+          b.setAttribute("aria-pressed", String(on));
+          b.classList.toggle("active", on);
+        }
+      };
+      group.append(...options.map(([value, label, ...content]) => {
+        const b = el("button", { type: "button", className: "focusable " + buttonClass, onclick: () => { look.set({ [key]: value }); show(); } }, ...content);
+        b.dataset.value = String(value);
+        b.setAttribute("aria-label", label);
+        return b;
+      }));
+      show();
+      return group;
+    };
+    // An on/off choice: the whole row is the button (a remote reaches it
+    // from anywhere above, a finger anywhere on it), the switch shows it.
+    const toggle = (key, title, hint) => {
+      const b = el("button", { type: "button", className: "look-row look-toggle focusable" },
+        el("span", { className: "look-text" }, el("b", {}, title), el("span", {}, hint)), el("span", { className: "switch" }));
+      const show = () => b.setAttribute("aria-checked", String(Boolean(look.get()[key])));
+      b.setAttribute("role", "switch");
+      b.onclick = () => { look.set({ [key]: !look.get()[key] }); show(); };
+      show();
+      return b;
+    };
+    const swatches = choice("swatches", "accent", look.ACCENTS.map((a) => [a, ACCENT_NAMES[a] || a,
+      el("span", { className: "swatch-dot" }, icon("check")), el("span", { className: "swatch-name" }, ACCENT_NAMES[a] || a)]));
+    for (const b of swatches.children) { b.classList.add("swatch"); b.dataset.accent = b.dataset.value; }
+    // Segmented controls: ui.css chips (focus, .active, finger size) on a track.
+    const size = choice("chips segmented", "fontScale", [[0.9, t("Piccolo")], [1, t("Medio")], [1.15, t("Grande")]].map(([v, text]) => [v, text, text]), "chip");
+    // The heading stays the page title (as Abbonamenti), the rows go in one box.
+    return [el("h2", {}, t("Aspetto")),
+      el("p", { className: "note" }, t("Le scelte valgono per questo dispositivo, per tutti i profili.")),
+      el("div", { className: "box look-box" }, row(t("Colore d'accento"), t("Usato per avanzamento, ora attuale e scelte attive"), swatches),
+      toggle("oled", t("Nero OLED"), t("Sfondo nero puro, per gli schermi OLED")),
+      toggle("nofx", t("Effetti ridotti"), t("Niente sfocature né animazioni, consigliato sulle TV lente. Si attiva da solo se il sistema chiede meno movimento.")),
+      row(t("Dimensione testo"), t("Per tutto VodMax su questo dispositivo"), size),
+      toggle("screensaver", t("Salvaschermo"), t("Dopo qualche minuto senza tasti, gli sfondi del catalogo con l'ora. Mai durante un video.")),
+      row(t("Salvaschermo dopo"), t("Minuti senza tasti, puntatore o tocchi"),
+        choice("chips segmented", "screensaverMinutes", [5, 10, 30].map((m) => [m, t("{n} minuti", { n: m }), t("{n} min", { n: m })]), "chip")))];
+  }
+  async function renderLook(main) {
+    main.replaceChildren(...lookSection());
+  }
+
   buildSections();
   phone.addEventListener("change", () => { if (!phone.matches && !state.view) open(store.get("settingsView", "subscriptions")); });
   // ---- Remote control: arrows move among everything that takes focus,
@@ -1512,21 +1578,50 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       if (first) { first.focus(); first.scrollIntoView({ block: "nearest" }); }
       return;
     }
-    const a = current.getBoundingClientRect();
+    // A switch row is as wide as the box: measured at its switch, it sits
+    // in the same right-hand column as the other rows' controls.
+    const box = (e) => (e.classList.contains("look-toggle") ? e.querySelector(".switch") : e).getBoundingClientRect();
+    const a = box(current);
     const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
-    let best = null, bestScore = Infinity;
+    // Up and Down stay in their column (the list or the section): a list
+    // row on the left is not "below" a control of the section.
+    const vertical = dir === "ArrowUp" || dir === "ArrowDown";
+    const inSide = $("side").contains(current), inContent = $("content").contains(current);
+    let pool = [];
     for (const e of all) {
       if (e === current) continue;
-      const b = e.getBoundingClientRect();
+      const b = box(e);
       const dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
       const ok = { ArrowLeft: dx < -4, ArrowRight: dx > 4, ArrowUp: dy < -4, ArrowDown: dy > 4 }[dir];
       if (!ok) continue;
-      const along = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dx) : Math.abs(dy);
-      const across = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dy) : Math.abs(dx);
+      if (vertical && $("side").contains(e) !== inSide) continue;
+      // Left from the section stays in it; at its left edge, the list (below).
+      if (dir === "ArrowLeft" && inContent && !$("content").contains(e)) continue;
+      pool.push({ e, b, dx, dy });
+    }
+    if (vertical) {
+      // The nearest row first (edge to edge), then the nearest control in
+      // it: a control further down but more in line is not skipped to.
+      const gap = (c) => Math.max(0, dir === "ArrowDown" ? c.b.top - a.bottom : a.top - c.b.bottom);
+      const near = Math.min(...pool.map(gap));
+      pool = pool.filter((c) => gap(c) <= near + 12);
+    } else if (inContent) {
+      // Left and Right stay on their row.
+      pool = pool.filter((c) => c.b.top < a.bottom && c.b.bottom > a.top);
+    }
+    let best = null, bestScore = Infinity;
+    for (const { e, dx, dy } of pool) {
+      const along = vertical ? Math.abs(dy) : Math.abs(dx);
+      const across = vertical ? Math.abs(dx) : Math.abs(dy);
       const score = along + across * 3;
       if (score < bestScore) { bestScore = score; best = e; }
     }
-    if (best) {
+    // Into a group of choices from another row: onto its chosen one (tvOS).
+    const group = best && vertical && best.parentElement.matches(".segmented, .swatches") && !best.parentElement.contains(current) ? best.parentElement : null;
+    if (group && group.querySelector('[aria-pressed="true"]')) best = group.querySelector('[aria-pressed="true"]');
+    // Out of the section: its own row in the list, not the nearest one.
+    if (!best && dir === "ArrowLeft" && inContent) best = document.querySelector(".item.active");
+    if (best && best.offsetParent !== null) {
       best.focus();
       best.scrollIntoView({ block: "nearest" });
     }
@@ -1566,7 +1661,8 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       $("content").replaceChildren(el("h2", {}, t("Impostazioni")),
         el("p", { className: "note" }, t("Le impostazioni sono riservate ai profili amministratore.")),
         button(t("Cambia profilo"), () => { store.set("profile", ""); window.VodMax.showProfiles(); }, "primary"),
-        ...languageSection());
+        ...languageSection(), ...lookSection());
+      cards($("content"));
       $("sections").hidden = true;
       document.body.classList.remove("at-list");
       return;

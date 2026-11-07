@@ -1,5 +1,6 @@
 // The device's look (decision 0054): accent colour, OLED black, reduced
-// effects and text size, kept in localStorage as vodmax.look. Loaded
+// effects, text size and the screensaver (screensaver.js reads it), kept
+// in localStorage as vodmax.look. Loaded
 // first in every page's <head> (the CSP allows no inline script), so the
 // classes are on <html> before ui.css paints; common.js exposes it as
 // VodMax.look and the settings page changes it. Never sent to the server.
@@ -8,7 +9,9 @@
 window.VodMaxLook = (() => {
   const KEY = "vodmax.look";
   const ACCENTS = ["aurora", "oceano", "tramonto", "lavanda", "menta", "rubino", "grafite"];
-  const DEFAULTS = { accent: "aurora", oled: false, nofx: false, fontScale: 1 };
+  // The screensaver starts off on touch screens: a phone locks itself.
+  const touch = Boolean(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  const DEFAULTS = { accent: "aurora", oled: false, nofx: false, fontScale: 1, screensaver: !touch, screensaverMinutes: 5 };
 
   function get() {
     try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY)) || {}); }

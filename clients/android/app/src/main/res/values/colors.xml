@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The web interface's tokens (internal/web/static/ui.css :root), decision 0051. -->
 <resources>
     <color name="bg">#0B0C10</color>
+    <color name="surface">#13151B</color>
     <color name="raised">#1D2028</color>
+    <color name="line">#29FFFFFF</color>
     <color name="text">#F5F5F7</color>
     <color name="soft">#A9ABB5</color>
+    <color name="ink">#0B0C10</color>
     <color name="accent">#00D6CA</color>
 </resources>
