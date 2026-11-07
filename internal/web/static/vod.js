@@ -34,26 +34,50 @@
     return el("div", { className: "poster" }, el("span", { className: "poster-title" }, title));
   }
 
-  function itemCard(item) {
+  // "Nuovo" only where it singles a few titles out: a first import, a new
+  // subscription or a list of the newest would put it on every card.
+  const isFresh = (item) => item.first_seen_at && Date.now() / 1000 - item.first_seen_at < 7 * 86400;
+  function itemCards(items) {
+    const few = items.filter(isFresh).length <= items.length * 0.3;
+    return items.map((item) => itemCard(item, few));
+  }
+
+  function itemCard(item, showNew) {
     const title = item.display_title;
     const card = el("button", { className: "card focusable" }, poster(item, title),
       el("span", { className: "label" }, title),
       el("span", { className: "sub" }, [item.year, item.variant_count > 1 ? t("{n} versioni", { n: item.variant_count }) : ""].filter(Boolean).join(" · ")));
-    const q = { 4: "4K", 3: "FHD" }[item.quality];
-    if (q) card.append(el("span", { className: "badge" }, q));
+    // Badges from what the catalogue already says: new this week on the
+    // left; 4K, else the rating, else the quality on the right.
+    const fresh = showNew && isFresh(item);
+    const q = { 4: "4K", 3: "FHD", 2: "HD" }[item.quality];
+    const right = item.quality === 4 || (!item.rating && q) ? el("span", { className: "badge hd right" }, q)
+      : item.rating ? el("span", { className: "badge rating right" }, rating(item.rating)) : null;
+    if (fresh || right) card.append(el("span", { className: "card-badges" }, fresh ? el("span", { className: "badge new" }, t("Nuovo")) : null, right));
     card.onclick = () => openDetail(item);
-    card.hero = heroFromItem(item);
+    card.hero = { ...heroFromItem(item), eyebrow: state.view === "movie" ? t("Film") : state.view === "series" ? t("Serie") : "" };
     return card;
   }
 
   function continueCard(c) {
-    const title = c.media === "episode" ? c.series_title : c.title;
+    const episode = c.media === "episode";
+    const title = episode ? c.series_title : c.title;
     const ep = "S" + c.season + "E" + c.number + " · " + c.title;
-    const sub = c.next ? t("Prossima puntata") + " · " + ep : c.media === "episode" ? ep : t("Mancano {time}", { time: clock(c.progress.duration - c.progress.position) });
+    const sub = [c.next ? t("Prossima puntata") : "", episode ? c.title : "",
+      c.next ? "" : t("Mancano {time}", { time: clock(c.progress.duration - c.progress.position) })].filter(Boolean).join(" · ");
     const pct = c.next ? 0 : c.progress.duration ? (c.progress.position / c.progress.duration) * 100 : 0;
-    const card = el("button", { className: "card wide focusable" }, poster({ logo: c.image }, title),
-      el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })),
-      el("span", { className: "label" }, title), el("span", { className: "sub" }, sub));
+    const art = poster({ logo: c.image }, title);
+    const card = el("button", { className: "card wide focusable" }, art,
+      episode ? el("span", { className: "card-badges" }, el("span", { className: "badge" }, "S" + c.season + " · E" + c.number)) : null,
+      pct ? el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })) : null,
+      el("span", { className: "label" }, title), el("span", { className: "sub tnum" }, sub));
+    // The title's backdrop fits a wide card better than its poster.
+    detailsOf(episode ? c.series_id : c.id).then((d) => {
+      if (!d.backdrop) return;
+      const img = el("img", { className: "poster", alt: "" });
+      img.onload = () => { if (art.isConnected) art.replaceWith(img); };
+      img.src = d.backdrop;
+    });
     card.onclick = () => play(c.media, c.id, title + (c.media === "episode" ? " · " + ep : ""), c.next ? 0 : c.progress.position);
     card.hero = heroFromContinue(c);
     // Off the row: the × on the card, the red key (Canc), or a long press.
@@ -106,7 +130,8 @@
     $("search").placeholder = state.view === "tv" ? t("Cerca un canale (nome o numero)") : t("Cerca film e serie");
     store.set("vodView", state.view);
     const main = $("content");
-    main.replaceChildren(el("p", { className: "empty" }, t("Caricamento…")));
+    main.replaceChildren(loading(state.view));
+    heroTop();
     try {
       if (state.view === "tv") await renderTV(main);
       else if (state.query) await renderSearch(main);
@@ -119,8 +144,32 @@
       if (my === renderSeq) main.replaceChildren(el("p", { className: "empty" }, e.message));
     }
     if (my !== renderSeq) return;
+    heroTop();
     if (!typing || document.activeElement !== $("search")) focusFirst(main);
   }
+
+  // While a page loads: grey shapes with the radii of what is coming.
+  function loading(view) {
+    const box = ["mylist", "movie", "series"].includes(view) || state.query
+      ? el("div", { className: "grid" }, ...Array.from({ length: 12 }, () => el("div", { className: "card" }, el("div", { className: "poster skeleton" }))))
+      : el("div", { className: "skeleton-list" }, ...Array.from({ length: 5 }, () => el("div", { className: "skeleton" })));
+    box.setAttribute("role", "status");
+    box.setAttribute("aria-label", t("Caricamento…"));
+    return box;
+  }
+
+  // An empty list: an icon, one sentence, the way to fill it.
+  function emptyState(icon, text, action) {
+    const box = el("div", { className: "empty-state" }, window.VodMaxIcons ? window.VodMaxIcons.icon(icon) : null, el("p", {}, text));
+    if (action) {
+      const b = el("button", { className: "button focusable", type: "button" });
+      window.VodMax.label(b, action[0], action[1]);
+      b.onclick = action[2];
+      box.append(b);
+    }
+    return box;
+  }
+  const goView = (view) => () => { state.view = view; state.query = ""; $("search").value = ""; render(); };
 
   // ---- TV: the channel list, then full screen ----
   const TV_LISTS = [["", t("Tutti")], ["tv", "TV"], ["sport", t("Sport")], ["radio", t("Radio")], ["favorites", t("Preferiti")]];
@@ -155,6 +204,7 @@
           c.next ? el("span", {}, t("Dopo: {time} {title}", { time: hhmm(c.next.start), title: c.next.title })) : null,
           p ? el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })) : null));
       b.onclick = () => { location.href = "/tv.html?channel=" + c.id; };
+      b.hero = channelHero(c);
       return el("li", {}, b);
     };
     // 600 at a time (a long list is slow to draw on a TV); the rest on
@@ -171,10 +221,26 @@
         focusFirst(ol.children[n]);
       };
     }
-    main.replaceChildren(el("h2", { className: "page-title" }, "TV"), el("div", { className: "tv-tools" }, ...chips, guide),
+    const hero = el("section", { className: "hero compact" });
+    main.replaceChildren(hero, el("div", { className: "tv-tools" }, ...chips, guide),
       query ? el("p", { className: "empty" }, t("{n} canali per “{query}” (nome o numero)", { n: channels.length, query: state.query })) : "",
       channels.length ? ol : el("p", { className: "empty" }, list === "favorites"
         ? t("Nessun preferito: in TV premi il tasto giallo (F) su un canale.") : t("Nessun canale.")), more || "");
+    if (channels.length) showHero(hero, channelHero(channels[0]));
+    else hero.remove();
+  }
+
+  // The TV list's header: what the focused channel shows now, over a glow
+  // of the channel's colour (the guide rarely has programme pictures).
+  function channelHero(c) {
+    const p = c.now;
+    return { title: p ? p.title : c.name, eyebrow: t("In onda adesso"), mark: el("span", { className: "hero-mark" }, window.VodMax.channelArt(c)),
+      text: [(c.number ? c.number + " · " : "") + c.name, p ? hhmm(p.start) + " – " + hhmm(p.stop) : "", c.next ? t("A seguire") + " · " + c.next.title : ""],
+      art: () => {
+        const glow = el("div", { className: "hero-art ch-glow" });
+        glow.style.setProperty("--tint", "hsla(" + channelHue(String(c.name || "")) + ", 50%, 40%, 0.55)");
+        return glow;
+      } };
   }
 
   // ---- Home: a featured title on top (it follows the focused card),
@@ -190,9 +256,23 @@
       el("div", { className: "poster skeleton" }))));
   }
 
+  // A row's title, with "Vedi tutti ›" when the row has a page of its own.
+  function section(title, view, before) {
+    const h = el("h2", { className: "section" }, el("span", {}, title));
+    if (view) {
+      const all = el("button", { className: "see-all focusable", type: "button" }, t("Vedi tutti"));
+      all.setAttribute("aria-label", t("Vedi tutti") + ": " + title);
+      all.onclick = () => { if (before) before(); state.view = view; state.query = ""; $("search").value = ""; window.scrollTo(0, 0); render(); };
+      h.append(all);
+    }
+    return h;
+  }
+  const newest = (kind) => () => store.set("browse." + kind, { ...browseState(kind), sort: "recent" });
+
   async function renderHome(main) {
-    main.replaceChildren(el("section", { className: "hero skeleton" }), el("h2", { className: "section" }, t("Continua a guardare")), skeletonRow(true),
+    main.replaceChildren(el("section", { className: "hero under" }), el("h2", { className: "section" }, t("Continua a guardare")), skeletonRow(true),
       el("h2", { className: "section" }, t("Nuovi film")), skeletonRow(false));
+    heroTop();
     const my = renderSeq;
     const [cont, films, series, favorites, recordings, mine, trending] = await Promise.all([
       api("GET", "/api/v1/continue"),
@@ -203,88 +283,219 @@
       api("GET", "/api/v1/mylist").catch(() => []),
       api("GET", "/api/v1/trending").catch(() => []),
     ]);
-    const hero = el("section", { className: "hero" });
+    const hero = el("section", { className: "hero under" });
     const parts = [hero];
-    if (await assistant()) parts.push(tonightBox());
+    const tonight = await assistant() ? tonightBox() : null;
     if (my !== renderSeq) return;
     parts.push(el("h2", { className: "section" }, t("Continua a guardare")));
     parts.push(cont.length ? el("div", { className: "row" }, ...cont.map(continueCard))
       : el("p", { className: "empty" }, t("Qui compaiono i film e gli episodi iniziati e la prossima puntata delle serie che stai seguendo.")));
-    if (mine.length) parts.push(el("h2", { className: "section" }, t("La mia lista")), el("div", { className: "row" }, ...mine.slice(0, 24).map(itemCard)));
+    if (mine.length) parts.push(section(t("La mia lista"), "mylist"), el("div", { className: "row" }, ...itemCards(mine.slice(0, 24))));
     // TMDB's week, among the titles you have (with a TMDB key).
-    if (trending.length) parts.push(el("h2", { className: "section" }, t("Di tendenza questa settimana")), el("div", { className: "row" }, ...trending.map(itemCard)));
-    if (favorites.length) parts.push(el("h2", { className: "section" }, t("In onda sui tuoi canali")), el("div", { className: "row" }, ...favorites.slice(0, 20).map(channelCard)));
-    parts.push(el("h2", { className: "section" }, t("Nuovi film")), el("div", { className: "row" }, ...films.items.map(itemCard)));
-    parts.push(el("h2", { className: "section" }, t("Nuove serie")), el("div", { className: "row" }, ...series.items.map(itemCard)));
+    if (trending.length) parts.push(section(t("Di tendenza questa settimana")), el("div", { className: "row" }, ...itemCards(trending)));
+    if (favorites.length) parts.push(section(t("In onda sui tuoi canali"), "tv", () => store.set("tvList", "favorites")), el("div", { className: "row" }, ...favorites.slice(0, 20).map(channelCard)));
+    parts.push(section(t("Nuovi film"), "movie", newest("movie")), el("div", { className: "row" }, ...itemCards(films.items)));
+    parts.push(section(t("Nuove serie"), "series", newest("series")), el("div", { className: "row" }, ...itemCards(series.items)));
     const done = recordings.filter((r) => r.status === "completed").slice(0, 12);
-    if (done.length) parts.push(el("h2", { className: "section" }, t("Registrazioni recenti")), el("div", { className: "row" }, ...done.map(recordingCard)));
+    if (done.length) parts.push(section(t("Registrazioni recenti"), "recordings"), el("div", { className: "row" }, ...done.map(recordingCard)));
+    // "Stasera" after the first two rows: what to resume and what is new
+    // come first, the question to the assistant just below.
+    if (tonight) parts.splice(Math.min(5, parts.length), 0, tonight);
     main.replaceChildren(...parts);
     // The featured title: the first thing to continue, else the newest film.
     const first = cont[0] ? heroFromContinue(cont[0]) : films.items[0] ? heroFromItem(films.items[0]) : null;
     if (first) showHero(hero, first);
+    heroTop();
   }
   // Added once, not at every visit of Home: the hero follows the focused
   // card only on the page that has one (a card of Film or a search sets
   // card.hero too, and a listener left from Home fetched its details).
   let heroTimer;
   $("content").addEventListener("focusin", (e) => {
-    const card = e.target.closest(".card");
-    const hero = $("content").querySelector(".hero:not(.skeleton)");
+    const card = e.target.closest(".card, .channels button");
+    const hero = $("content").querySelector(".hero");
     if (!card || !card.hero || !hero) return;
     clearTimeout(heroTimer);
     // Only if the focus is still on that card (moving on quickly with
     // the remote must not redraw the hero under the new focus).
-    heroTimer = setTimeout(() => { if (document.activeElement === card && hero.isConnected) showHero(hero, card.hero); }, 350);
+    heroTimer = setTimeout(() => {
+      if (document.activeElement !== card || !hero.isConnected) return;
+      showHero(hero, card.hero);
+      // The card's rating becomes the one the hero shows (TMDB's, once known).
+      if (card.hero.id) detailsOf(card.hero.id).then((d) => { const r = card.querySelector(".badge.rating"); if (r && d.rating) r.textContent = rating(d.rating); });
+    }, 350);
   });
 
+  const QUALITY = { 4: "4K", 3: "Full HD", 2: "HD", 1: "SD" };
+  const rating = (r) => Number(r).toLocaleString(locale, { maximumFractionDigits: 1 });
   function heroFromItem(item) {
-    return { id: item.id, title: item.display_title, logo: item.logo,
-      meta: [item.year, { 4: "4K", 3: "Full HD" }[item.quality], item.rating ? "★ " + Number(item.rating).toLocaleString(locale, { maximumFractionDigits: 1 }) : ""],
+    return { id: item.id, title: item.display_title, poster: item.logo, year: item.year, quality: item.quality, rating: item.rating,
       actions: [["primary", "play", t("Guarda"), () => openDetail(item)], ["", "info", t("Dettagli"), () => openDetail(item)]] };
   }
   function heroFromContinue(c) {
     const episode = c.media === "episode";
     const title = episode ? c.series_title : c.title;
     const ep = episode ? "S" + c.season + "E" + c.number + " · " + c.title : "";
-    return { id: episode ? c.series_id : c.id, title, logo: c.image,
-      meta: [c.next ? t("Prossima puntata") : episode ? t("Continua") : t("Mancano {time}", { time: clock(c.progress.duration - c.progress.position) }), ep],
-      actions: [["primary", "play", c.next ? t("Guarda la puntata") : t("Riprendi"), () => play(c.media, c.id, title + (episode ? " · " + ep : ""), c.next ? 0 : c.progress.position)]] };
+    const item = episode ? { id: c.series_id, kind: "series", display_title: c.series_title, logo: c.image }
+      : { id: c.id, kind: "movie", display_title: c.title, year: c.year, logo: c.image };
+    // The time left on the button, as in "Riprendi · 48 min".
+    const left = c.next ? "" : " · " + Math.max(1, Math.ceil((c.progress.duration - c.progress.position) / 60)) + " min";
+    return { id: item.id, title, poster: c.image, year: c.year,
+      text: [c.next ? t("Prossima puntata") : episode ? t("Continua") : "", ep],
+      actions: [["primary", "play", c.next ? t("Guarda la puntata") : t("Riprendi") + left, () => play(c.media, c.id, title + (episode ? " · " + ep : ""), c.next ? 0 : c.progress.position)],
+        ["", "info", t("Dettagli"), () => openDetail(item)]] };
+  }
+
+  // The meta line of a hero or a detail page: year, duration and genre as
+  // text, the rating and the quality as pills.
+  function metaLine(m) {
+    const text = [m.year ? el("strong", { className: "m" }, String(m.year)) : null,
+      ...(m.text || []).filter(Boolean).map((s) => el("span", { className: "m" }, s))].filter(Boolean);
+    return [...text, m.rating ? el("span", { className: "badge rating" }, rating(m.rating)) : null,
+      QUALITY[m.quality] ? el("span", { className: "badge hd" }, QUALITY[m.quality]) : null].filter(Boolean);
+  }
+  const detailText = (d) => [d.duration ? Math.round(d.duration / 60) + " min" : "", d.genre ? d.genre.split(",")[0].trim() : ""];
+
+  // The title's logo (TMDB) in place of its name, once it has loaded; the
+  // name stays as its alternative text for screen readers.
+  function titleLogo(h1, url, title) {
+    const img = el("img", { className: "title-logo", alt: title });
+    img.onload = () => { if (h1.isConnected) h1.replaceChildren(img); };
+    img.src = url;
+  }
+
+  // A backdrop that fades into the page. Drawn on a canvas so the bottom of
+  // the picture turns transparent over the ambient (common.js): no seam
+  // where it ends. CSS could only do it with mask-image, which webOS 22 has
+  // only prefixed (and old WebViews not at all). The shade behind the text
+  // and the header is in the picture too, so it fades with it. A detail
+  // page has more text, wider and longer, than a hero: its shade is deeper.
+  function fadedArt(url, box, fadeTop, detail) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(window.devicePixelRatio || 1, 2);
+        const w = Math.round(box.clientWidth * k), h = Math.round(box.clientHeight * k);
+        if (!w || !h) { resolve(null); return; }
+        const c = el("canvas", { className: "hero-art", width: w, height: h });
+        const g = c.getContext("2d");
+        const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+        g.drawImage(img, (w - img.naturalWidth * s) / 2, (h - img.naturalHeight * s) * 0.2, img.naturalWidth * s, img.naturalHeight * s);
+        const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg-rgb").trim() || "11, 12, 16";
+        const shade = (x1, y1, a, hold) => {
+          const gr = g.createLinearGradient(0, 0, x1, y1);
+          gr.addColorStop(0, "rgba(" + bg + "," + a + ")");
+          if (hold) gr.addColorStop(hold, "rgba(" + bg + "," + a + ")");
+          gr.addColorStop(1, "rgba(" + bg + ",0)");
+          g.fillStyle = gr;
+          g.fillRect(0, 0, w, h);
+        };
+        if (detail) shade(w * 0.85, 0, 0.92, 0.55);
+        else shade(w * 0.72, 0, 0.9);
+        shade(0, h * 0.3, 0.55);
+        if (w < h * 1.3) { // a phone: the text spans the width, so the shade goes down, not across
+          const down = detail ? g.createLinearGradient(0, h * 0.12, 0, h * 0.42) : g.createLinearGradient(0, h * 0.2, 0, h * 0.65);
+          down.addColorStop(0, "rgba(" + bg + ",0)");
+          down.addColorStop(1, "rgba(" + bg + "," + (detail ? 0.88 : 0.75) + ")");
+          g.fillStyle = down;
+          g.fillRect(0, 0, w, h);
+        }
+        g.globalCompositeOperation = "destination-in";
+        const fade = g.createLinearGradient(0, h * 0.5, 0, h);
+        fade.addColorStop(0, "rgba(0,0,0,1)");
+        fade.addColorStop(0.55, "rgba(0,0,0,0.5)");
+        fade.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = fade;
+        g.fillRect(0, 0, w, h);
+        // Below the header (not under it): the top fades in too.
+        if (fadeTop) {
+          const top = g.createLinearGradient(0, 0, 0, h * 0.3);
+          top.addColorStop(0, "rgba(0,0,0,0)");
+          top.addColorStop(1, "rgba(0,0,0,1)");
+          g.fillStyle = top;
+          g.fillRect(0, 0, w, h); // the whole canvas: destination-in clears what it does not cover
+        }
+        resolve(c);
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+  // The new picture fades in over the old one, which then goes.
+  function setArt(box, art) {
+    const old = [...box.querySelectorAll(":scope > .hero-art")];
+    if (art) box.insertBefore(art, box.querySelector(".hero-text"));
+    setTimeout(() => old.forEach((o) => o.remove()), art ? 700 : 0);
   }
 
   let heroShown = null;
   async function showHero(hero, h) {
     heroShown = h;
-    const buttons = h.actions.map(([kind, icon, text, fn]) => {
+    const compact = hero.classList.contains("compact");
+    const buttons = (compact ? [] : h.actions || []).map(([kind, icon, text, fn]) => {
       const b = el("button", { className: "button focusable " + kind });
       window.VodMax.label(b, icon, text);
       b.onclick = fn;
       return b;
     });
     const plot = el("p", { className: "hero-plot" });
-    const art = el("div", { className: "hero-art" });
+    const title = el("h1", {}, h.title);
+    const meta = el("div", { className: "hero-meta" }, ...metaLine(h));
     // A focused hero button keeps the focus on the new one in its place.
     const had = hero.contains(document.activeElement) ? [...hero.querySelectorAll("button")].indexOf(document.activeElement) : -1;
-    hero.replaceChildren(art, el("div", { className: "hero-text" }, el("h1", {}, h.title),
-      el("p", { className: "hero-meta" }, h.meta.filter(Boolean).join(" · ")), plot, el("div", { className: "hero-actions" }, ...buttons)));
+    // The eyebrow names the page (Film, Serie, In onda adesso): a heading.
+    const text = el("div", { className: "hero-text" }, h.eyebrow ? el("h2", { className: "eyebrow" }, h.eyebrow) : null, h.mark || null, title, meta,
+      compact ? null : plot, buttons.length ? el("div", { className: "hero-actions" }, ...buttons) : null);
+    const old = hero.querySelector(".hero-text");
+    if (old) old.replaceWith(text); else hero.append(text);
+    heroTop();
     if (had >= 0 && buttons.length) buttons[Math.min(had, buttons.length - 1)].focus();
-    if (h.logo) art.style.backgroundImage = "url(" + JSON.stringify(h.logo) + ")";
-    const d = await detailsOf(h.id);
+    if (h.art) { setArt(hero, h.art()); return; } // a channel: its glow, no details
+    const d = h.id ? await detailsOf(h.id) : {};
     if (heroShown !== h) return;
     plot.textContent = d.plot || "";
-    if (d.backdrop) {
-      const img = new Image();
-      img.onload = () => { if (heroShown === h) { art.style.backgroundImage = "url(" + JSON.stringify(d.backdrop) + ")"; art.classList.add("wide"); window.VodMax.setAmbient(d.backdrop); } };
-      img.src = d.backdrop;
-    }
+    meta.replaceChildren(...metaLine({ ...h, rating: d.rating || h.rating, text: [...(h.text || []), ...detailText(d)] }));
+    if (d.logo) titleLogo(title, d.logo, h.title);
+    const art = d.backdrop ? await fadedArt(d.backdrop, hero, !hero.classList.contains("under")) : null;
+    if (heroShown !== h) return;
+    setArt(hero, art);
+    window.VodMax.setAmbient(d.backdrop || h.poster || "");
   }
 
+  // Home's hero lies under the header: the bar is clear while it is over
+  // the picture and gets its dark band back once the page scrolls on.
+  const header = document.querySelector("header.top");
+  function heroTop() {
+    document.documentElement.style.setProperty("--top-h", header.offsetHeight + "px");
+    // Clear until the title and its buttons would pass under the bar.
+    const hero = $("content").querySelector(".hero.under");
+    const text = hero && hero.querySelector(".hero-text");
+    document.body.classList.toggle("over-hero", Boolean(hero) && (text ? text.getBoundingClientRect().top > header.offsetHeight : window.scrollY < 8));
+  }
+  window.addEventListener("scroll", heroTop, { passive: true });
+  window.addEventListener("resize", heroTop);
+
+  // The hue of a channel's initials tile (common.js channelArt), to tint
+  // its tile on Home whether it shows the logo or the initials.
+  function channelHue(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    return (Math.imul(h, 2654435761) >>> 0) % 360;
+  }
+  const onAir = (p, now = Date.now() / 1000) => (p ? Math.min(100, Math.max(0, ((now - p.start) / (p.stop - p.start)) * 100)) : 0);
+
+  // "In onda sui tuoi canali": a dark tile tinted with the channel's colour,
+  // its logo, what is on with its progress, what follows.
   function channelCard(c) {
     const p = c.now;
-    const pct = p ? Math.min(100, Math.max(0, ((Date.now() / 1000 - p.start) / (p.stop - p.start)) * 100)) : 0;
-    const art = el("div", { className: "poster channel-art" }, window.VodMax.channelArt(c));
-    const card = el("button", { className: "card wide focusable" }, art,
-      p ? el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })) : null,
-      el("span", { className: "label" }, c.number + " · " + c.name), el("span", { className: "sub" }, p ? p.title : t("Nessuna informazione")));
+    const tile = el("div", { className: "poster ch-tile" },
+      el("span", { className: "ch-head" }, window.VodMax.channelArt(c), el("span", { className: "ch-num tnum" }, c.number || "")),
+      el("span", { className: "eyebrow tnum" }, p ? t("In onda") + " · " + hhmm(p.start) + " – " + hhmm(p.stop) : c.name),
+      el("strong", { className: "ch-now" }, p ? p.title : t("Nessuna informazione")),
+      p ? el("span", { className: "ch-bar" }, el("span", { style: "width:" + onAir(p) + "%" })) : null,
+      c.next ? el("span", { className: "ch-next" }, t("A seguire") + " · " + c.next.title) : null);
+    tile.style.setProperty("--tint", "hsla(" + channelHue(String(c.name || "")) + ", 45%, 34%, 0.35)");
+    const card = el("button", { className: "card wide focusable" }, tile, el("span", { className: "label" }, c.name));
     card.onclick = () => { location.href = "/tv.html?channel=" + c.id; };
     return card;
   }
@@ -427,15 +638,19 @@
     // Two providers (or two local collections) can use the same category id.
     if (b.category && b.categorySub) q.set("category_subscription", b.categorySub);
     if (cursor) q.set("cursor", cursor);
-    if (!grid) main.replaceChildren(el("h2", { className: "page-title" }, kind === "movie" ? t("Film") : t("Serie")), filterBar(kind, b), skeletonRow(false));
+    if (!grid) main.replaceChildren(el("section", { className: "hero compact" }), filterBar(kind, b), skeletonRow(false));
     const my = renderSeq; // "Altri titoli" too: dropped if the page changed meanwhile
     const page = await api("GET", "/api/v1/catalog/" + kind + "?" + q);
     if (my !== renderSeq) return;
     if (!grid) {
       grid = el("div", { className: "grid" });
       main.lastElementChild.replaceWith(page.items.length ? grid : el("p", { className: "empty" }, t("Nessun titolo con questi filtri.")));
+      // The header shows the first title, then the focused one.
+      const hero = main.querySelector(".hero");
+      if (page.items.length) showHero(hero, { ...heroFromItem(page.items[0]), eyebrow: kind === "movie" ? t("Film") : t("Serie") });
+      else hero.remove();
     }
-    grid.append(...page.items.map(itemCard));
+    grid.append(...itemCards(page.items));
     const oldMore = main.querySelector(".more");
     if (oldMore) oldMore.remove();
     if (page.next) {
@@ -515,7 +730,7 @@
     if (state.view === "series") sections.reverse(); // the current tab's kind first
     const parts = [];
     for (const [label, items] of sections) {
-      if (items.length) parts.push(el("h2", { className: "section" }, label), el("div", { className: "grid" }, ...items.map(itemCard)));
+      if (items.length) parts.push(el("h2", { className: "section" }, label), el("div", { className: "grid" }, ...itemCards(items)));
     }
     if (!parts.length) parts.push(el("p", { className: "empty" }, t("Nessun risultato per “{query}”.", { query: state.query })));
     main.replaceChildren(...parts);
@@ -533,8 +748,8 @@
     const usage = [t("Usati {size}", { size: gb(space.used_bytes) }), space.free_bytes >= 0 ? t("liberi {size}", { size: gb(space.free_bytes) }) : "",
       space.max_gb ? t("limite {n} GB", { n: space.max_gb }) : "", space.keep_days ? t("si tengono {n} giorni", { n: space.keep_days }) : ""].filter(Boolean).join(" · ");
     const parts = [el("h2", { className: "page-title" }, t("Registrazioni")), el("p", { className: "empty" }, usage)];
-    if (!list.length) parts.push(el("p", { className: "empty" }, t("Nessuna registrazione. In TV premi R (tasto blu) sul programma in onda, " +
-      "oppure registra dalla Guida, oppure crea una regola qui sotto.")));
+    if (!list.length) parts.push(emptyState("video", t("Nessuna registrazione. In TV premi R (tasto blu) sul programma in onda, " +
+      "oppure registra dalla Guida, oppure crea una regola qui sotto."), ["calendar-days", t("Guida TV"), () => { location.href = "/guide.html"; }]));
     else {
       parts.push(el("p", { className: "empty" }, t("OK guarda · Giallo (P) protegge dalla cancellazione automatica · Rosso (Canc) elimina")));
       parts.push(el("ol", { className: "recs" }, ...list.map((r) => {
@@ -577,8 +792,8 @@
     const list = await api("GET", "/api/v1/mylist");
     if (my !== renderSeq) return;
     main.replaceChildren(el("h2", { className: "page-title" }, t("La mia lista")),
-      list.length ? el("div", { className: "grid" }, ...list.map(itemCard))
-        : el("p", { className: "empty" }, t("La lista è vuota. Nella scheda di un film o di una serie premi “La mia lista” per ritrovarlo qui.")));
+      list.length ? el("div", { className: "grid" }, ...itemCards(list))
+        : emptyState("bookmark", t("La lista è vuota. Nella scheda di un film o di una serie premi “La mia lista” per ritrovarlo qui."), ["film", t("Vai ai film"), goView("movie")]));
   }
 
   // The "My list" button of a detail page.
@@ -617,8 +832,8 @@
       : Math.round(b / 1e6).toLocaleString(locale) + " MB";
     const box = el("section", { id: "downloads" }, el("h2", { className: "page-title" }, t("Download")));
     if (!list.length) {
-      box.append(el("p", { className: "empty" }, t("Nessun download. Nella scheda di un film o di una serie premi “Scarica”: il server lo copia sul suo disco, " +
-        "senza togliere la connessione a chi guarda, e lo trovi nelle raccolte «Scaricati».")));
+      box.append(emptyState("download", t("Nessun download. Nella scheda di un film o di una serie premi “Scarica”: il server lo copia sul suo disco, " +
+        "senza togliere la connessione a chi guarda, e lo trovi nelle raccolte «Scaricati»."), ["film", t("Vai ai film"), goView("movie")]));
       return box;
     }
     box.append(el("ol", { className: "downloads" }, ...list.map((d) => {
@@ -868,19 +1083,29 @@
     const panel = $("detail");
     $("detail-plot").textContent = "";
     $("detail-credits").replaceChildren();
-    panel.classList.remove("with-backdrop");
-    panel.style.backgroundImage = "";
+    $("cast").hidden = true;
+    $("detail-image").hidden = true;
+    setArt($("detail-art"), null);
     let d;
-    try { d = await api("GET", "/api/v1/items/" + item.id + "/details"); } catch { return; }
+    try { d = await api("GET", "/api/v1/items/" + item.id + "/details"); } catch { $("detail-image").hidden = !item.logo; return; }
     if (state.detail !== item) return;
     if (d.title && d.title.toLowerCase() !== item.display_title.toLowerCase()) $("detail-title").textContent = d.title;
-    const meta = $("detail-meta").textContent;
-    const extra = [d.duration ? Math.round(d.duration / 60) + " min" : "", d.genre].filter(Boolean).join(" · ");
-    if (extra) $("detail-meta").textContent = [meta, extra].filter(Boolean).join(" · ");
+    if (d.logo) titleLogo($("detail-title"), d.logo, $("detail-title").textContent);
+    $("detail-meta").replaceChildren(...detailMeta(item, d));
     $("detail-plot").textContent = d.plot || "";
-    const rows = [[t("Regia"), d.director], [t("Cast"), d.cast], [t("Uscita"), d.released], [t("Paese"), d.country],
+    const people = (d.people || []).slice(0, 12);
+    const rows = [[t("Regia"), d.director], [t("Cast"), people.length ? "" : d.cast], [t("Uscita"), released(d.released)], [t("Paese"), d.country],
       [t("Titolo originale"), d.original_title && d.original_title !== item.display_title ? d.original_title : ""]];
     for (const [k, v] of rows) if (v) $("detail-credits").append(el("dt", {}, k), el("dd", {}, v));
+    // The cast with TMDB's photos, initials without one. Not focusable:
+    // there is no search by person to open.
+    $("cast-list").replaceChildren(...people.map((p) => {
+      const initials = el("span", { className: "cast-photo" }, p.name.split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase());
+      const face = p.photo ? el("img", { className: "cast-photo", src: p.photo, alt: "", loading: "lazy" }) : initials;
+      if (p.photo) face.onerror = () => face.replaceWith(initials);
+      return el("li", {}, face, el("strong", {}, p.name), p.role ? el("span", {}, p.role) : null);
+    }));
+    $("cast").hidden = !people.length;
     if (!d.local && item.kind === "movie") addDownloadButtons(item);
     if (d.trailer) {
       const a = el("a", { className: "button focusable trailer", href: "https://www.youtube.com/watch?v=" + encodeURIComponent(d.trailer),
@@ -888,16 +1113,37 @@
       window.VodMax.label(a, "circle-play", "Trailer");
       $("detail-actions").append(a);
     }
+    // The backdrop over the whole top of the page, fading into the ambient;
+    // the poster only when there is none.
+    $("detail-image").hidden = Boolean(d.backdrop) || !item.logo;
+    panel.classList.toggle("with-backdrop", Boolean(d.backdrop));
     if (d.backdrop) {
-      const img = new Image();
-      img.onload = () => {
-        if (state.detail !== item) return;
-        panel.style.backgroundImage = "url(" + JSON.stringify(d.backdrop) + ")";
-        panel.classList.add("with-backdrop");
-        window.VodMax.setAmbient(d.backdrop);
-      };
-      img.src = d.backdrop;
+      window.VodMax.setAmbient(d.backdrop);
+      const art = await fadedArt(d.backdrop, $("detail-art"), false, true);
+      if (state.detail === item) setArt($("detail-art"), art);
     }
+  }
+
+  // TMDB's ISO date in words ("1 gennaio 2010"); a provider's free text as it is.
+  const released = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || "")
+    ? new Date(s + "T00:00").toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" }) : s;
+
+  // Year, duration, genres, versions as text; rating and quality as pills.
+  function detailMeta(item, d = {}) {
+    // TMDB's rating when known, as on the hero: the same title shows the
+    // same rating wherever its page was opened from.
+    return metaLine({ year: item.year, quality: item.quality, rating: d.rating || item.rating,
+      text: [d.duration ? Math.round(d.duration / 60) + " min" : "", d.genre, item.variant_count > 1 ? t("{n} versioni", { n: item.variant_count }) : ""] });
+  }
+
+  // "Titoli simili": titles of the catalogue sharing genres, as cards.
+  async function showSimilar(item) {
+    $("similar").hidden = true;
+    $("similar-row").replaceChildren();
+    const list = await api("GET", "/api/v1/items/" + item.id + "/similar").catch(() => []);
+    if (state.detail !== item || !list.length) return;
+    $("similar-row").replaceChildren(...itemCards(list));
+    $("similar").hidden = false;
   }
 
   // ---- Downloads to the server's disk ----
@@ -949,16 +1195,16 @@
     if (!state.detail) state.detailFrom = document.activeElement;
     state.detail = item;
     $("detail-title").textContent = item.display_title;
-    $("detail-meta").textContent = [item.year, { 4: "4K", 3: "Full HD", 2: "HD", 1: "SD" }[item.quality],
-      item.variant_count > 1 ? t("{n} versioni", { n: item.variant_count }) : "",
-      item.rating ? "★ " + Number(item.rating).toLocaleString(locale, { maximumFractionDigits: 1 }) : ""].filter(Boolean).join(" · ");
-    $("detail-image").hidden = !item.logo;
+    $("detail-meta").replaceChildren(...detailMeta(item));
     if (item.logo) $("detail-image").src = item.logo;
+    $("detail").scrollTop = 0; // a similar title opens at its top
     // A poster the server cannot fetch (404, 502) leaves no broken-image box.
     $("detail-image").onerror = () => { $("detail-image").hidden = true; };
     showDetails(item);
+    showSimilar(item);
     $("seasons").replaceChildren();
     $("episodes").replaceChildren();
+    $("episodes-title").hidden = item.kind !== "series";
     const actions = $("detail-actions");
     actions.replaceChildren();
     $("detail").hidden = false;
@@ -1030,15 +1276,20 @@
       $("episodes").replaceChildren(...eps.filter((e) => e.season === season).map((e) => {
         const pct = e.progress ? (e.progress.completed ? 100 : (e.progress.position / (e.progress.duration || 1)) * 100) : 0;
         const thumb = el("span", { className: "ep-thumb" }, el("span", { className: "ep-num" }, e.number));
+        // The badge only over a picture: without one the big number says it.
         if (e.thumb) {
           const img = el("img", { src: e.thumb, alt: "", loading: "lazy" });
-          img.onerror = () => img.remove();
-          thumb.append(img);
+          const badge = el("span", { className: "badge" }, "E" + e.number);
+          img.onerror = () => { img.remove(); badge.remove(); };
+          thumb.append(img, badge);
         }
-        if (e.duration) thumb.append(el("span", { className: "ep-dur" }, Math.round(e.duration / 60) + " min"));
         if (pct) thumb.append(el("span", { className: "bar" }, el("div", { style: "width:" + pct + "%" })));
+        const p = e.progress;
+        const info = [e.duration ? Math.round(e.duration / 60) + " min" : "",
+          p && p.completed ? t("Visto") : p && p.duration ? t("Mancano {time}", { time: clock(p.duration - p.position) }) : ""].filter(Boolean).join(" · ");
         const b = el("button", { className: "focusable ep-card" + (e === next ? " next" : "") }, thumb,
-          el("span", { className: "ep-text" }, el("strong", {}, e.number + ". " + (e.title || t("Episodio {n}", { n: e.number }))),
+          el("span", { className: "ep-text" }, el("strong", {}, e.title || t("Episodio {n}", { n: e.number })),
+            info ? el("span", { className: "ep-info tnum" }, info) : null,
             e.plot ? el("span", { className: "ep-plot" }, e.plot) : null));
         b.title = e.plot || "";
         b.onclick = () => play("episode", e.id, item.display_title + " · S" + e.season + "E" + e.number + " " + e.title,
@@ -1052,15 +1303,15 @@
       if (cur) row.scrollLeft = Math.max(0, cur.parentElement.getBoundingClientRect().left - row.getBoundingClientRect().left - 8);
     };
     $("seasons").replaceChildren(...seasons.map((s) => {
-      const b = el("button", { className: "tab focusable" }, t("Stagione {n}", { n: s }));
+      const b = el("button", { className: "chip focusable" }, t("Stagione {n}", { n: s }));
       b.dataset.season = s;
       b.onclick = () => showSeason(s);
       return b;
     }));
     if (next) {
       const code = { episode: "S" + next.season + "E" + next.number };
-      const go = el("button", { className: "button focusable" },
-        next.progress && !next.progress.completed ? t("Riprendi {episode}", code) : t("Guarda {episode}", code));
+      const go = el("button", { className: "button primary focusable" });
+      window.VodMax.label(go, "play", next.progress && !next.progress.completed ? t("Riprendi {episode}", code) : t("Guarda {episode}", code));
       go.onclick = () => play("episode", next.id, item.display_title + " · S" + next.season + "E" + next.number + " " + next.title,
         next.progress && !next.progress.completed ? next.progress.position : 0);
       $("detail-actions").prepend(go);
@@ -1073,6 +1324,7 @@
   $("detail-back").onclick = () => closeDetail();
   function closeDetail() {
     $("detail").hidden = true;
+    document.body.classList.remove("with-detail"); // the page below is hidden until then, and hidden things take no focus
     state.detail = null;
     const from = state.detailFrom;
     state.detailFrom = null;
@@ -1252,7 +1504,7 @@
         ...p.sess.subtitles.map((tr) => ({ label: trackLabel(tr, "sub"), on: tr.index === p.sub, ok: tr.supported, pick: () => switchTracks(p.audio, tr.index, { sub: tr.language }) }))];
     const buttons = items.map((it) => {
       const b = document.createElement("button");
-      b.className = "focusable" + (it.on ? " on" : "");
+      b.className = "chip focusable" + (it.on ? " active" : "");
       b.textContent = (it.on ? "✓ " : "") + it.label;
       b.disabled = !it.ok;
       b.onclick = () => { closeMenu(); it.pick(); };
@@ -1262,7 +1514,7 @@
     menu.replaceChildren(title, ...buttons);
     menu.hidden = false;
     showBar();
-    (buttons.find((b) => b.classList.contains("on")) || buttons[0]).focus();
+    (buttons.find((b) => b.classList.contains("active")) || buttons[0]).focus();
   }
   function closeMenu() { $("player-menu").hidden = true; }
 
@@ -1844,6 +2096,9 @@
       const dx = bx - ax, dy = by - ay;
       const ok = { ArrowLeft: dx < -4, ArrowRight: dx > 4, ArrowUp: dy < -4, ArrowDown: dy > 4 }[dir];
       if (!ok) continue;
+      // Up and Down go from row to row and keep the column: "Vedi tutti"
+      // is reached with Right from the row's last card (below).
+      if (!horizontal && e.classList.contains("see-all")) continue;
       // Across: the gap between the two boxes (0 when they line up), so a
       // field to the side of its label is not skipped for a button below.
       const along = horizontal ? Math.abs(dx) : Math.abs(dy);
@@ -1874,6 +2129,8 @@
     }
     let best = null, bestScore = Infinity;
     for (const c of found) if (c.score < bestScore) { bestScore = c.score; best = c.e; }
+    const row = current.closest(".row");
+    if (!best && dir === "ArrowRight" && row && row.previousElementSibling) best = row.previousElementSibling.querySelector(".see-all");
     if (!best) return;
     // Scrolled by the least that shows it whole (scroll-margin keeps the
     // focus ring in view): focus() alone centres a card that is off screen,

@@ -788,5 +788,13 @@
   "Guida TV (Guida / E)": "TV guide (Guide / E)",
   "Rimangono {n} min": "{n} min left",
   "Cerca un canale": "Search channels",
-  "Nessun canale per «{q}»": "No channels for “{q}”"
+  "Nessun canale per «{q}»": "No channels for “{q}”",
+  "Vedi tutti": "See all",
+  "In onda": "On now",
+  "Nuovo": "New",
+  "In onda adesso": "Now on air",
+  "Titoli simili": "Similar titles",
+  "Visto": "Watched",
+  "Vai ai film": "Go to movies",
+  "Episodi": "Episodes"
 }
