@@ -734,11 +734,11 @@
   let dialogAction = null;
   function confirmDialog(text, action) {
     $("dialog-text").textContent = text;
-    $("dialog").hidden = false;
+    $("dialog").hidden = $("dialog-scrim").hidden = false;
     dialogAction = action;
   }
   function closeDialog(confirmed) {
-    $("dialog").hidden = true;
+    $("dialog").hidden = $("dialog-scrim").hidden = true;
     const a = dialogAction;
     dialogAction = null;
     if (confirmed && a) a();

@@ -152,6 +152,7 @@ body.controls-on .digits { top: 6.5rem; }
 
 #dialog-text { margin: 0 0 var(--s2); font-size: var(--t-l); font-weight: 600; white-space: pre-line; }
 .dialog .hint { margin: 0; }
+#dialog { z-index: 8; } /* over its .scrim */
 
 @media (prefers-reduced-motion: no-preference) {
   .banner, .list { transition: opacity 0.15s ease; }
@@ -309,7 +310,8 @@ body.controls-on .banner { display: none; }
 /* Phone: the info bar across the width, smaller number and tile, the
    badges in a row under the text. */
 @media (max-width: 700px) {
-  .banner { left: var(--s4); right: var(--s4); bottom: calc(var(--s4) + env(safe-area-inset-bottom)); flex-wrap: wrap; gap: var(--s2) var(--s3); width: auto; max-width: none; padding: var(--s4); }
+  .banner { left: var(--s4); right: var(--s4); bottom: calc(var(--s4) + env(safe-area-inset-bottom)); flex-wrap: wrap; align-items: flex-start; gap: var(--s2) var(--s3); width: auto; max-width: none; padding: var(--s4); }
+  .banner .info { flex-basis: 0; } /* beside the number and the tile, not under them */
   .banner .number { font-size: var(--t-xl); min-width: 0; }
   .banner .logo { width: 3rem; height: 3rem; }
   .banner .logo .ch-art.mono { font-size: var(--t-s); }
