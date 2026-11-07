@@ -101,8 +101,10 @@ versione).
 | <img src="docs/screenshots/assistant-rule.jpg" alt="Assistente: una regola da una frase"> | <img src="docs/screenshots/assistant-settings.jpg" alt="Impostazioni dell'assistente"> |
 | Assistente: una regola di registrazione da una frase, da controllare prima di salvare | Impostazioni dell'assistente: integrato, servizio online o un tuo server |
 
-<sub>Dati di esempio: canali e guida inventati, titoli dei film open source
-del Blender Studio con immagini generate.</sub>
+<sub>Dati di esempio: canali e guida inventati, i film open source del Blender
+Studio (CC BY) e qualche titolo inventato illustrato con foto di pubblico dominio.
+I loghi dei titoli sono scritte disegnate per la demo, non i loghi dei film.
+Crediti delle immagini: [docs/screenshots/CREDITS.md](docs/screenshots/CREDITS.md).</sub>
 
 ## Installazione
 

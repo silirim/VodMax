@@ -101,8 +101,10 @@ reports are very welcome (open an issue with the device and the version).
 | <img src="docs/screenshots/assistant-rule.jpg" alt="Assistant: a recording rule from a sentence"> | <img src="docs/screenshots/assistant-settings.jpg" alt="Assistant settings"> |
 | Assistant: a recording rule from a sentence, checked before saving | Assistant settings: built in, online service or your own server |
 
-<sub>Screenshots use demo data: invented channels and guide, and the titles
-of the Blender Studio open movies with generated artwork. The interface is in
+<sub>Screenshots use demo data: invented channels and guide, the Blender Studio open
+movies (CC BY) and a few invented titles illustrated with public-domain photos.
+The title logos are wordmarks drawn for the demo, not the films' logos. Artwork
+credits: [docs/screenshots/CREDITS.md](docs/screenshots/CREDITS.md). The interface is in
 Italian, English, Spanish, French, German and Polish (chosen per device; new
 languages are one dictionary file each).</sub>
 
