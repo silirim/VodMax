@@ -2,6 +2,17 @@
 
 .more { margin: 1.2rem 0; }
 
+/* One opaque card look for the lists of these pages (as ui.css .box),
+   one focus look for those that are buttons; hover only with a mouse
+   (on touch it would stay after a tap). */
+.rule, .form-card, .downloads li, .channels button, .recs li > button.rec, .episodes .ep-card {
+  background: var(--surface); border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.channels button:focus, .recs li > button.rec:focus, .episodes .ep-card:focus { outline: none; background: var(--raised); border-color: var(--focus); box-shadow: var(--glow); }
+@media (hover: hover) and (pointer: fine) {
+  .channels button:hover, .recs li > button.rec:hover, .episodes .ep-card:hover { border-color: rgba(255, 255, 255, 0.55); }
+}
+
 /* Detail: translucent over the ambient (common.js), the page below hidden
    while it is open; the backdrop (a canvas, vod.js fadedArt) across the
    top of the page, scrolling with it and fading into the ambient. */
@@ -67,12 +78,11 @@ body.with-detail main, body.with-detail header.top { visibility: hidden; }
 .episodes.ep-row li { flex: none; width: 34vw; min-width: 24rem; max-width: 40rem; margin-right: var(--gap); }
 .episodes .ep-card {
   display: flex; align-items: stretch; height: 100%; padding: 0;
-  overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s);
+  overflow: hidden; border-radius: var(--r-s);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow-s);
   transition: transform var(--dur) var(--ease), box-shadow var(--dur), border-color var(--dur);
 }
-.episodes .ep-card:focus { outline: none; background: var(--raised); border-color: var(--focus); box-shadow: var(--glow); transform: scale(1.03); }
-@media (hover: hover) and (pointer: fine) { .episodes .ep-card:hover { border-color: rgba(255, 255, 255, 0.55); } }
+.episodes .ep-card:focus { transform: scale(1.03); }
 .ep-thumb { position: relative; flex: none; display: block; width: 52%; height: 0; padding-top: 29.25%; overflow: hidden; background: linear-gradient(160deg, var(--raised), var(--surface)); }
 .ep-thumb img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
 .ep-num { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2.6rem; font-weight: 800; color: rgba(255, 255, 255, 0.18); }
@@ -107,15 +117,10 @@ html { scroll-padding-top: 6.5rem; }
   font: inherit;
   color: var(--text);
   text-align: left;
-  background: var(--surface);
-  border: 1px solid var(--line);
   border-radius: var(--r-s);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   cursor: pointer;
   transition: border-color var(--dur), box-shadow var(--dur);
 }
-.recs li > button.rec:hover { border-color: rgba(255, 255, 255, 0.55); }
-.recs li > button.rec:focus { outline: none; background: var(--raised); border-color: var(--focus); box-shadow: var(--glow); }
 .recs .state { color: var(--soft); }
 .recs .state.recording { color: var(--rec); font-weight: 600; }
 
@@ -163,13 +168,13 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .credits dd { margin: 0; color: var(--text); }
 
 /* Recording rules */
-.rule { margin: 1rem 0; padding: 1.2rem 1.4rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.rule { margin: 1rem 0; padding: 1.2rem 1.4rem; border-radius: var(--r-s); }
 .rule .actions { margin-top: 0.8rem; gap: 0.5rem; }
 .rule p { margin: 0.3rem 0; }
 .rule > strong:first-child { display: block; margin-bottom: 0.3rem; font-size: 1.15rem; }
 .rule-form { display: grid; gap: 0.9rem; max-width: 52rem; margin: 0; }
 /* A form for a new item, in a card like those of the settings. */
-.form-card { margin: 2rem 0 3rem; padding: 1.4rem 1.7rem 1.6rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.form-card { margin: 2rem 0 3rem; padding: 1.4rem 1.7rem 1.6rem; border-radius: var(--r); }
 .form-card > h2.section { margin: 0 0 1rem; }
 @media (max-width: 700px) { .form-card { padding: 1.1rem 1.1rem 1.2rem; border-radius: var(--r-s); } }
 .rule-field { display: grid; grid-template-columns: 12rem 1fr; align-items: center; gap: 1rem; color: var(--soft); }
@@ -201,10 +206,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .tv-tools { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.5rem 0 1rem; }
 .channels { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(26rem, 100%), 1fr)); gap: 0.5rem; }
 .channels button { display: grid; grid-template-columns: 3rem 3.2rem 1fr; gap: 0.8rem; align-items: center; width: 100%; padding: 0.6rem 0.8rem;
-  font: inherit; color: var(--text); text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); cursor: pointer; transition: border-color var(--dur), box-shadow var(--dur); }
-.channels button:hover { border-color: rgba(255, 255, 255, 0.55); }
-.channels button:focus { outline: none; background: var(--raised); border-color: var(--focus); box-shadow: var(--glow); }
+  font: inherit; color: var(--text); text-align: left; border-radius: var(--r-s); cursor: pointer; transition: border-color var(--dur), box-shadow var(--dur); }
 .channels .num { color: var(--soft); text-align: right; font-variant-numeric: tabular-nums; }
 .channels .ch-art { width: 3.2rem; height: 2.2rem; }
 .channels .what { overflow: hidden; min-width: 0; }
@@ -322,7 +324,7 @@ body.over-hero .top::after { opacity: 0; }
 
 /* Downloads, above the recordings. */
 .downloads { list-style: none; padding: 0; margin: 0.6rem 0 1.6rem; display: grid; gap: 0.6rem; }
-.downloads li { display: flex; gap: 1rem; align-items: center; padding: 1rem 1.4rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.downloads li { display: flex; gap: 1rem; align-items: center; padding: 1rem 1.4rem; border-radius: var(--r-s); }
 .downloads .dl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
 .downloads .dl-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .downloads .state.downloading { color: var(--accent); }
