@@ -1,11 +1,35 @@
-html, body { margin: 0; height: 100%; background: #0b0c10; color: #f5f5f7; font-family: "LG Smart UI", system-ui, sans-serif; }
-#launcher { box-sizing: border-box; max-width: 60rem; margin: 0 auto; padding: 18vh 5vw 0; font-size: 28px; }
-h1 { margin: 0 0 1rem; font-size: 72px; }
+/* The VodMax look (decision 0051) without the web's files: same colours,
+   a dark glass-like panel, pill buttons, white when focused (two white
+   pills side by side would hide which one has the remote). Inter is not
+   on the TV: the system font. Sizes in px: the app always runs at 1920x1080. */
+html, body { margin: 0; height: 100%; color: #f5f5f7; font-family: "LG Smart UI", system-ui, sans-serif; }
+body { background: #0b0c10 radial-gradient(ellipse at 30% 0%, rgba(0, 214, 202, 0.10), rgba(11, 12, 16, 0) 60%) no-repeat; }
+#launcher {
+  box-sizing: border-box; max-width: 1040px; margin: 16vh auto 0; padding: 56px 64px 48px; font-size: 28px; line-height: 1.4;
+  background: rgba(30, 33, 42, 0.94) linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 42%);
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 22px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+h1 { margin: 0 0 16px; font-size: 64px; font-weight: 800; letter-spacing: -0.02em; }
+/* The word mark's accent dot, as in the web header. */
+h1::after { content: ""; display: inline-block; width: 14px; height: 14px; margin-left: 6px; border-radius: 50%; background: linear-gradient(90deg, #00f5a0, #00b8f5); }
 #message { color: #a9abb5; min-height: 1.4em; }
-input { box-sizing: border-box; width: 100%; padding: 0.6em 0.9em; font: inherit; color: #f5f5f7; background: #1d2028; border: 3px solid transparent; border-radius: 14px; }
-input:focus { border-color: #fff; outline: none; }
-.buttons { margin-top: 1rem; }
-button { padding: 0.6em 1.4em; margin-right: 0.6rem; font: inherit; font-weight: 600; color: #f5f5f7; background: #2a2d36; border: 0; border-radius: 999px; }
-button:focus { color: #0b0c10; background: #fff; outline: none; }
-.hint { color: #6e717c; font-size: 22px; margin-top: 2rem; }
+input {
+  box-sizing: border-box; width: 100%; padding: 0.6em 0.9em; font: inherit; color: #f5f5f7;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+input:focus { border-color: #fff; box-shadow: 0 0 0 2px #fff; outline: none; }
+input::placeholder { color: #a9abb5; }
+.buttons { margin-top: 24px; }
+button {
+  min-height: 2.4em; padding: 0.5em 1.4em; margin-right: 16px; font: inherit; font-weight: 600; color: #f5f5f7;
+  background: rgba(255, 255, 255, 0.10); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+button:focus {
+  color: #0b0c10; background: #fff; border-color: #fff; outline: none; transform: scale(1.06);
+  box-shadow: 0 0 0 3px #fff, 0 0 0 7px rgba(255, 255, 255, 0.22), 0 0 40px rgba(255, 255, 255, 0.18);
+}
+.hint { color: #a9abb5; font-size: 22px; margin: 32px 0 0; }
 .bad { color: #ff9a92; }
