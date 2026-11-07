@@ -3,6 +3,15 @@
    phone: large text that grows with the screen, safe margins, one strong
    focus style everywhere, icons from icons.js. */
 
+/* Inter, served by VodMax itself: a TV must look the same without
+   internet (decision 0051). One variable file covers every weight. */
+@font-face {
+  font-family: "Inter";
+  src: url(fonts/InterVariable.woff2) format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 :root {
   --bg: #0b0c10;
   --surface: #13151b;
@@ -27,8 +36,10 @@
   --safe: clamp(16px, 4vw, 96px);
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  /* "Dimensione testo" in the settings: 0.9 / 1 / 1.15 (look.js sets it). */
+  --font-scale: 1;
   /* ~15 px on a phone, ~18 px on a laptop, ~24 px on a 1080p TV, more on 4K. */
-  font-size: clamp(15px, 0.95vw + 6px, 34px);
+  font-size: calc(clamp(15px, 0.95vw + 6px, 34px) * var(--font-scale));
   line-height: 1.4;
   color-scheme: dark;
   -webkit-font-smoothing: antialiased;

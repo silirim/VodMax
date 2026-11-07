@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
 	"strings"
@@ -13,6 +14,10 @@ import (
 
 //go:embed static
 var static embed.FS
+
+// The font: a container without /etc/mime.types would serve it as a plain
+// octet stream, and the pages preload it as font/woff2.
+func init() { mime.AddExtensionType(".woff2", "font/woff2") }
 
 // Handler serves the interface. The content security policy allows no
 // external resource: the interface must never reach a provider (or
