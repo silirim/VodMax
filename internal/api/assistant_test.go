@@ -421,7 +421,10 @@ func TestAssistantServiceRefuses(t *testing.T) {
 		t.Fatalf("no credit: %d %s", code, body)
 	}
 	set(401, `{"error":{"message":"Incorrect API key provided: sk-proj-****abcd"}}`)
-	code, body = e.do(t, "POST", "/api/v1/assistant/tonight", map[string]string{"wish": ""}, true)
+	// A wish asks the model whatever the hour: the test guide covers only
+	// the next few hours, so a plain "tonight" in the morning has nothing
+	// to propose and never reaches the model.
+	code, body = e.do(t, "POST", "/api/v1/assistant/tonight", map[string]string{"wish": "un film"}, true)
 	if code != 502 || strings.Contains(string(body), "abcd") || !strings.Contains(string(body), "chiave API") {
 		t.Fatalf("key refused: %d %s", code, body)
 	}
