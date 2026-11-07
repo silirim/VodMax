@@ -134,8 +134,7 @@ window.GuideGrid = (() => {
           n.style.left = pct(now) + "%";
           line.append(n);
         }
-        const name = el("div", { className: "name" + (r.channel.logo ? "" : " no-logo") }, el("b", {}, r.channel.number || ""),
-          r.channel.logo ? el("img", { src: r.channel.logo, alt: "", loading: "lazy" }) : null, r.channel.name,
+        const name = el("div", { className: "name" }, el("b", {}, r.channel.number || ""), window.VodMax.channelArt(r.channel), r.channel.name,
           r.channel.catchup_days ? el("small", { className: "archive", title: t("Archivio di {days} giorni", { days: r.channel.catchup_days }) }, "↺") : null);
         return el("div", { className: "guide-row" }, name, line);
       });

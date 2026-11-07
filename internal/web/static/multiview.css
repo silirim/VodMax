@@ -10,6 +10,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: #000; color:
 .mv-label { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 0.6em; padding: 1.4em 0.8em 0.5em;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.85)); font-size: 0.9rem; pointer-events: none; }
 .mv-label .number { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+.mv-label .ch-art { width: 2.2em; height: 1.6em; flex: none; }
 .mv-label .name { font-weight: 600; white-space: nowrap; }
 .mv-label .now { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mv-label svg { width: 1.1em; height: 1.1em; margin-left: auto; flex: none; color: var(--accent); }
@@ -29,6 +30,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: #000; color:
 .mv-pick ol { list-style: none; margin: 0; padding: 0; }
 .mv-pick li { display: flex; gap: 0.8em; align-items: baseline; padding: 0.55em 0.8em; border-radius: 8px; cursor: pointer; }
 .mv-pick li .number { color: var(--soft); min-width: 2.5em; font-variant-numeric: tabular-nums; }
+.mv-pick li .ch-art { width: 2em; height: 1.4em; flex: none; align-self: center; }
 .mv-pick li .now { color: var(--soft); font-size: 0.85em; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
 .mv-pick li.selected, .mv-pick li:hover { color: #0b0c10; background: var(--focus); }
 .mv-pick li.selected .number, .mv-pick li.selected .now, .mv-pick li:hover .number, .mv-pick li:hover .now { color: #2b2d35; }

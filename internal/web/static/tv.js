@@ -242,9 +242,7 @@
     banner.classList.toggle("browsing", browsing);
     $("banner-number").textContent = channel.number;
     $("banner-name").textContent = channel.name;
-    const logo = $("banner-logo");
-    logo.hidden = !channel.logo;
-    if (channel.logo) logo.src = channel.logo;
+    $("banner-logo").replaceChildren(window.VodMax.channelArt(channel));
     const badges = $("banner-badges");
     badges.replaceChildren();
     const quality = { 4: "4K", 3: "FHD", 2: "HD", 1: "SD" }[channel.quality];
@@ -353,8 +351,8 @@
       if (start + k === o.selected) li.classList.add("selected");
       if (state.current && c.id === state.current.id) li.classList.add("current");
       const n = document.createElement("span"); n.className = "n"; n.textContent = c.number;
-      const logo = document.createElement("img"); logo.className = "l"; logo.alt = ""; logo.loading = "lazy";
-      if (c.logo) { logo.src = c.logo; logo.onerror = () => { logo.style.visibility = "hidden"; }; } else logo.style.visibility = "hidden";
+      const logo = window.VodMax.channelArt(c);
+      logo.classList.add("l");
       const name = document.createElement("span"); name.className = "c"; name.textContent = c.name;
       if (c.favorite) { const st = document.createElement("span"); st.className = "star"; st.textContent = "★"; name.append(st); }
       const p = document.createElement("span"); p.className = "p";
@@ -839,8 +837,6 @@
     }
     if (handled) e.preventDefault();
   });
-
-  $("banner-logo").onerror = () => { $("banner-logo").hidden = true; };
 
   // Keep "now / next" fresh.
   setInterval(() => { refreshChannels().catch(() => {}); }, 60000);

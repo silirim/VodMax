@@ -277,7 +277,7 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
   font: inherit; color: var(--text); text-align: left; background: var(--raised); border: 1px solid transparent; border-radius: 10px; cursor: pointer; }
 .channels button:focus, .channels button:hover { border-color: var(--text); outline: none; }
 .channels .num { color: var(--soft); text-align: right; }
-.channels img, .channels .nologo { width: 3.2rem; height: 2.2rem; object-fit: contain; }
+.channels .ch-art { width: 3.2rem; height: 2.2rem; }
 .channels .what { overflow: hidden; min-width: 0; }
 .channels .what strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .channels .what span { display: block; color: var(--soft); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -327,14 +327,15 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 
 /* Channel and recording cards */
 .channel-art { align-items: center; justify-content: center; background: linear-gradient(160deg, #1f222b, #15171d); }
-.channel-art img { max-width: 60%; max-height: 60%; object-fit: contain; }
+.channel-art .ch-art { max-width: 60%; max-height: 60%; }
+.channel-art .ch-art.mono { width: 60%; height: 60%; font-size: 1.6rem; }
 .rec-art { align-items: flex-end; background: linear-gradient(160deg, #2a1d22, #15171d); color: var(--soft); font-weight: 600; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: center; }
 
 @media (max-width: 800px) {
   .channels button { grid-template-columns: 1.8rem 2.8rem minmax(0, 1fr); gap: 0.6rem; padding: 0.55rem 0.7rem; }
   .channels .num { font-size: 0.85rem; }
-  .channels img, .channels .nologo { width: 2.8rem; height: 2rem; }
+  .channels .ch-art { width: 2.8rem; height: 2rem; }
 }
 
 /* Downloads, above the recordings. */
