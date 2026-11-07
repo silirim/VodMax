@@ -107,6 +107,7 @@
     store.set("vodView", state.view);
     const main = $("content");
     main.replaceChildren(el("p", { className: "empty" }, t("Caricamento…")));
+    heroTop();
     try {
       if (state.view === "tv") await renderTV(main);
       else if (state.query) await renderSearch(main);
@@ -119,6 +120,7 @@
       if (my === renderSeq) main.replaceChildren(el("p", { className: "empty" }, e.message));
     }
     if (my !== renderSeq) return;
+    heroTop();
     if (!typing || document.activeElement !== $("search")) focusFirst(main);
   }
 
@@ -191,8 +193,9 @@
   }
 
   async function renderHome(main) {
-    main.replaceChildren(el("section", { className: "hero skeleton" }), el("h2", { className: "section" }, t("Continua a guardare")), skeletonRow(true),
+    main.replaceChildren(el("section", { className: "hero under" }), el("h2", { className: "section" }, t("Continua a guardare")), skeletonRow(true),
       el("h2", { className: "section" }, t("Nuovi film")), skeletonRow(false));
+    heroTop();
     const my = renderSeq;
     const [cont, films, series, favorites, recordings, mine, trending] = await Promise.all([
       api("GET", "/api/v1/continue"),
@@ -203,7 +206,7 @@
       api("GET", "/api/v1/mylist").catch(() => []),
       api("GET", "/api/v1/trending").catch(() => []),
     ]);
-    const hero = el("section", { className: "hero" });
+    const hero = el("section", { className: "hero under" });
     const parts = [hero];
     if (await assistant()) parts.push(tonightBox());
     if (my !== renderSeq) return;
@@ -222,6 +225,7 @@
     // The featured title: the first thing to continue, else the newest film.
     const first = cont[0] ? heroFromContinue(cont[0]) : films.items[0] ? heroFromItem(films.items[0]) : null;
     if (first) showHero(hero, first);
+    heroTop();
   }
   // Added once, not at every visit of Home: the hero follows the focused
   // card only on the page that has one (a card of Film or a search sets
@@ -229,7 +233,7 @@
   let heroTimer;
   $("content").addEventListener("focusin", (e) => {
     const card = e.target.closest(".card");
-    const hero = $("content").querySelector(".hero:not(.skeleton)");
+    const hero = $("content").querySelector(".hero");
     if (!card || !card.hero || !hero) return;
     clearTimeout(heroTimer);
     // Only if the focus is still on that card (moving on quickly with
@@ -237,46 +241,129 @@
     heroTimer = setTimeout(() => { if (document.activeElement === card && hero.isConnected) showHero(hero, card.hero); }, 350);
   });
 
+  const QUALITY = { 4: "4K", 3: "Full HD", 2: "HD", 1: "SD" };
+  const rating = (r) => Number(r).toLocaleString(locale, { maximumFractionDigits: 1 });
   function heroFromItem(item) {
-    return { id: item.id, title: item.display_title, logo: item.logo,
-      meta: [item.year, { 4: "4K", 3: "Full HD" }[item.quality], item.rating ? "★ " + Number(item.rating).toLocaleString(locale, { maximumFractionDigits: 1 }) : ""],
+    return { id: item.id, title: item.display_title, poster: item.logo, year: item.year, quality: item.quality, rating: item.rating,
       actions: [["primary", "play", t("Guarda"), () => openDetail(item)], ["", "info", t("Dettagli"), () => openDetail(item)]] };
   }
   function heroFromContinue(c) {
     const episode = c.media === "episode";
     const title = episode ? c.series_title : c.title;
     const ep = episode ? "S" + c.season + "E" + c.number + " · " + c.title : "";
-    return { id: episode ? c.series_id : c.id, title, logo: c.image,
-      meta: [c.next ? t("Prossima puntata") : episode ? t("Continua") : t("Mancano {time}", { time: clock(c.progress.duration - c.progress.position) }), ep],
-      actions: [["primary", "play", c.next ? t("Guarda la puntata") : t("Riprendi"), () => play(c.media, c.id, title + (episode ? " · " + ep : ""), c.next ? 0 : c.progress.position)]] };
+    const item = episode ? { id: c.series_id, kind: "series", display_title: c.series_title, logo: c.image }
+      : { id: c.id, kind: "movie", display_title: c.title, year: c.year, logo: c.image };
+    return { id: item.id, title, poster: c.image, year: c.year,
+      text: [c.next ? t("Prossima puntata") : episode ? t("Continua") : t("Mancano {time}", { time: clock(c.progress.duration - c.progress.position) }), ep],
+      actions: [["primary", "play", c.next ? t("Guarda la puntata") : t("Riprendi"), () => play(c.media, c.id, title + (episode ? " · " + ep : ""), c.next ? 0 : c.progress.position)],
+        ["", "info", t("Dettagli"), () => openDetail(item)]] };
+  }
+
+  // The meta line of a hero or a detail page: year, duration and genre as
+  // text, the rating and the quality as pills.
+  function metaLine(m) {
+    const text = [m.year ? el("strong", { className: "m" }, String(m.year)) : null,
+      ...(m.text || []).filter(Boolean).map((s) => el("span", { className: "m" }, s))].filter(Boolean);
+    return [...text, m.rating ? el("span", { className: "badge rating" }, rating(m.rating)) : null,
+      QUALITY[m.quality] ? el("span", { className: "badge hd" }, QUALITY[m.quality]) : null].filter(Boolean);
+  }
+  const detailText = (d) => [d.duration ? Math.round(d.duration / 60) + " min" : "", d.genre ? d.genre.split(",")[0].trim() : ""];
+
+  // The title's logo (TMDB) in place of its name, once it has loaded; the
+  // name stays as its alternative text for screen readers.
+  function titleLogo(h1, url, title) {
+    const img = el("img", { className: "title-logo", alt: title });
+    img.onload = () => { if (h1.isConnected) h1.replaceChildren(img); };
+    img.src = url;
+  }
+
+  // A backdrop that fades into the page. Drawn on a canvas so the bottom of
+  // the picture turns transparent over the ambient (common.js): no seam
+  // where it ends. CSS could only do it with mask-image, which webOS 22 has
+  // only prefixed (and old WebViews not at all). The shade behind the text
+  // and the header is in the picture too, so it fades with it.
+  function fadedArt(url, box) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const k = Math.min(window.devicePixelRatio || 1, 2);
+        const w = Math.round(box.clientWidth * k), h = Math.round(box.clientHeight * k);
+        if (!w || !h) { resolve(null); return; }
+        const c = el("canvas", { className: "hero-art", width: w, height: h });
+        const g = c.getContext("2d");
+        const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+        g.drawImage(img, (w - img.naturalWidth * s) / 2, (h - img.naturalHeight * s) * 0.2, img.naturalWidth * s, img.naturalHeight * s);
+        const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg-rgb").trim() || "11, 12, 16";
+        const shade = (x1, y1, a) => {
+          const gr = g.createLinearGradient(0, 0, x1, y1);
+          gr.addColorStop(0, "rgba(" + bg + "," + a + ")");
+          gr.addColorStop(1, "rgba(" + bg + ",0)");
+          g.fillStyle = gr;
+          g.fillRect(0, 0, w, h);
+        };
+        shade(w * 0.72, 0, 0.9);
+        shade(0, h * 0.3, 0.55);
+        g.globalCompositeOperation = "destination-in";
+        const fade = g.createLinearGradient(0, h * 0.5, 0, h);
+        fade.addColorStop(0, "rgba(0,0,0,1)");
+        fade.addColorStop(0.55, "rgba(0,0,0,0.5)");
+        fade.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = fade;
+        g.fillRect(0, 0, w, h);
+        resolve(c);
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+  // The new picture fades in over the old one, which then goes.
+  function setArt(box, art) {
+    const old = [...box.querySelectorAll(":scope > .hero-art")];
+    if (art) box.insertBefore(art, box.querySelector(".hero-text"));
+    setTimeout(() => old.forEach((o) => o.remove()), art ? 700 : 0);
   }
 
   let heroShown = null;
   async function showHero(hero, h) {
     heroShown = h;
-    const buttons = h.actions.map(([kind, icon, text, fn]) => {
+    const buttons = (h.actions || []).map(([kind, icon, text, fn]) => {
       const b = el("button", { className: "button focusable " + kind });
       window.VodMax.label(b, icon, text);
       b.onclick = fn;
       return b;
     });
     const plot = el("p", { className: "hero-plot" });
-    const art = el("div", { className: "hero-art" });
+    const title = el("h1", {}, h.title);
+    const meta = el("div", { className: "hero-meta" }, ...metaLine(h));
     // A focused hero button keeps the focus on the new one in its place.
     const had = hero.contains(document.activeElement) ? [...hero.querySelectorAll("button")].indexOf(document.activeElement) : -1;
-    hero.replaceChildren(art, el("div", { className: "hero-text" }, el("h1", {}, h.title),
-      el("p", { className: "hero-meta" }, h.meta.filter(Boolean).join(" · ")), plot, el("div", { className: "hero-actions" }, ...buttons)));
+    const text = el("div", { className: "hero-text" }, h.eyebrow ? el("p", { className: "eyebrow" }, h.eyebrow) : null, h.mark || null, title, meta,
+      hero.classList.contains("compact") ? null : plot, buttons.length ? el("div", { className: "hero-actions" }, ...buttons) : null);
+    const old = hero.querySelector(".hero-text");
+    if (old) old.replaceWith(text); else hero.append(text);
     if (had >= 0 && buttons.length) buttons[Math.min(had, buttons.length - 1)].focus();
-    if (h.logo) art.style.backgroundImage = "url(" + JSON.stringify(h.logo) + ")";
-    const d = await detailsOf(h.id);
+    if (h.art) { setArt(hero, h.art); return; } // a channel: its tile, no details
+    const d = h.id ? await detailsOf(h.id) : {};
     if (heroShown !== h) return;
     plot.textContent = d.plot || "";
-    if (d.backdrop) {
-      const img = new Image();
-      img.onload = () => { if (heroShown === h) { art.style.backgroundImage = "url(" + JSON.stringify(d.backdrop) + ")"; art.classList.add("wide"); window.VodMax.setAmbient(d.backdrop); } };
-      img.src = d.backdrop;
-    }
+    meta.replaceChildren(...metaLine({ ...h, rating: h.rating || d.rating, text: [...(h.text || []), ...detailText(d)] }));
+    if (d.logo) titleLogo(title, d.logo, h.title);
+    const art = d.backdrop ? await fadedArt(d.backdrop, hero) : null;
+    if (heroShown !== h) return;
+    setArt(hero, art);
+    window.VodMax.setAmbient(d.backdrop || h.poster || "");
   }
+
+  // Home's hero lies under the header: the bar is clear while it is over
+  // the picture and gets its dark band back once the page scrolls on.
+  const header = document.querySelector("header.top");
+  function heroTop() {
+    document.documentElement.style.setProperty("--top-h", header.offsetHeight + "px");
+    const hero = $("content").querySelector(".hero.under");
+    document.body.classList.toggle("over-hero", Boolean(hero) && hero.getBoundingClientRect().bottom > header.offsetHeight + 8);
+  }
+  window.addEventListener("scroll", heroTop, { passive: true });
+  window.addEventListener("resize", heroTop);
 
   function channelCard(c) {
     const p = c.now;
