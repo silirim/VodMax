@@ -56,6 +56,11 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0048](0048-registrazioni-insistere-quando-serve.md) | Registrazioni: insistere quando serve, non quando è inutile | **Approvata** |
 | [0049](0049-backup-con-profili-e-registrazioni.md) | Backup: profili compresi, registrazioni recenti tenute | **Approvata** |
 | [0050](0050-assistente-serata-e-tempi.md) | Assistente: tutta la serata, e risposte che si possono usare | **Approvata** |
+| [0051](0051-aspetto-vetro-e-caratteri.md) | Aspetto: tema "vetro" e caratteri propri | **Approvata** |
+| [0052](0052-immagini-sfondi-loghi-badge.md) | Immagini: sfondi, loghi dei titoli, segnaposto | **Approvata** |
+| [0053](0053-guida-con-il-video.md) | Guida: il video continua, il programma a vista | **Approvata** |
+| [0054](0054-aspetto-accento-oled-effetti.md) | Aspetto: accento, nero OLED, effetti ridotti, salvaschermo | **Approvata** |
+| [0055](0055-voti-esterni.md) | Voti esterni (Rotten Tomatoes, IMDb, Metacritic) | **Respinta** |
 
 ## Ordine consigliato per decidere
 
