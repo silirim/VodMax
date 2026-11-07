@@ -105,12 +105,15 @@ html { scroll-padding-top: 6.5rem; }
   font: inherit;
   color: var(--text);
   text-align: left;
-  background: var(--raised);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--r-s);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   cursor: pointer;
+  transition: border-color var(--dur), box-shadow var(--dur);
 }
-.recs li > button.rec:focus { background: var(--raised); outline: 2px solid var(--text); }
+.recs li > button.rec:hover { border-color: rgba(255, 255, 255, 0.55); }
+.recs li > button.rec:focus { outline: none; background: var(--raised); border-color: var(--focus); box-shadow: var(--glow); }
 .recs .state { color: var(--soft); }
 .recs .state.recording { color: var(--rec); font-weight: 600; }
 
@@ -158,36 +161,35 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .credits dd { margin: 0; color: var(--text); }
 
 /* Recording rules */
-.rule { margin: 1rem 0; padding: 1.2rem 1.4rem; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; }
+.rule { margin: 1rem 0; padding: 1.2rem 1.4rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
 .rule .actions { margin-top: 0.8rem; gap: 0.5rem; }
 .rule p { margin: 0.3rem 0; }
 .rule > strong:first-child { display: block; margin-bottom: 0.3rem; font-size: 1.15rem; }
 .rule-form { display: grid; gap: 0.9rem; max-width: 52rem; margin: 0; }
 /* A form for a new item, in a card like those of the settings. */
-.form-card { margin: 2rem 0 3rem; padding: 1.4rem 1.7rem 1.6rem; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
+.form-card { margin: 2rem 0 3rem; padding: 1.4rem 1.7rem 1.6rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
 .form-card > h2.section { margin: 0 0 1rem; }
-@media (max-width: 700px) { .form-card { padding: 1.1rem 1.1rem 1.2rem; border-radius: 14px; } }
+@media (max-width: 700px) { .form-card { padding: 1.1rem 1.1rem 1.2rem; border-radius: var(--r-s); } }
 .rule-field { display: grid; grid-template-columns: 12rem 1fr; align-items: center; gap: 1rem; color: var(--soft); }
-.rule-form input, .rule-form select { padding: 0.5em 0.7em; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
 .rule-form button { justify-self: start; min-width: 9rem; }
 .matches { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; color: var(--text); }
-.matches li { display: grid; gap: 0.15rem; padding: 0.6rem 0.9rem; background: var(--raised); border-radius: 10px; border-left: 3px solid var(--line); overflow-wrap: anywhere; word-break: break-word; }
+.matches li { display: grid; gap: 0.15rem; padding: 0.6rem 0.9rem; background: var(--raised); border-radius: var(--r-xs); border-left: 3px solid var(--line); overflow-wrap: anywhere; word-break: break-word; }
 .matches li.empty { display: block; background: none; border: 0; padding: 0; }
 .matches .when { color: var(--soft); font-size: 0.9rem; }
 .matches strong { color: var(--text); font-weight: 600; }
 .matches .what { font-size: 0.95rem; }
-.rule-once { display: grid; gap: 0.5rem; margin-top: 0.5rem; padding: 0.8rem 0.9rem; background: var(--raised); border-radius: 12px; border-left: 3px solid var(--accent); }
+.rule-once { display: grid; gap: 0.5rem; margin-top: 0.5rem; padding: 0.8rem 0.9rem; background: var(--raised); border-radius: var(--r-s); border-left: 3px solid var(--accent); }
 .rule-once p { margin: 0; }
 .once-item { display: grid; gap: 0.2rem; overflow-wrap: anywhere; word-break: break-word; }
 .once-item .when { color: var(--soft); font-size: 0.9rem; }
 .once-item .buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.3rem; }
 .matches li.new { border-left-color: var(--accent); }
-.matches li.scheduled { border-left-color: #8fd9b6; }
-.matches li.conflict, .matches li.too_long { border-left-color: #ff9a92; }
-.matches .conflict .what, .matches .too_long .what { color: #ff9a92; }
-.matches .scheduled .what, .matches .new .what { color: #8fd9b6; }
+.matches li.scheduled { border-left-color: var(--ok); }
+.matches li.conflict, .matches li.too_long { border-left-color: var(--bad); }
+.matches .conflict .what, .matches .too_long .what { color: var(--bad); }
+.matches .scheduled .what, .matches .new .what { color: var(--ok); }
 .matches .cancelled .what, .matches .rerun .what, .matches .rerun strong { color: var(--soft); }
-.matches .live { color: #8fd9b6; }
+.matches .live { color: var(--ok); }
 .rule-form .check { display: flex; align-items: center; gap: 0.6rem; color: var(--text); }
 .rule-form .check input { width: 1.3rem; height: 1.3rem; accent-color: var(--accent); }
 .recs .tag { color: var(--soft); }
@@ -317,13 +319,13 @@ body.over-hero .top::after { opacity: 0; }
 
 /* Downloads, above the recordings. */
 .downloads { list-style: none; padding: 0; margin: 0.6rem 0 1.6rem; display: grid; gap: 0.6rem; }
-.downloads li { display: flex; gap: 1rem; align-items: center; padding: 1rem 1.4rem; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; }
+.downloads li { display: flex; gap: 1rem; align-items: center; padding: 1rem 1.4rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
 .downloads .dl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
 .downloads .dl-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .downloads .state.downloading { color: var(--accent); }
 .downloads .state.failed { color: var(--bad); }
-.downloads .bar { display: block; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 0.3rem; }
-.downloads .bar div { height: 100%; background: var(--accent-grad); }
+.downloads .bar { display: block; height: 4px; background: rgba(255, 255, 255, 0.14); border-radius: var(--r-pill); overflow: hidden; margin-top: 0.3rem; }
+.downloads .bar div { height: 100%; background: var(--accent-grad); border-radius: var(--r-pill); }
 .downloads .dl-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .dl-state { align-self: center; }
 @media (max-width: 700px) { .downloads li { flex-direction: column; align-items: stretch; } }
@@ -429,3 +431,10 @@ body.over-hero .top::after { opacity: 0; }
 .pick-art img { position: absolute; top: 0; left: 50%; transform: translateX(-50%); height: 100%; width: auto; max-width: none; max-height: none; }
 .pick-art span { position: relative; padding: 0.7rem; }
 .pick-art.backdrop::before { top: 0; right: 0; bottom: 0; left: 0; filter: none; }
+
+/* Empty lists: icon, one sentence, the button that fills them. */
+.empty-state { display: flex; flex-direction: column; align-items: center; max-width: 36rem; margin: var(--s7) auto; text-align: center; }
+.empty-state p { margin: 0 0 var(--s5); }
+/* Loading lists: rows with the radius of the real ones. */
+.skeleton-list { display: grid; gap: var(--s2); margin-top: var(--s6); }
+.skeleton-list .skeleton { height: 4.2rem; }

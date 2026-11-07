@@ -122,7 +122,7 @@
     $("search").placeholder = state.view === "tv" ? t("Cerca un canale (nome o numero)") : t("Cerca film e serie");
     store.set("vodView", state.view);
     const main = $("content");
-    main.replaceChildren(el("p", { className: "empty" }, t("Caricamento…")));
+    main.replaceChildren(loading(state.view));
     heroTop();
     try {
       if (state.view === "tv") await renderTV(main);
@@ -139,6 +139,29 @@
     heroTop();
     if (!typing || document.activeElement !== $("search")) focusFirst(main);
   }
+
+  // While a page loads: grey shapes with the radii of what is coming.
+  function loading(view) {
+    const box = ["mylist", "movie", "series"].includes(view) || state.query
+      ? el("div", { className: "grid" }, ...Array.from({ length: 12 }, () => el("div", { className: "card" }, el("div", { className: "poster skeleton" }))))
+      : el("div", { className: "skeleton-list" }, ...Array.from({ length: 5 }, () => el("div", { className: "skeleton" })));
+    box.setAttribute("role", "status");
+    box.setAttribute("aria-label", t("Caricamento…"));
+    return box;
+  }
+
+  // An empty list: an icon, one sentence, the way to fill it.
+  function emptyState(icon, text, action) {
+    const box = el("div", { className: "empty empty-state" }, window.VodMaxIcons ? window.VodMaxIcons.icon(icon) : null, el("p", {}, text));
+    if (action) {
+      const b = el("button", { className: "button focusable", type: "button" });
+      window.VodMax.label(b, action[0], action[1]);
+      b.onclick = action[2];
+      box.append(b);
+    }
+    return box;
+  }
+  const goView = (view) => () => { state.view = view; state.query = ""; $("search").value = ""; render(); };
 
   // ---- TV: the channel list, then full screen ----
   const TV_LISTS = [["", t("Tutti")], ["tv", "TV"], ["sport", t("Sport")], ["radio", t("Radio")], ["favorites", t("Preferiti")]];
@@ -707,8 +730,8 @@
     const usage = [t("Usati {size}", { size: gb(space.used_bytes) }), space.free_bytes >= 0 ? t("liberi {size}", { size: gb(space.free_bytes) }) : "",
       space.max_gb ? t("limite {n} GB", { n: space.max_gb }) : "", space.keep_days ? t("si tengono {n} giorni", { n: space.keep_days }) : ""].filter(Boolean).join(" · ");
     const parts = [el("h2", { className: "page-title" }, t("Registrazioni")), el("p", { className: "empty" }, usage)];
-    if (!list.length) parts.push(el("p", { className: "empty" }, t("Nessuna registrazione. In TV premi R (tasto blu) sul programma in onda, " +
-      "oppure registra dalla Guida, oppure crea una regola qui sotto.")));
+    if (!list.length) parts.push(emptyState("video", t("Nessuna registrazione. In TV premi R (tasto blu) sul programma in onda, " +
+      "oppure registra dalla Guida, oppure crea una regola qui sotto."), ["calendar-days", t("Guida TV"), () => { location.href = "/guide.html"; }]));
     else {
       parts.push(el("p", { className: "empty" }, t("OK guarda · Giallo (P) protegge dalla cancellazione automatica · Rosso (Canc) elimina")));
       parts.push(el("ol", { className: "recs" }, ...list.map((r) => {
@@ -752,7 +775,7 @@
     if (my !== renderSeq) return;
     main.replaceChildren(el("h2", { className: "page-title" }, t("La mia lista")),
       list.length ? el("div", { className: "grid" }, ...list.map(itemCard))
-        : el("p", { className: "empty" }, t("La lista è vuota. Nella scheda di un film o di una serie premi “La mia lista” per ritrovarlo qui.")));
+        : emptyState("bookmark", t("La lista è vuota. Nella scheda di un film o di una serie premi “La mia lista” per ritrovarlo qui."), ["film", t("Vai ai film"), goView("movie")]));
   }
 
   // The "My list" button of a detail page.
@@ -791,8 +814,8 @@
       : Math.round(b / 1e6).toLocaleString(locale) + " MB";
     const box = el("section", { id: "downloads" }, el("h2", { className: "page-title" }, t("Download")));
     if (!list.length) {
-      box.append(el("p", { className: "empty" }, t("Nessun download. Nella scheda di un film o di una serie premi “Scarica”: il server lo copia sul suo disco, " +
-        "senza togliere la connessione a chi guarda, e lo trovi nelle raccolte «Scaricati».")));
+      box.append(emptyState("download", t("Nessun download. Nella scheda di un film o di una serie premi “Scarica”: il server lo copia sul suo disco, " +
+        "senza togliere la connessione a chi guarda, e lo trovi nelle raccolte «Scaricati»."), ["film", t("Vai ai film"), goView("movie")]));
       return box;
     }
     box.append(el("ol", { className: "downloads" }, ...list.map((d) => {
