@@ -782,5 +782,7 @@
   "Schermo intero": "Schermo intero",
   "Esci dallo schermo intero": "Esci dallo schermo intero",
   "Questo accesso con l'account di casa sostituisce il dispositivo «{current}» di questo browser. Continuare?": "Questo accesso con l'account di casa sostituisce il dispositivo «{current}» di questo browser. Continuare?",
-  "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?": "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?"
+  "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?": "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?",
+  "in onda": "in onda",
+  "rivedibile": "rivedibile"
 }

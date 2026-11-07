@@ -16,7 +16,6 @@
 
   const grid = window.GuideGrid.create($("guide"), {
     toolbar: document.querySelector("header.top"),
-    panel: $("programme"),
     flash,
     onWatch: (channel) => { location.href = "/tv.html?channel=" + channel.id; },
     onFromStart: (channel, p) => {

@@ -2,13 +2,16 @@
 // live video (decision 0053): one grid, two homes.
 //
 // Arrows move between programmes (Left/Right in time, Up/Down between
-// channels), OK opens a programme (watch, from the start, record), Back
-// closes it. Past the edge of the window the window moves.
+// channels); the programme in focus is described in the panel above the
+// time scale (title, channel, time, plot, image when the guide has one).
+// OK opens its actions in the same panel (watch, from the start, record),
+// Back returns to the cell. Past the edge of the window the window moves.
 //
 //   const grid = GuideGrid.create(container, {
 //     toolbar,   // element with the [data-list] tabs, [data-move] buttons,
 //                // a .guide-when label and an optional [data-close]
-//     panel,     // the element that shows a programme (its actions)
+//     panel,     // where the programme is described; default: a panel of
+//                // the grid's own, above the time scale
 //     hours,     // window width: 3 hours, 1.5 on phones
 //     list,      // "all" | "favorites" | "sport" (default: the last used)
 //     onWatch(channel, programme), onFromStart(channel, programme),
@@ -19,6 +22,7 @@
 //   grid.load()           the window as it is
 //   grid.show(channelId)  the window at now, the channel's programme on air in focus
 //   grid.key(e)           true when the key was for the grid (arrows, OK, Back)
+//   grid.close()          the actions, back to the cell
 "use strict";
 
 window.GuideGrid = (() => {
@@ -48,9 +52,11 @@ window.GuideGrid = (() => {
     const HOURS = o.hours || (window.matchMedia("(max-width: 600px)").matches ? 1.5 : 3);
     const flash = o.flash || (() => {});
     const toolbar = o.toolbar || null;
-    const panel = o.panel;
-    // seq: windows asked, done: the last one answered (they can arrive out of order).
-    const state = { from: slot(Date.now() / 1000), list: o.list || store.get("guideList", "all"), rows: [], kids: false, seq: 0, done: 0 };
+    const panel = o.panel || el("section", { className: "programme-panel", hidden: true });
+    const ownPanel = !o.panel;
+    // seq: windows asked, done: the last one answered (they can arrive out of
+    // order). shown: the programme described in the panel, open: with its actions.
+    const state = { from: slot(Date.now() / 1000), list: o.list || store.get("guideList", "all"), rows: [], kids: false, seq: 0, done: 0, shown: null, open: false };
     window.VodMax.me().then((me) => { state.kids = Boolean(me && me.profile && me.profile.kind === "kids"); }).catch(() => {});
     const $$ = (sel) => [...container.querySelectorAll(sel)];
     const inToolbar = (node) => Boolean(toolbar && node && toolbar.contains(node));
@@ -84,7 +90,7 @@ window.GuideGrid = (() => {
         s.style.left = pct(ts) + "%";
         scale.append(s);
       }
-      const head = el("div", { className: "guide-times" }, el("div", {}), scale);
+      const times = el("div", { className: "guide-times" }, el("div", {}), scale);
       const rows = state.rows.map((r, ri) => {
         const line = el("div", { className: "line" });
         r.programmes.forEach((p, pi) => {
@@ -99,11 +105,14 @@ window.GuideGrid = (() => {
           b.style.left = pct(p.start) + "%";
           b.style.width = "calc(" + (pct(end) - pct(p.start)) + "% - 3px)";
           b.dataset.row = ri;
+          b.dataset.i = pi;
           b.dataset.start = p.start;
           b.dataset.stop = p.stop;
           b.dataset.channel = r.channel.id;
           b.dataset.key = r.channel.id + ":" + p.start;
           b.onclick = () => openProgramme(r, p);
+          // The mouse reads a programme by resting on it, like the remote.
+          b.onpointerenter = () => { if (!state.open) b.focus({ preventScroll: true }); };
           line.append(b);
         });
         if (now >= from && now < from + span) {
@@ -116,7 +125,8 @@ window.GuideGrid = (() => {
           r.channel.catchup_days ? el("small", { className: "archive", title: t("Archivio di {days} giorni", { days: r.channel.catchup_days }) }, "↺") : null);
         return el("div", { className: "guide-row" }, name, line);
       });
-      container.replaceChildren(head, ...(rows.length ? rows : [el("p", { className: "empty" },
+      // The panel and the time scale stay at the top; the rows scroll under them.
+      container.replaceChildren(el("div", { className: "guide-head" }, ownPanel ? panel : null, times), ...(rows.length ? rows : [el("p", { className: "empty" },
         state.list === "favorites" ? t("Nessun preferito con la guida in questo orario.") : t("Nessun programma in guida in questo orario."))]));
       // focusKey: a programme ("channel:start"), a channel ({channel}: its
       // programme on air), or the row and the side the window moved to
@@ -135,37 +145,58 @@ window.GuideGrid = (() => {
       if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: "nearest" }); }
     }
     const firstCell = () => container.querySelector(".prog.on-air") || container.querySelector(".prog");
+    const cellOf = (row, p) => container.querySelector('.prog[data-key="' + row.channel.id + ":" + p.start + '"]');
 
-    // ---- A programme ----
-    function openProgramme(row, p) {
+    // ---- The programme in the panel ----
+    // The cell in focus is described; OK adds its actions (open).
+    container.addEventListener("focusin", (e) => {
+      const b = e.target.closest(".prog");
+      if (!b || state.open) return;
+      const row = state.rows[Number(b.dataset.row)];
+      if (row) describe(row, row.programmes[Number(b.dataset.i)], false);
+    });
+    function describe(row, p, open) {
       const now = Date.now() / 1000;
-      const buttons = [];
+      state.shown = { row, p };
+      state.open = open;
       const archive = row.channel.catchup_days && p.start >= now - row.channel.catchup_days * 86400 && p.start < now;
-      const replay = () => o.onFromStart(row.channel, p);
-      if (p.start <= now && p.stop > now) {
-        buttons.push(iconButton("button focusable", "play", t("Guarda"), () => o.onWatch(row.channel, p)));
-        if (archive) buttons.push(iconButton("button secondary focusable", "undo-2", t("Dall'inizio"), replay));
-      } else if (archive) {
-        buttons.push(iconButton("button focusable", "play", t("Riguarda"), replay));
+      const onAir = p.start <= now && p.stop > now;
+      const status = p.recording ? "● " + t("in registrazione") : onAir ? t("in onda") : archive ? "↺ " + t("rivedibile") : "";
+      const buttons = [];
+      if (open) {
+        const replay = () => o.onFromStart(row.channel, p);
+        if (onAir) {
+          buttons.push(iconButton("button focusable", "play", t("Guarda"), () => o.onWatch(row.channel, p)));
+          if (archive) buttons.push(iconButton("button secondary focusable", "undo-2", t("Dall'inizio"), replay));
+        } else if (archive) {
+          buttons.push(iconButton("button focusable", "play", t("Riguarda"), replay));
+        }
+        if (p.recording && !state.kids) {
+          buttons.push(el("button", { className: "button secondary focusable", onclick: () => record(row, p) }, t("Annulla la registrazione")));
+        } else if (p.stop > now && !state.kids) {
+          buttons.push(iconButton("button focusable", "circle-dot", t("Registra"), () => record(row, p)));
+        }
+        buttons.push(el("button", { className: "button secondary focusable", onclick: () => close() }, t("Chiudi")));
       }
-      if (p.recording && !state.kids) {
-        buttons.push(el("button", { className: "button secondary focusable", onclick: () => record(row, p) }, t("Annulla la registrazione")));
-      } else if (p.stop > now && !state.kids) {
-        buttons.push(iconButton("button focusable", "circle-dot", t("Registra"), () => record(row, p)));
-      }
-      buttons.push(el("button", { className: "button secondary focusable", onclick: () => close() }, t("Chiudi")));
-      panel.replaceChildren(el("h2", {}, p.title),
-        el("p", { className: "meta" }, row.channel.name + " · " + dayName(p.start) + " " + hhmm(p.start) + "–" + hhmm(p.stop) +
-          (p.category ? " · " + p.category : "") + (p.recording ? " · ● " + t("in registrazione") : "")),
-        ...[p.subtitle, p.description].filter(Boolean).map((text) => el("p", {}, text)),
-        el("div", { className: "buttons" }, ...buttons));
+      panel.replaceChildren(...[
+        p.icon ? el("img", { className: "art", src: p.icon, alt: "", onerror() { this.remove(); } }) : null,
+        el("div", { className: "text" },
+          el("h2", {}, p.title),
+          el("p", { className: "meta" }, row.channel.name + " · " + dayName(p.start) + " " + hhmm(p.start) + "–" + hhmm(p.stop) +
+            (p.category ? " · " + p.category : ""), status ? el("span", { className: "state" }, status) : null),
+          ...[p.subtitle, p.description].filter(Boolean).map((text) => el("p", { className: "plot" }, text)),
+          open ? el("div", { className: "buttons" }, ...buttons) : null)].filter(Boolean));
+      panel.classList.toggle("open", open);
       panel.hidden = false;
-      panel.dataset.back = row.channel.id + ":" + p.start;
-      buttons[0].focus();
+      if (open) buttons[0].focus();
     }
+    function openProgramme(row, p) { describe(row, p, true); }
+    // The actions close; the focus goes back to the cell.
     function close() {
-      panel.hidden = true;
-      const b = container.querySelector('.prog[data-key="' + panel.dataset.back + '"]');
+      if (!state.open) return;
+      const { row, p } = state.shown;
+      describe(row, p, false);
+      const b = cellOf(row, p);
       if (b) b.focus();
     }
     async function record(row, p) {
@@ -178,7 +209,7 @@ window.GuideGrid = (() => {
           await api("POST", "/api/v1/recordings", { channel_id: row.channel.id, start: p.start, stop: p.stop, title: p.title, from_guide: true });
           flash(t("Registrazione programmata: {title}", { title: p.title }));
         }
-        close();
+        state.open = false;
         load(row.channel.id + ":" + p.start);
       } catch (e) { flash(e.message); }
     }
@@ -216,7 +247,7 @@ window.GuideGrid = (() => {
     function key(e) {
       const k = keyOf(e);
       const active = document.activeElement;
-      if (!panel.hidden) {
+      if (state.open) {
         if (k === "Back") { close(); return true; }
         // The panel's buttons in a row: the arrows go along them.
         const buttons = [...panel.querySelectorAll("button")];
@@ -276,7 +307,7 @@ window.GuideGrid = (() => {
       setList,
       jump,
       show(channelId) { state.from = slot(Date.now() / 1000); return load({ channel: channelId }); },
-      get open() { return !panel.hidden; },
+      get open() { return state.open; },
     };
   }
 
