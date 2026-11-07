@@ -166,11 +166,11 @@ body.controls-on .digits { top: 6.5rem; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* One row on TV and PC screens; a second only with "Grande" text in a
-     small window, never overlapping. */
-  flex-wrap: wrap;
-  gap: var(--s1) var(--s3);
-  padding: var(--s2);
+  /* Always one row: tv.js drops labels (.tight and on) until it fits. */
+  flex-wrap: nowrap;
+  gap: var(--s3);
+  /* Room at the ends for the focused pill's glow. */
+  padding: var(--s2) var(--s3);
   font-size: var(--t-s);
 }
 .ctl-group { display: flex; align-items: center; gap: var(--s1); }
@@ -184,16 +184,11 @@ body.controls-on .digits { top: 6.5rem; }
 .controls #ctl-fav.on { color: var(--fav); }
 .controls #ctl-fav.on .icon { fill: currentColor; }
 .controls #ctl-fav.on:focus { color: var(--ink); }
-/* The rarer actions keep only their icon (the name is their tooltip and
-   accessible name); two more in narrow windows, and below full HD while
-   "Torna in diretta (−5:00)" needs the room. */
-.controls [data-action="multiview"] .txt, .controls [data-action="fullscreen"] .txt { display: none; }
-@media (max-width: 1400px) {
-  .controls [data-action="startOver"] .txt, .controls [data-action="rec"] .txt { display: none; }
-}
-@media (max-width: 1800px) {
-  .controls.behind [data-action="startOver"] .txt, .controls.behind [data-action="rec"] .txt { display: none; }
-}
+/* When the bar would not fit on one row (narrow window, "Grande" text,
+   "Torna in diretta (−5:00)"), the rarer actions keep only their icon: the
+   name stays their tooltip and accessible name. */
+.controls.tight [data-action="fullscreen"] .txt, .controls.tighter [data-action="multiview"] .txt,
+.controls.tightest [data-action="startOver"] .txt, .controls.tightest [data-action="rec"] .txt { display: none; }
 
 body.controls-on .banner { display: none; }
 
@@ -242,6 +237,7 @@ body.controls-on .banner { display: none; }
   .ctl-group { display: contents; }
   .controls [data-action] .txt { display: inline; }
   .controls [data-action="multiview"] .txt, .controls [data-action="fullscreen"] .txt { display: none; }
+  .controls [data-action="multiview"], .controls [data-action="fullscreen"] { min-width: 44px; }
   .controls button {
     display: flex; flex-direction: column; align-items: center; gap: var(--s1);
     padding: var(--s2) var(--s1); color: #fff; font-weight: 600; background: none; border: 0; border-radius: var(--r-s);

@@ -525,12 +525,16 @@
     const behind = p ? p.behind() : 0;
     const live = $("ctl-live");
     live.classList.toggle("behind", behind > 12);
-    ctl.classList.toggle("behind", behind > 12); // the longer label needs room (tv.css)
     VodMax.label(live, behind > 12 ? "skip-forward" : "radio", behind > 12 ? t("Torna in diretta (−{time})", { time: VodMax.clock(behind) }) : t("In diretta"));
     const fav = $("ctl-fav");
     fav.classList.toggle("on", Boolean(c && c.favorite));
     VodMax.label(fav, "star", c && c.favorite ? t("Preferito") + " ✓" : t("Preferito"));
     ctl.hidden = false;
+    // One row: drop the rarer labels until it fits (window size, "Grande"
+    // text and the longer "Torna in diretta" all count). Touch has its grid.
+    const tight = ["tight", "tighter", "tightest"];
+    ctl.classList.remove(...tight);
+    for (const c of tight) { if (touch.matches || ctl.scrollWidth <= ctl.clientWidth) break; ctl.classList.add(c); }
     document.body.classList.add("controls-on");
     updateTimeline();
     clearTimeout(state.timers.controls);
