@@ -129,7 +129,7 @@ body.guide-page .programme-panel { margin: 0 var(--safe); }
   .guide-row .name .ch-art.mono { font-size: 0.7rem; }
   .guide-row .name .ch-name, .guide-row .name .archive { display: none; }
   .programme-panel { padding: var(--s2) var(--s3); border-radius: var(--r-s); }
-  .programme-panel .art, .guide-overlay .programme-panel .art, .programme-panel .plot { display: none; }
+  .programme-panel .art, .programme-panel .art.tile, .guide-overlay .programme-panel .art, .programme-panel .plot { display: none; }
   .programme-panel h2 { font-size: var(--t-m); }
   .programme-panel .meta { margin: 0; font-size: var(--t-s); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .programme-panel .buttons { gap: var(--s2); margin-top: var(--s2); }
