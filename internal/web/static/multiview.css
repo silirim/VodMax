@@ -1,44 +1,92 @@
-/* Multiview: two or four live channels at once. */
+/* Multiview: two or four live channels at once. Over moving video the
+   floating parts are dark glass (ui.css): the bar and the channel picker
+   blur; the four labels look the same without blur (at most 4 blurred
+   surfaces on screen). */
 html, body { height: 100%; margin: 0; overflow: hidden; background: #000; color: var(--text); }
-.mosaic { display: grid; gap: 4px; height: 100%; padding: 4px; box-sizing: border-box; }
+.mosaic { display: grid; gap: var(--s3); height: 100%; padding: var(--s3); box-sizing: border-box; }
 .mosaic.n2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; align-content: center; }
 .mosaic.n4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-.mv-cell { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--surface); border: 3px solid transparent; border-radius: 10px; cursor: pointer; }
+.mv-cell {
+  position: relative; min-width: 0; min-height: 0; overflow: hidden; cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--glass-line); border-radius: var(--r-s);
+  transition: box-shadow var(--dur) var(--ease), border-color var(--dur);
+}
 .mosaic.n2 .mv-cell { aspect-ratio: 16 / 9; }
-.mv-cell.active { border-color: var(--accent); }
+/* The box with the sound: the focus ring of every page, not the accent. */
+.mv-cell.active { z-index: 1; border-color: var(--focus); box-shadow: var(--glow); }
 .mv-cell video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
-.mv-label { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 0.6em; padding: 1.4em 0.8em 0.5em;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85)); font-size: 0.9rem; pointer-events: none; }
-.mv-label .number { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
-.mv-label .ch-art { width: 2.2em; height: 1.6em; flex: none; }
-.mv-label .name { font-weight: 600; white-space: nowrap; }
-.mv-label .now { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mv-label svg { width: 1.1em; height: 1.1em; margin-left: auto; flex: none; color: var(--accent); }
-.mv-empty { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5em; color: var(--soft); text-align: center; padding: 1em; }
-.mv-empty svg { width: 2.2em; height: 2.2em; }
+
+/* The channel of a box: a dark pill at the bottom left. */
+.mv-label {
+  position: absolute; left: var(--s3); bottom: var(--s3); display: flex; align-items: center; gap: 0.5em;
+  max-width: calc(100% - 2 * var(--s3)); padding: 0.3em 0.85em 0.3em 0.35em;
+  font-size: var(--t-s); white-space: nowrap; pointer-events: none;
+  background-color: rgba(10, 12, 18, 0.74); background-image: var(--glass-sheen);
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: var(--r-pill);
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow-s);
+}
+.mv-label .number { padding-left: 0.4em; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mv-label .ch-art { flex: none; width: 1.9em; height: 1.9em; border-radius: var(--r-xs); }
+.mv-label img.ch-art { padding: 0.15em; background: rgba(255, 255, 255, 0.08); }
+.mv-label .name { flex: none; font-weight: 600; }
+.mv-label .now { min-width: 0; overflow: hidden; color: var(--soft); text-overflow: ellipsis; }
+.mv-label .now:not(:empty)::before { content: "·"; margin-right: 0.5em; color: var(--soft); }
+.mv-label svg { flex: none; width: 1.15em; height: 1.15em; margin-left: 0.15em; }
+
+/* An empty box (or one with a problem): the icon in a glass disc. */
+.mv-empty { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: radial-gradient(circle at 50% 45%, var(--raised), var(--surface) 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s3); padding: var(--s4); color: var(--soft); text-align: center; }
+.mv-empty svg {
+  box-sizing: content-box; width: 1.6em; height: 1.6em; padding: 0.7em; color: var(--text);
+  background-color: rgba(255, 255, 255, 0.1); background-image: var(--glass-sheen), var(--control-base);
+  border: 1px solid var(--glass-line); border-radius: 50%; box-shadow: inset 0 1px 0 var(--glass-hi);
+}
 .mv-cell.active .mv-empty { color: var(--text); }
-.mv-bar { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.7rem;
-  background: rgba(19, 21, 27, 0.92); border: 1px solid var(--line); border-radius: 16px; font-size: 0.85rem; transition: opacity 0.3s; max-width: calc(100vw - 2rem); box-sizing: border-box; }
+.mv-cell.active .mv-empty svg { color: var(--ink); background: var(--focus); }
+
+.mv-bar {
+  position: fixed; top: var(--s4); left: 50%; z-index: 2; transform: translateX(-50%);
+  display: flex; align-items: center; gap: var(--s2); width: max-content; max-width: calc(100vw - 2 * var(--s4)); padding: var(--s1) var(--s4) var(--s1) var(--s1);
+  font-size: var(--t-s); box-sizing: border-box; transition: opacity 0.3s;
+}
 .mv-bar.idle { opacity: 0; pointer-events: none; }
-.mv-bar button { display: inline-flex; align-items: center; gap: 0.4em; padding: 0.45em 1em; font: inherit; color: var(--text); background: var(--bg);
-  border: 1px solid var(--line); border-radius: 999px; cursor: pointer; white-space: nowrap; }
-.mv-bar button svg { width: 1.1em; height: 1.1em; }
-.mv-bar button:focus, .mv-bar button:hover { color: #0b0c10; background: var(--focus); outline: none; }
+.mv-bar .tab { color: var(--text); font-weight: 600; white-space: nowrap; }
 .mv-bar .hint { color: var(--soft); }
-.mv-pick { position: fixed; top: 0; bottom: 0; left: 0; width: min(28rem, 90vw); padding: 1.5rem; box-sizing: border-box; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); }
-.mv-pick h2 { margin: 0 0 1rem; color: var(--accent); font-size: 1.15rem; }
-.mv-pick ol { list-style: none; margin: 0; padding: 0; }
-.mv-pick li { display: flex; gap: 0.8em; align-items: baseline; padding: 0.55em 0.8em; border-radius: 8px; cursor: pointer; }
-.mv-pick li .number { color: var(--soft); min-width: 2.5em; font-variant-numeric: tabular-nums; }
-.mv-pick li .ch-art { width: 2em; height: 1.4em; flex: none; align-self: center; }
-.mv-pick li .now { color: var(--soft); font-size: 0.85em; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
-.mv-pick li.selected, .mv-pick li:hover { color: #0b0c10; background: var(--focus); }
-.mv-pick li.selected .number, .mv-pick li.selected .now, .mv-pick li:hover .number, .mv-pick li:hover .now { color: #2b2d35; }
+
+/* The channel picker: a dark glass panel on the left, rows like the TV's
+   channel list (the selected one white). */
+.mv-pick {
+  position: fixed; top: var(--s4); bottom: var(--s4); left: var(--s4); z-index: 3;
+  display: flex; flex-direction: column; width: min(30rem, calc(100vw - 2 * var(--s4)));
+  padding: var(--s5) var(--s4) var(--s4); box-sizing: border-box; overflow: hidden;
+}
+.mv-pick h2 { display: flex; align-items: center; gap: var(--s3); margin: 0 var(--s2) var(--s3); font-size: var(--t-xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.mv-pick-close { order: 1; margin-left: auto; padding: 0.35em 0.75em; font-size: var(--t-m); }
+.mv-pick ol { flex: 1 1 auto; min-height: 0; margin: 0 calc(-1 * var(--s2)); padding: var(--s2); overflow: hidden; list-style: none; }
+.mv-pick li { display: flex; gap: var(--s3); align-items: center; padding: var(--s2) var(--s3); border-radius: var(--r-s); cursor: pointer; }
+.mv-pick li > span:nth-child(3) { min-width: 0; overflow: hidden; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.mv-pick li .number { flex: none; min-width: 2.4em; color: var(--soft); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.mv-pick li .ch-art { flex: none; width: 1.9em; height: 1.9em; border-radius: var(--r-xs); }
+.mv-pick li img.ch-art { padding: 0.15em; background: rgba(255, 255, 255, 0.08); }
+.mv-pick li .now { margin-left: auto; max-width: 45%; overflow: hidden; color: var(--soft); font-size: var(--t-s); white-space: nowrap; text-overflow: ellipsis; }
+@media (hover: hover) and (pointer: fine) {
+  .mv-pick li:hover { background: rgba(255, 255, 255, 0.1); }
+}
+.mv-pick li.selected { color: var(--ink); background: var(--focus); box-shadow: var(--glow); }
+.mv-pick li.selected .number, .mv-pick li.selected .now { color: var(--ink); }
+.mv-pick li.selected .now { opacity: 0.72; }
+
 .status { top: auto; bottom: 2rem; } /* under the bar, which sits at the top */
-.mv-pick-close { float: right; padding: 0.2em 0.6em; font: inherit; color: var(--soft); background: none; border: 0; cursor: pointer; }
+/* Watching: the server's warnings wait for the menu (as on the TV page). */
+#server-problems { display: none; }
+
+/* Phones: the boxes one under the other, the bar at the bottom. */
 @media (max-width: 800px) {
+  .mosaic { gap: var(--s2); padding: var(--s2); }
   .mosaic.n2 { grid-template-columns: 1fr; grid-template-rows: auto auto; }
   .mosaic.n4 { grid-template-columns: 1fr; grid-template-rows: repeat(4, 1fr); }
+  .mv-label { left: var(--s2); bottom: var(--s2); max-width: calc(100% - 2 * var(--s2)); }
   .mv-bar .hint { display: none; }
-  .mv-bar { top: auto; bottom: 1rem; }
+  .mv-bar { top: auto; bottom: calc(var(--s4) + env(safe-area-inset-bottom)); padding-right: var(--s1); }
+  .status { bottom: calc(5rem + env(safe-area-inset-bottom)); }
 }

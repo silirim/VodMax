@@ -151,7 +151,7 @@
   function openPick(i) {
     const cur = state.channels.findIndex((c) => c.id === state.ids[i]);
     state.pick = { cell: i, selected: Math.max(0, cur) };
-    const close = el("button", { type: "button", className: "mv-pick-close", onclick: closePick }, "✕");
+    const close = el("button", { type: "button", className: "tab mv-pick-close", onclick: closePick }, "✕");
     close.setAttribute("aria-label", t("Chiudi"));
     $("mv-pick-title").replaceChildren(close, t("Canale per il riquadro {n}", { n: i + 1 }));
     $("mv-pick").hidden = false;
@@ -160,7 +160,7 @@
   function closePick() { state.pick = null; $("mv-pick").hidden = true; }
   function renderPick() {
     const p = state.pick;
-    const rows = Math.max(6, Math.floor((window.innerHeight * 0.8) / 44));
+    const rows = Math.max(6, Math.floor((window.innerHeight * 0.8) / 64)); // rows with a logo tile: about 64 px on a 1080p TV
     const start = Math.max(0, Math.min(p.selected - Math.floor(rows / 2), state.channels.length - rows));
     $("mv-pick-items").replaceChildren(...state.channels.slice(start, start + rows).map((c, k) => {
       const li = el("li", { className: start + k === p.selected ? "selected" : "" }, el("span", { className: "number" }, String(c.number)),
