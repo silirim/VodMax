@@ -1,39 +1,84 @@
 .guide-nav { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .guide-when { min-width: 12rem; text-align: center; color: var(--soft); }
 
-/* The guide page scrolls inside the grid, so the programme panel and the
-   time scale (sticky at its top) stay in sight. */
+/* The guide page scrolls inside the grid, so the programme panel (above
+   it) and the time scale (sticky at its top) stay in sight. */
 body.guide-page { height: 100vh; }
 body.guide-page { display: flex; flex-direction: column; overflow: hidden; }
-body.guide-page .top { flex: none; }
+body.guide-page .top, body.guide-page .programme-panel { flex: none; }
 body.guide-page .guide { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+body.guide-page .programme-panel { margin: 0 var(--safe); }
 
-.guide { --name: 13rem; --row: 3.3rem; padding-bottom: 4rem; }
-.guide-head { position: sticky; top: 0; z-index: 2; background: var(--bg); }
+/* The time scale and the channel column stay in sight (sticky) while the
+   rows scroll under them, down and, on phones, sideways. */
+.guide { --name: 14.5rem; --row: 3.6rem; padding-bottom: 4rem; scroll-padding: 3rem 0 0 var(--name); }
+.guide-head { position: sticky; top: 0; z-index: 3; background: var(--bg); }
 .guide-times, .guide-row { display: grid; grid-template-columns: var(--name) 1fr; }
-.guide-times { border-bottom: 1px solid var(--line); }
-.guide-times .scale { position: relative; height: 2rem; }
-.guide-times .scale span { position: absolute; top: 0.4rem; color: var(--soft); font-size: 0.9rem; transform: translateX(-50%); }
-.guide-row { height: var(--row); border-bottom: 1px solid var(--line); }
-.guide-row .name { display: flex; align-items: center; gap: 0.6rem; padding: 0 0.6rem; overflow: hidden; white-space: nowrap; }
-.guide-row .name b { color: var(--soft); font-weight: 500; min-width: 2.2rem; }
-.guide-row .name .ch-art { width: 2rem; height: 2rem; }
-.guide-row .line { position: relative; overflow: hidden; } /* nothing past the window */
-.guide-row .empty-line { color: var(--soft); font-size: 0.85rem; padding: 1rem; }
-.prog {
-  position: absolute; top: 0.25rem; bottom: 0.25rem;
-  padding: 0.25rem 0.5rem; overflow: hidden; text-align: left; white-space: nowrap; text-overflow: ellipsis;
-  font: inherit; font-size: 0.92rem; color: var(--text);
-  background: var(--raised); border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
+/* The shadow paints the page margin too: cells scrolled sideways pass
+   under the column, not beside it. */
+.guide-times .corner, .guide-row .name { position: -webkit-sticky; position: sticky; left: 0; z-index: 2; background: var(--bg); box-shadow: calc(-1 * var(--safe)) 0 0 var(--bg); }
+.guide-times .scale { position: relative; height: 2.6rem; }
+/* Each half hour: its time at the left of a short tick. */
+.guide-times .tick { position: absolute; top: 0; height: 1.3rem; padding-left: 0.45em; color: var(--soft); font-size: var(--t-s); font-weight: 600; line-height: 1.3rem; border-left: 1px solid var(--glass-line); }
+.now-pill {
+  position: absolute; bottom: 0.2rem; z-index: 1; transform: translateX(-50%);
+  padding: 0.1em 0.55em; font-size: var(--t-xs); font-weight: 700; line-height: 1.4;
+  color: var(--accent-ink); background: var(--accent); border-radius: var(--r-pill);
 }
-.prog small { display: block; color: var(--soft); font-size: 0.78rem; }
-.prog.on-air { background: #24262e; }
-/* A red dot: the ⏺ symbol is missing from some TV fonts. */
-.prog.recording::before { content: ""; display: inline-block; width: 0.55em; height: 0.55em; margin-right: 0.35em; border-radius: 50%; background: var(--rec); vertical-align: 0.05em; }
-/* ↺ on a past programme still in the provider's archive. */
-.prog .mark { color: var(--soft); margin-right: 0.3em; }
-.prog:focus, .prog:hover { outline: none; border-color: var(--text); background: #2b2e37; z-index: 1; }
-.now-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); pointer-events: none; }
+.guide-row { height: var(--row); }
+.guide-row .name { display: flex; align-items: center; gap: 0.6rem; padding: 0 0.8rem 0 0.2rem; overflow: hidden; white-space: nowrap; }
+.guide-row .name b { flex: none; min-width: 2.4rem; color: var(--soft); font-weight: 500; text-align: right; }
+.guide-row .name .ch-art { flex: none; width: 2.4rem; height: 2.4rem; }
+.guide-row .name .ch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.guide-row .name .archive { flex: none; color: var(--soft); }
+/* Nothing past the window on the sides; above and below the focused cell
+   glows over its neighbours (its row goes on top). */
+.guide-row .line { position: relative; -webkit-clip-path: inset(-3rem 0); clip-path: inset(-3rem 0); }
+.guide-row:focus-within { position: relative; z-index: 1; }
+.guide-row .empty-line { color: var(--soft); font-size: 0.85rem; padding: 1rem; }
+/* Cells: translucent glass without blur (spec §2), the programme on air a
+   little brighter with a bold title, the past ones dimmed. A genre the
+   guide names tints the left edge (--genre), calm and thin. */
+.prog {
+  position: absolute; top: 0.2rem; bottom: 0.2rem;
+  display: flex; flex-direction: column; justify-content: center; gap: 0.1em;
+  padding: 0.25rem 0.6rem; overflow: hidden; text-align: left; white-space: nowrap;
+  font: inherit; font-size: var(--t-s); line-height: 1.25; color: var(--text);
+  background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--r-xs);
+  box-shadow: inset 3px 0 0 var(--genre, transparent);
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease), background-color var(--dur), box-shadow var(--dur);
+}
+.prog .t, .prog small { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.prog .t { font-weight: 500; }
+.prog small { color: var(--soft); font-size: var(--t-xs); }
+.prog.on-air { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.12); }
+.prog.on-air .t { font-weight: 700; }
+.prog.past { opacity: 0.55; }
+/* Still in the provider's archive: dimmed less, it can be watched. */
+.prog.past.can-replay { opacity: 0.8; }
+.prog .mark { display: inline-block; margin-right: 0.3em; color: var(--accent); vertical-align: -0.12em; }
+.prog .mark .icon { display: block; width: 1em; height: 1em; }
+/* A red dot in the corner (the ⏺ symbol is missing from some TV fonts). */
+.prog.recording::after { content: ""; position: absolute; top: 0.45rem; right: 0.45rem; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--rec); }
+.prog.recording .t { padding-right: 0.8rem; }
+.prog[data-genre="film"] { --genre: rgba(167, 139, 250, 0.75); }
+.prog[data-genre="sport"] { --genre: rgba(74, 222, 128, 0.7); }
+.prog[data-genre="news"] { --genre: rgba(96, 165, 250, 0.75); }
+.prog[data-genre="kids"] { --genre: rgba(251, 191, 36, 0.7); }
+@media (hover: hover) and (pointer: fine) {
+  .prog:hover { background-color: rgba(255, 255, 255, 0.16); }
+}
+/* In focus: white, lifted, the shared glow; never dimmed. */
+.prog:focus, .prog.focus {
+  outline: none; z-index: 2; opacity: 1;
+  color: var(--ink); background: var(--focus); border-color: var(--focus);
+  transform: translateY(-0.12rem);
+  box-shadow: inset 3px 0 0 var(--genre, transparent), var(--glow);
+}
+.prog:focus small, .prog.focus small, .prog:focus .mark, .prog.focus .mark { color: var(--ink); }
+.prog.past:focus, .prog.past.focus { opacity: 1; }
+.now-line { position: absolute; top: 0; bottom: 0; z-index: 1; width: 2px; margin-left: -1px; background: var(--accent); pointer-events: none; }
 
 /* The programme in focus, above the time scale: reading it costs nothing,
    OK adds the actions in the same place. */
@@ -52,21 +97,19 @@ body.guide-page .guide { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .programme-panel .buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
-.prog.past { opacity: 0.55; }
-.prog.past.can-replay { opacity: 0.85; }
-.guide-row .name .archive { color: var(--soft); margin-left: 0.3rem; }
 
-/* Phones: the channel column keeps number and logo, the names go; the
-   window is 1.5 hours (guide-grid.js), labels every 30 minutes still fit.
-   The panel keeps two lines: title and when. */
+/* Phones: a narrow column with the logo and the number under it; half
+   hours at least 140 px wide, the grid scrolls sideways inside itself
+   (the window is 1.5 hours, guide-grid.js). The panel keeps two lines:
+   title and when. */
 @media (max-width: 600px) {
-  .guide { --name: 5.2rem; --row: 3.6rem; }
-  .guide-row .name { gap: 0.3rem; padding: 0 0.3rem; font-size: 0; }
-  .guide-row .name b { font-size: 0.85rem; min-width: 1.8rem; }
-  .guide-row .name .ch-art { width: 1.8rem; height: 1.8rem; }
+  .guide { --name: 3.5rem; --row: 3.8rem; overflow-x: auto; }
+  .guide-head, .guide-row { min-width: calc(var(--name) + var(--slots, 3) * 9.5rem); }
+  .guide-row .name { flex-direction: column; justify-content: center; gap: 0.15rem; padding: 0 0.3rem 0 0; }
+  .guide-row .name b { order: 1; min-width: 0; font-size: var(--t-xs); text-align: center; }
+  .guide-row .name .ch-art { width: 2rem; height: 2rem; }
   .guide-row .name .ch-art.mono { font-size: 0.7rem; }
-  .guide-times .scale span { font-size: 0.75rem; }
-  .prog { font-size: 0.85rem; padding: 0.2rem 0.35rem; }
+  .guide-row .name .ch-name, .guide-row .name .archive { display: none; }
   .programme-panel { min-height: 0; padding: 0.5rem 0.4rem; }
   .programme-panel .art, .programme-panel .plot { display: none; }
   .programme-panel h2 { font-size: 1.05rem; }

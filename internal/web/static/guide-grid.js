@@ -10,8 +10,8 @@
 //   const grid = GuideGrid.create(container, {
 //     toolbar,   // element with the [data-list] tabs, [data-move] buttons,
 //                // a .guide-when label and an optional [data-close]
-//     panel,     // where the programme is described; default: a panel of
-//                // the grid's own, above the time scale
+//     panel,     // where the programme is described (outside the
+//                // container, which scrolls)
 //     hours,     // window width: 3 hours, 1.5 on phones
 //     list,      // "all" | "favorites" | "sport" (default: the last used)
 //     onWatch(channel, programme), onFromStart(channel, programme),
@@ -62,8 +62,7 @@ window.GuideGrid = (() => {
     const HOURS = o.hours || (window.matchMedia("(max-width: 600px)").matches ? 1.5 : 3);
     const flash = o.flash || (() => {});
     const toolbar = o.toolbar || null;
-    const panel = o.panel || el("section", { className: "programme-panel", hidden: true });
-    const ownPanel = !o.panel;
+    const panel = o.panel;
     // seq: windows asked, done: the last one answered (they can arrive out of
     // order). shown: the programme described in the panel, open: with its actions.
     const state = { from: slot(Date.now() / 1000), list: o.list || store.get("guideList", "all"), rows: [], kids: false, seq: 0, done: 0, shown: null, open: false };
@@ -96,28 +95,39 @@ window.GuideGrid = (() => {
       const pct = (ts) => Math.max(0, Math.min(100, ((ts - from) / span) * 100));
       const scale = el("div", { className: "scale" });
       for (let ts = from; ts < from + span; ts += 1800) {
-        const s = el("span", {}, hhmm(ts));
+        const s = el("span", { className: "tick tnum" }, hhmm(ts));
         s.style.left = pct(ts) + "%";
         scale.append(s);
       }
-      const times = el("div", { className: "guide-times" }, el("div", {}), scale);
+      // "Now" as a pill on the scale, above the line that crosses the rows.
+      if (now >= from && now < from + span) {
+        const pill = el("span", { className: "now-pill tnum" }, hhmm(now));
+        pill.style.left = pct(now) + "%";
+        scale.append(pill);
+      }
+      const times = el("div", { className: "guide-times" }, el("div", { className: "corner" }), scale);
+      // Phones scroll the grid sideways: its width follows the half hours.
+      container.style.setProperty("--slots", span / 1800);
       const rows = state.rows.map((r, ri) => {
         const line = el("div", { className: "line" });
         r.programmes.forEach((p, pi) => {
           // The states are classes for the theme: .on-air, .past, .can-replay
           // (in the provider's archive), .recording; .focus follows the focus.
           const replay = p.stop <= now && r.channel.catchup_days && p.start >= now - r.channel.catchup_days * 86400;
+          // Title and time each on one line; ↺ (an icon: the glyph is missing
+          // from some TV fonts) leads the time of a programme to watch again.
           const b = el("button", { className: "prog focusable" + (p.start <= now && p.stop > now ? " on-air" : "") + (p.stop <= now ? " past" : "") +
             (p.recording ? " recording" : "") + (replay ? " can-replay" : "") },
-            replay ? el("span", { className: "mark" }, "↺") : null,
-            p.title, el("small", {}, hhmm(p.start) + "–" + hhmm(p.stop) + (replay ? " · " + t("riguarda") : "")));
+            el("span", { className: "t" }, p.title),
+            el("small", { className: "tnum" }, replay ? el("span", { className: "mark" }, window.VodMaxIcons.icon("rotate-ccw")) : null,
+              hhmm(p.start) + "–" + hhmm(p.stop) + (replay ? " · " + t("riguarda") : "")));
           if (p.category) b.dataset.genre = genre(p.category);
           // Provider guides overlap at times: drawn up to the next start, so
           // no programme hides another.
           const next = r.programmes[pi + 1];
           const end = next && next.start < p.stop && next.start > p.start ? next.start : p.stop;
           b.style.left = pct(p.start) + "%";
-          b.style.width = "calc(" + (pct(end) - pct(p.start)) + "% - 3px)";
+          b.style.width = "calc(" + (pct(end) - pct(p.start)) + "% - 0.2rem)";
           b.dataset.row = ri;
           b.dataset.i = pi;
           b.dataset.start = p.start;
@@ -134,12 +144,13 @@ window.GuideGrid = (() => {
           n.style.left = pct(now) + "%";
           line.append(n);
         }
-        const name = el("div", { className: "name" }, el("b", {}, r.channel.number || ""), window.VodMax.channelArt(r.channel), r.channel.name,
+        const name = el("div", { className: "name" }, el("b", { className: "tnum" }, r.channel.number || ""), window.VodMax.channelArt(r.channel),
+          el("span", { className: "ch-name" }, r.channel.name),
           r.channel.catchup_days ? el("small", { className: "archive", title: t("Archivio di {days} giorni", { days: r.channel.catchup_days }) }, "↺") : null);
         return el("div", { className: "guide-row" }, name, line);
       });
-      // The panel and the time scale stay at the top; the rows scroll under them.
-      container.replaceChildren(el("div", { className: "guide-head" }, ownPanel ? panel : null, times), ...(rows.length ? rows : [el("p", { className: "empty" },
+      // The time scale stays at the top; the rows scroll under it.
+      container.replaceChildren(el("div", { className: "guide-head" }, times), ...(rows.length ? rows : [el("p", { className: "empty" },
         state.list === "favorites" ? t("Nessun preferito con la guida in questo orario.") : t("Nessun programma in guida in questo orario."))]));
       // focusKey: a programme ("channel:start"), a channel ({channel}: its
       // programme on air), or the row and the side the window moved to
@@ -239,7 +250,8 @@ window.GuideGrid = (() => {
       if (dir === "ArrowLeft" || dir === "ArrowRight") {
         const list = inRow(row);
         const i = list.indexOf(cur) + (dir === "ArrowRight" ? 1 : -1);
-        if (i >= 0 && i < list.length) { list[i].focus(); return; }
+        // On phones the grid scrolls sideways: the whole cell into view.
+        if (i >= 0 && i < list.length) { list[i].focus(); list[i].scrollIntoView({ block: "nearest", inline: "nearest" }); return; }
         // Past the edge of the window: move it, staying on the channel. Not
         // while the last move is loading: a held key would stack hours.
         if (state.done !== state.seq) return;
