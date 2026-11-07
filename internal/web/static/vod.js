@@ -47,7 +47,7 @@
       : item.rating ? el("span", { className: "badge rating right" }, rating(item.rating)) : null;
     if (fresh || right) card.append(el("span", { className: "card-badges" }, fresh ? el("span", { className: "badge new" }, t("Nuovo")) : null, right));
     card.onclick = () => openDetail(item);
-    card.hero = heroFromItem(item);
+    card.hero = { ...heroFromItem(item), eyebrow: state.view === "movie" ? t("Film") : state.view === "series" ? t("Serie") : "" };
     return card;
   }
 
@@ -173,6 +173,7 @@
           c.next ? el("span", {}, t("Dopo: {time} {title}", { time: hhmm(c.next.start), title: c.next.title })) : null,
           p ? el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })) : null));
       b.onclick = () => { location.href = "/tv.html?channel=" + c.id; };
+      b.hero = channelHero(c);
       return el("li", {}, b);
     };
     // 600 at a time (a long list is slow to draw on a TV); the rest on
@@ -189,10 +190,26 @@
         focusFirst(ol.children[n]);
       };
     }
-    main.replaceChildren(el("h2", { className: "page-title" }, "TV"), el("div", { className: "tv-tools" }, ...chips, guide),
+    const hero = el("section", { className: "hero compact" });
+    main.replaceChildren(hero, el("div", { className: "tv-tools" }, ...chips, guide),
       query ? el("p", { className: "empty" }, t("{n} canali per “{query}” (nome o numero)", { n: channels.length, query: state.query })) : "",
       channels.length ? ol : el("p", { className: "empty" }, list === "favorites"
         ? t("Nessun preferito: in TV premi il tasto giallo (F) su un canale.") : t("Nessun canale.")), more || "");
+    if (channels.length) showHero(hero, channelHero(channels[0]));
+    else hero.remove();
+  }
+
+  // The TV list's header: what the focused channel shows now, over a glow
+  // of the channel's colour (the guide rarely has programme pictures).
+  function channelHero(c) {
+    const p = c.now;
+    return { title: p ? p.title : c.name, eyebrow: t("In onda adesso"), mark: el("span", { className: "hero-mark" }, window.VodMax.channelArt(c)),
+      text: [(c.number ? c.number + " · " : "") + c.name, p ? hhmm(p.start) + " – " + hhmm(p.stop) : "", c.next ? t("A seguire") + " · " + c.next.title : ""],
+      art: () => {
+        const glow = el("div", { className: "hero-art ch-glow" });
+        glow.style.setProperty("--tint", "hsla(" + channelHue(String(c.name || "")) + ", 50%, 40%, 0.55)");
+        return glow;
+      } };
   }
 
   // ---- Home: a featured title on top (it follows the focused card),
@@ -264,7 +281,7 @@
   // card.hero too, and a listener left from Home fetched its details).
   let heroTimer;
   $("content").addEventListener("focusin", (e) => {
-    const card = e.target.closest(".card");
+    const card = e.target.closest(".card, .channels button");
     const hero = $("content").querySelector(".hero");
     if (!card || !card.hero || !hero) return;
     clearTimeout(heroTimer);
@@ -314,7 +331,7 @@
   // where it ends. CSS could only do it with mask-image, which webOS 22 has
   // only prefixed (and old WebViews not at all). The shade behind the text
   // and the header is in the picture too, so it fades with it.
-  function fadedArt(url, box) {
+  function fadedArt(url, box, fadeTop) {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -342,6 +359,14 @@
         fade.addColorStop(1, "rgba(0,0,0,0)");
         g.fillStyle = fade;
         g.fillRect(0, 0, w, h);
+        // Below the header (not under it): the top fades in too.
+        if (fadeTop) {
+          const top = g.createLinearGradient(0, 0, 0, h * 0.3);
+          top.addColorStop(0, "rgba(0,0,0,0)");
+          top.addColorStop(1, "rgba(0,0,0,1)");
+          g.fillStyle = top;
+          g.fillRect(0, 0, w, h); // the whole canvas: destination-in clears what it does not cover
+        }
         resolve(c);
       };
       img.onerror = () => resolve(null);
@@ -358,7 +383,8 @@
   let heroShown = null;
   async function showHero(hero, h) {
     heroShown = h;
-    const buttons = (h.actions || []).map(([kind, icon, text, fn]) => {
+    const compact = hero.classList.contains("compact");
+    const buttons = (compact ? [] : h.actions || []).map(([kind, icon, text, fn]) => {
       const b = el("button", { className: "button focusable " + kind });
       window.VodMax.label(b, icon, text);
       b.onclick = fn;
@@ -369,19 +395,20 @@
     const meta = el("div", { className: "hero-meta" }, ...metaLine(h));
     // A focused hero button keeps the focus on the new one in its place.
     const had = hero.contains(document.activeElement) ? [...hero.querySelectorAll("button")].indexOf(document.activeElement) : -1;
-    const text = el("div", { className: "hero-text" }, h.eyebrow ? el("p", { className: "eyebrow" }, h.eyebrow) : null, h.mark || null, title, meta,
-      hero.classList.contains("compact") ? null : plot, buttons.length ? el("div", { className: "hero-actions" }, ...buttons) : null);
+    // The eyebrow names the page (Film, Serie, In onda adesso): a heading.
+    const text = el("div", { className: "hero-text" }, h.eyebrow ? el("h2", { className: "eyebrow" }, h.eyebrow) : null, h.mark || null, title, meta,
+      compact ? null : plot, buttons.length ? el("div", { className: "hero-actions" }, ...buttons) : null);
     const old = hero.querySelector(".hero-text");
     if (old) old.replaceWith(text); else hero.append(text);
     heroTop();
     if (had >= 0 && buttons.length) buttons[Math.min(had, buttons.length - 1)].focus();
-    if (h.art) { setArt(hero, h.art); return; } // a channel: its tile, no details
+    if (h.art) { setArt(hero, h.art()); return; } // a channel: its glow, no details
     const d = h.id ? await detailsOf(h.id) : {};
     if (heroShown !== h) return;
     plot.textContent = d.plot || "";
     meta.replaceChildren(...metaLine({ ...h, rating: h.rating || d.rating, text: [...(h.text || []), ...detailText(d)] }));
     if (d.logo) titleLogo(title, d.logo, h.title);
-    const art = d.backdrop ? await fadedArt(d.backdrop, hero) : null;
+    const art = d.backdrop ? await fadedArt(d.backdrop, hero, !hero.classList.contains("under")) : null;
     if (heroShown !== h) return;
     setArt(hero, art);
     window.VodMax.setAmbient(d.backdrop || h.poster || "");
@@ -563,13 +590,17 @@
     // Two providers (or two local collections) can use the same category id.
     if (b.category && b.categorySub) q.set("category_subscription", b.categorySub);
     if (cursor) q.set("cursor", cursor);
-    if (!grid) main.replaceChildren(el("h2", { className: "page-title" }, kind === "movie" ? t("Film") : t("Serie")), filterBar(kind, b), skeletonRow(false));
+    if (!grid) main.replaceChildren(el("section", { className: "hero compact" }), filterBar(kind, b), skeletonRow(false));
     const my = renderSeq; // "Altri titoli" too: dropped if the page changed meanwhile
     const page = await api("GET", "/api/v1/catalog/" + kind + "?" + q);
     if (my !== renderSeq) return;
     if (!grid) {
       grid = el("div", { className: "grid" });
       main.lastElementChild.replaceWith(page.items.length ? grid : el("p", { className: "empty" }, t("Nessun titolo con questi filtri.")));
+      // The header shows the first title, then the focused one.
+      const hero = main.querySelector(".hero");
+      if (page.items.length) showHero(hero, { ...heroFromItem(page.items[0]), eyebrow: kind === "movie" ? t("Film") : t("Serie") });
+      else hero.remove();
     }
     grid.append(...page.items.map(itemCard));
     const oldMore = main.querySelector(".more");

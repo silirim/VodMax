@@ -199,15 +199,17 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .tv-tools { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.5rem 0 1rem; }
 .channels { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(26rem, 100%), 1fr)); gap: 0.5rem; }
 .channels button { display: grid; grid-template-columns: 3rem 3.2rem 1fr; gap: 0.8rem; align-items: center; width: 100%; padding: 0.6rem 0.8rem;
-  font: inherit; color: var(--text); text-align: left; background: var(--raised); border: 1px solid transparent; border-radius: 10px; cursor: pointer; }
-.channels button:focus, .channels button:hover { border-color: var(--text); outline: none; }
-.channels .num { color: var(--soft); text-align: right; }
+  font: inherit; color: var(--text); text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); cursor: pointer; transition: border-color var(--dur), box-shadow var(--dur); }
+.channels button:hover { border-color: rgba(255, 255, 255, 0.55); }
+.channels button:focus { outline: none; background: var(--raised); border-color: var(--focus); box-shadow: var(--glow); }
+.channels .num { color: var(--soft); text-align: right; font-variant-numeric: tabular-nums; }
 .channels .ch-art { width: 3.2rem; height: 2.2rem; }
 .channels .what { overflow: hidden; min-width: 0; }
 .channels .what strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .channels .what span { display: block; color: var(--soft); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.channels .what .bar { height: 3px; margin-top: 0.3rem; background: var(--bg); border-radius: 2px; overflow: hidden; }
-.channels .what .bar div { height: 100%; background: var(--accent-grad); }
+.channels .what .bar { height: 4px; margin-top: 0.3rem; background: rgba(255, 255, 255, 0.14); border-radius: var(--r-pill); overflow: hidden; }
+.channels .what .bar div { height: 100%; background: var(--accent-grad); border-radius: var(--r-pill); }
 
 /* Seek bar: a taller area to click or drag, the time under the pointer. */
 .player-seek { position: relative; padding: 0.7rem 0; cursor: pointer; touch-action: none; }
@@ -245,10 +247,33 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .title-logo { display: block; width: auto; height: auto; max-width: min(30rem, 100%); max-height: 8.5rem; object-fit: contain; object-position: left bottom; filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.5)); }
 .eyebrow { margin: 0 0 var(--s2); color: var(--text); font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
 .hero-meta, .detail .meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin: 0 0 var(--s3); color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
-.hero-meta .m + .m::before, .detail .meta .m + .m::before { content: "·"; margin-right: var(--s2); color: var(--soft); }
+/* The dot after an item, not before: when the line wraps it never starts the next one. */
+.hero-meta .m:not(:last-child)::after, .detail .meta .m:not(:last-child)::after { content: "·"; margin-left: var(--s2); color: var(--soft); }
 .hero-meta .badge, .detail .meta .badge { position: static; font-size: var(--t-s); }
 .hero-plot { margin: 0 0 var(--s5); max-width: 42rem; color: rgba(255, 255, 255, 0.88); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: 1.45em; }
 .hero-actions { display: flex; gap: var(--s3); flex-wrap: wrap; }
+/* Film, Serie and the TV list: a shorter header with the first or the
+   focused title (or channel), below the bar. */
+.hero.compact { min-height: clamp(13rem, 36vh, 26rem); margin-bottom: var(--s3); }
+.hero.compact .hero-text { padding: var(--s6) 0 var(--s3); }
+.hero.compact h1 { font-size: clamp(1.7rem, 2.6vw, var(--t-2xl)); }
+.hero.compact .title-logo { max-height: 6rem; }
+.ch-glow { background: radial-gradient(55% 85% at 78% 45%, var(--tint), rgba(0, 0, 0, 0) 72%); }
+.hero-mark { display: block; margin-bottom: var(--s3); }
+.hero-mark .ch-art { display: block; width: 6rem; height: 3.6rem; object-position: left center; }
+.hero-mark .ch-art.mono { display: inline-flex; width: 3.6rem; font-size: var(--t-l); }
+@media (max-width: 700px) {
+  .hero.compact { min-height: 11rem; }
+  .hero-mark .ch-art { width: 4.4rem; height: 2.6rem; }
+  .hero-mark .ch-art.mono { width: 2.6rem; }
+}
+/* Phone: the filters on one line that scrolls sideways, not three. */
+@media (max-width: 700px) {
+  .chips.filters, .tv-tools { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: calc(-1 * var(--safe)); margin-right: calc(-1 * var(--safe));
+    padding: var(--s3) var(--safe); }
+  .chips.filters::-webkit-scrollbar, .tv-tools::-webkit-scrollbar { display: none; }
+  .chips.filters > *, .tv-tools > * { flex: none; }
+}
 /* The header: clear over Home's picture, its dark band back below it. */
 .top { transition: background-color calc(var(--dur) * 2); }
 .top::after { transition: opacity calc(var(--dur) * 2); }
