@@ -529,13 +529,27 @@ window.VodMax = (() => {
   }, true);
   const sheetOpen = () => { const s = document.getElementById("more-sheet"); return Boolean(s && !s.hidden); };
 
+  // Long translations: when the menu does not fit, the less used sections
+  // become icons (named when open, and as a tooltip), as on medium screens.
+  function fitTabs() {
+    const nav = document.getElementById("tabs");
+    if (!nav) return;
+    nav.classList.remove("tight");
+    if (nav.scrollWidth > nav.clientWidth + 1) nav.classList.add("tight");
+  }
+  addEventListener("resize", fitTabs);
+  if (document.fonts) document.fonts.ready.then(fitTabs);
+  // Sections shown later (Download) widen the menu.
+  const tabsBox = document.getElementById("tabs");
+  if (tabsBox && window.MutationObserver) new MutationObserver(fitTabs).observe(tabsBox, { subtree: true, childList: true, attributeFilter: ["hidden"] });
+
   // Runs start() once the device is paired, otherwise pairs it.
   async function withToken(start) {
     await ssoReady;
     await linkReady;
     if (!token()) { showPairing(); return; }
     start();
-    decorate();
+    decorate().then(fitTabs);
     watchStatus();
     offerAppUpdate();
   }

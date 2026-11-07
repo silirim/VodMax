@@ -528,6 +528,7 @@ body.with-player #server-problems, body.with-panel #server-problems, body.with-d
   /* The less used sections as icons, named when open (and as a tooltip). */
   #tabs .tab.compact:not(.active) .tab-text { display: none; }
 }
+#tabs.tight .tab.compact:not(.active) .tab-text { display: none; }
 
 /* A few choices (a recording in progress: from the start or live). */
 .picker.choice { width: min(92vw, 28rem); }
