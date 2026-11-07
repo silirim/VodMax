@@ -101,6 +101,8 @@ che il traffico passi dal tunnel, che a VPN chiusa non parta nessuna
 connessione e che un server VPN irraggiungibile non causi fughe di traffico.
 `packaging/update_test.go` esegue `vodmax-update` con curl e server finti
 (la scelta della versione, senza rete né installazione).
+Per prove manuali e schermate senza chiave TMDB, `VODMAX_TMDB_BASE=http://…`
+fa parlare il server con un TMDB finto (solo QA, non è una funzione).
 
 L'app Android si compila con i suoi test JVM (anche in CI, job `android`):
 

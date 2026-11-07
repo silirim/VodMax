@@ -118,6 +118,10 @@ func run(data, listen, recordings, downloads, ffmpeg, ffprobe string, device boo
 	if err := svc.SetCacheDir(filepath.Join(data, "cache")); err != nil {
 		return err
 	}
+	// QA only: a fake TMDB lets screenshots and manual tests run without a key or network.
+	if base := os.Getenv("VODMAX_TMDB_BASE"); base != "" {
+		svc.SetTMDBBase(base)
+	}
 	svc.StartMaintenance(ctx, log)
 	go func() {
 		<-ctx.Done()
