@@ -1,0 +1,9 @@
+/* A channel's logo, or the tile with its initials when it has none
+   (channelArt in common.js, decision 0052). The pages size .ch-art where
+   they draw it; the look of the tile is here, shared, until ui.css takes
+   it over. */
+.ch-art { object-fit: contain; }
+.ch-art.mono {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; overflow: hidden;
+  color: #fff; font-weight: 700; font-size: 0.8em; letter-spacing: 0.02em; border-radius: 6px;
+}

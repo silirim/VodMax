@@ -6,10 +6,11 @@
 <title>VodMax · Guida TV</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="ch-art.css">
 <link rel="stylesheet" href="vod.css">
 <link rel="stylesheet" href="guide.css">
 </head>
-<body>
+<body class="guide-page">
 <header class="top">
   <nav id="tabs" class="keep">
     <a class="tab focusable nav-link" href="/" data-i18n>← Menu</a>
@@ -28,12 +29,12 @@
   </div>
 </header>
 <main id="guide" class="guide" aria-live="polite"></main>
-<section id="programme" class="programme-panel" hidden></section>
 <div id="status" class="status" hidden></div>
 <script src="i18n/languages.js"></script>
 <script src="i18n.js"></script>
 <script src="icons.js"></script>
 <script src="common.js"></script>
+<script src="guide-grid.js"></script>
 <script src="guide.js"></script>
 </body>
 </html>

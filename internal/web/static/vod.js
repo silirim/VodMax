@@ -149,7 +149,7 @@
       const p = c.now;
       const pct = p ? Math.min(100, Math.max(0, ((now - p.start) / (p.stop - p.start)) * 100)) : 0;
       const b = el("button", { className: "focusable" }, el("span", { className: "num" }, c.number || ""),
-        c.logo ? el("img", { src: c.logo, alt: "", loading: "lazy" }) : el("span", { className: "nologo" }),
+        window.VodMax.channelArt(c),
         el("span", { className: "what" }, el("strong", {}, (c.favorite ? "★ " : "") + c.name),
           el("span", {}, p ? hhmm(p.start) + " " + p.title : t("Nessuna informazione")),
           c.next ? el("span", {}, t("Dopo: {time} {title}", { time: hhmm(c.next.start), title: c.next.title })) : null,
@@ -281,7 +281,7 @@
   function channelCard(c) {
     const p = c.now;
     const pct = p ? Math.min(100, Math.max(0, ((Date.now() / 1000 - p.start) / (p.stop - p.start)) * 100)) : 0;
-    const art = el("div", { className: "poster channel-art" }, c.logo ? el("img", { src: c.logo, alt: "", loading: "lazy" }) : el("span", {}, c.name));
+    const art = el("div", { className: "poster channel-art" }, window.VodMax.channelArt(c));
     const card = el("button", { className: "card wide focusable" }, art,
       p ? el("div", { className: "bar" }, el("div", { style: "width:" + pct + "%" })) : null,
       el("span", { className: "label" }, c.number + " · " + c.name), el("span", { className: "sub" }, p ? p.title : t("Nessuna informazione")));

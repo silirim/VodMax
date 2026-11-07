@@ -917,8 +917,31 @@ window.VodMax = (() => {
     if (el.tagName === "BUTTON") el.setAttribute("aria-label", text); // the text can be hidden on phones
   }
 
+  // A channel's logo, or a tile with its initials when it has none or the
+  // image fails (decision 0052): the same tile in the guide, the channel
+  // list, the banner and multiview, never a broken-image icon. The colour
+  // comes from the name, so a channel keeps it everywhere.
+  function channelArt(channel) {
+    const name = String(channel.name || "");
+    const mono = () => {
+      // "IT: Rai 1 HD" → "RA": country tags, numbers and quality say nothing on a tile.
+      const words = name.replace(/^\[?[A-Z]{2,3}\]?\s*[:|-]\s*/, "").split(/[\s\-_.,:;|/()[\]+&]+/)
+        .filter((w) => w && !/^\d+$/.test(w) && !/^(HD|FHD|UHD|4K|SD|HEVC|H265|RAW)$/i.test(w));
+      const text = (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || name || "?").slice(0, 2)).toUpperCase();
+      let h = 0;
+      for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+      const tile = el("span", { className: "ch-art mono" }, text);
+      // Scrambled, so "Rai 1" and "Rai 2" get different hues.
+      tile.style.background = "hsl(" + ((Math.imul(h, 2654435761) >>> 0) % 360) + ", 45%, 34%)";
+      return tile;
+    };
+    if (!channel.logo) return mono();
+    const img = el("img", { className: "ch-art", src: channel.logo, alt: "", loading: "lazy" });
+    img.onerror = () => { const m = mono(); for (const c of img.classList) m.classList.add(c); img.replaceWith(m); };
+    return img;
+  }
   // The Android app's native player (window.VodMaxNative), if present.
   const native = window.VodMaxNative || null;
 
-  return { countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, bottomNav, closeSheet, sheetOpen, label, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
+  return { countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, bottomNav, closeSheet, sheetOpen, label, channelArt, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
 })();

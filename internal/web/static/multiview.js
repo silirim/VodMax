@@ -72,7 +72,7 @@
       cell.box.append(el("div", { className: "mv-empty" }, icon("plus"), el("span", {}, message || t("Scegli un canale"))));
       return;
     }
-    const label = el("div", { className: "mv-label" }, el("span", { className: "number" }, String(c.number)),
+    const label = el("div", { className: "mv-label" }, el("span", { className: "number" }, String(c.number)), window.VodMax.channelArt(c),
       el("span", { className: "name" }, c.name), el("span", { className: "now" }, c.now ? c.now.title : ""));
     if (cell.i === state.active) label.append(icon("volume-2"));
     cell.box.append(label);
@@ -164,7 +164,7 @@
     const start = Math.max(0, Math.min(p.selected - Math.floor(rows / 2), state.channels.length - rows));
     $("mv-pick-items").replaceChildren(...state.channels.slice(start, start + rows).map((c, k) => {
       const li = el("li", { className: start + k === p.selected ? "selected" : "" }, el("span", { className: "number" }, String(c.number)),
-        el("span", {}, c.name), el("span", { className: "now" }, c.now ? c.now.title : ""));
+        window.VodMax.channelArt(c), el("span", {}, c.name), el("span", { className: "now" }, c.now ? c.now.title : ""));
       li.onclick = (e) => { e.stopPropagation(); p.selected = start + k; choose(); };
       return li;
     }));
