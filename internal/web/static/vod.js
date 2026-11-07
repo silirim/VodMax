@@ -338,9 +338,11 @@
     const ep = episode ? "S" + c.season + "E" + c.number + " · " + c.title : "";
     const item = episode ? { id: c.series_id, kind: "series", display_title: c.series_title, logo: c.image }
       : { id: c.id, kind: "movie", display_title: c.title, year: c.year, logo: c.image };
+    // The time left on the button, as in "Riprendi · 48 min".
+    const left = c.next ? "" : " · " + Math.max(1, Math.ceil((c.progress.duration - c.progress.position) / 60)) + " min";
     return { id: item.id, title, poster: c.image, year: c.year,
-      text: [c.next ? t("Prossima puntata") : episode ? t("Continua") : t("Mancano {time}", { time: clock(c.progress.duration - c.progress.position) }), ep],
-      actions: [["primary", "play", c.next ? t("Guarda la puntata") : t("Riprendi"), () => play(c.media, c.id, title + (episode ? " · " + ep : ""), c.next ? 0 : c.progress.position)],
+      text: [c.next ? t("Prossima puntata") : episode ? t("Continua") : "", ep],
+      actions: [["primary", "play", c.next ? t("Guarda la puntata") : t("Riprendi") + left, () => play(c.media, c.id, title + (episode ? " · " + ep : ""), c.next ? 0 : c.progress.position)],
         ["", "info", t("Dettagli"), () => openDetail(item)]] };
   }
 
