@@ -82,6 +82,40 @@ func readDetails(t *testing.T, e *env, id string) details {
 	return d
 }
 
+// "Titoli simili" comes from the catalogue alone: same kind, shared
+// categories through any version, never the title itself or its other
+// versions, and hidden to kids like the title.
+func TestSimilarTitles(t *testing.T) {
+	e, _ := tvSetup(t)
+	film := strconv.FormatInt(findItem(t, e, "movie", "1408"), 10)
+	psycho := findItem(t, e, "movie", "psycho")
+	series := strconv.FormatInt(findItem(t, e, "series", "twin"), 10)
+	var list []struct {
+		ID    int64
+		Title string `json:"display_title"`
+	}
+	// Only one version of 1408 shares Horror with Psycho, whichever one
+	// the catalogue shows as primary; that is enough.
+	code, body := e.do(t, "GET", "/api/v1/items/"+film+"/similar", nil, true)
+	if code != 200 || json.Unmarshal(body, &list) != nil || len(list) != 1 || list[0].ID != psycho || list[0].Title != "Psycho" {
+		t.Fatalf("similar to 1408: %d %s", code, body)
+	}
+	if code, body := e.do(t, "GET", "/api/v1/items/"+series+"/similar", nil, true); code != 200 || strings.TrimSpace(string(body)) != "[]" {
+		t.Fatalf("lone series: %d %s", code, body)
+	}
+	// Kids: an adult title has no page, hence no row either.
+	e.do(t, "PUT", "/api/v1/subscriptions/1/categories/movie/10", map[string]any{"adult": true}, true)
+	e.do(t, "PUT", "/api/v1/subscriptions/1/categories/movie/11", map[string]any{"adult": true}, true)
+	e.do(t, "PUT", "/api/v1/subscriptions/1/rules", map[string]any{"adult": true}, true)
+	kid := addKids(t, e)
+	if code, _ := e.call(t, "GET", "/api/v1/items/"+film+"/similar", nil, kid.device, kid.profile); code != 404 {
+		t.Fatalf("adult title's row shown to kids: %d", code)
+	}
+	if code, body := e.call(t, "GET", "/api/v1/items/"+series+"/similar", nil, kid.device, kid.profile); code != 200 {
+		t.Fatalf("kids similar: %d %s", code, body)
+	}
+}
+
 func TestDetailsAndTMDBFallback(t *testing.T) {
 	e, _ := tvSetup(t)
 	film := strconv.FormatInt(findItem(t, e, "movie", "1408"), 10)

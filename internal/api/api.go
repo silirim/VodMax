@@ -89,6 +89,7 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	route("PUT /api/v1/items/{id}/hidden", levelAdmin, a.putHidden)
 	route("GET /api/v1/items/{id}/variants", levelViewer, a.variants)
 	route("GET /api/v1/items/{id}/details", levelViewer, a.details)
+	route("GET /api/v1/items/{id}/similar", levelViewer, a.similar)
 	route("POST /api/v1/debug/player", levelViewer, a.playerLog)
 	route("GET /api/v1/downloads", levelMember, a.listDownloads)
 	route("POST /api/v1/downloads", levelMember, a.addDownload)
@@ -1677,6 +1678,20 @@ func (a *api) details(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, d)
+}
+
+func (a *api) similar(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	list, err := a.svc.Similar(r.Context(), id)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 func (a *api) listDownloads(w http.ResponseWriter, r *http.Request) {

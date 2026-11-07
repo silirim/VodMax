@@ -161,6 +161,17 @@ func (s *Service) Details(ctx context.Context, itemID int64) (ItemDetails, error
 	return d, nil
 }
 
+// Similar is the "Titoli simili" row of a detail page: up to 12 titles
+// of the catalogue, with what the viewer may see, no call outside.
+func (s *Service) Similar(ctx context.Context, itemID int64) ([]store.CatalogItem, error) {
+	if err := s.allowItem(ctx, itemID); err != nil {
+		return nil, err
+	}
+	list, err := s.st.Similar(ctx, itemID, 12, viewerOf(ctx).Kids)
+	s.catalogImages(ctx, list)
+	return list, err
+}
+
 // itemDetails builds the detail page of a film or series, from the
 // provider (or the collection's files) and TMDB; the error says why the
 // provider's page is missing, the details hold what is known anyway.

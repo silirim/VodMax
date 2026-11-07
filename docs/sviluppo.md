@@ -67,6 +67,8 @@ guasto; il client la ignora.
 | `PUT /api/v1/subscriptions/{id}/categories/{kind}/{categoria}` | Correzione manuale: `enabled`, `section`, `country`, `adult` (`null` = automatico) |
 | `PUT /api/v1/items/{id}/hidden` | Nasconde o ripristina un singolo titolo o canale |
 | `GET /api/v1/items/{id}/variants` | Le versioni dello stesso titolo, migliore per prima |
+| `GET /api/v1/items/{id}/details` | Scheda di un film o una serie: trama, cast con foto (`people`), logo del titolo, sfondo, trailer, fonti |
+| `GET /api/v1/items/{id}/similar` | "Titoli simili": fino a 12 titoli dello stesso tipo del catalogo con più categorie in comune (poi voto e novità), stesse schede del catalogo; mai il titolo stesso o le sue versioni |
 | `GET /api/v1/tv/channels` | Canali in ordine da telecomando con numero, ora e a seguire: `section`, `list=favorites` |
 | `GET /api/v1/tv/channels/{id}/guide` | Guida di un canale (`hours`, massimo 72) |
 | `PUT /api/v1/tv/favorites/{id}` `{favorite}` | Aggiunge o toglie un canale dai preferiti |

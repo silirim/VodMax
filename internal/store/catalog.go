@@ -699,6 +699,39 @@ func (s *Store) InMyList(ctx context.Context, profileID, itemID int64) (bool, er
 	return n > 0, err
 }
 
+// Similar lists up to limit visible titles of the same kind as itemID
+// that share its categories (any version of either title counts, as in
+// Catalog's category filter), the ones with most categories in common
+// first, then the best rated and the newest; never the title itself or
+// another version of it.
+// shortcut: genres are not stored per item, so the provider's categories stand in for them; switch to genres if the catalogue ever keeps them.
+func (s *Store) Similar(ctx context.Context, itemID int64, limit int, noAdult bool) ([]CatalogItem, error) {
+	rows, err := s.r.QueryContext(ctx, `WITH ref AS (SELECT id, kind, group_key FROM item WHERE id = ? AND kind IN ('movie', 'series')),
+		refcat AS (SELECT DISTINCT v.subscription_id, v.category_id FROM item v, ref
+			WHERE v.kind = ref.kind AND v.available = 1 AND v.category_id <> '' AND (v.id = ref.id OR (ref.group_key <> '' AND v.group_key = ref.group_key)))
+		SELECT `+itemColumns+` FROM refcat rc
+		JOIN item v ON v.subscription_id = rc.subscription_id AND v.category_id = rc.category_id AND v.available = 1
+		JOIN item i ON i.kind = v.kind AND (i.id = v.id OR (v.group_key <> '' AND i.group_key = v.group_key)), ref
+		WHERE i.kind = ref.kind AND i.available = 1 AND i.visible = 1 AND i.primary_variant = 1 AND (? = 0 OR i.adult = 0)
+			AND i.id <> ref.id AND (ref.group_key = '' OR i.group_key <> ref.group_key)
+		GROUP BY i.id
+		ORDER BY count(DISTINCT rc.subscription_id || ':' || rc.category_id) DESC, coalesce(i.rating, 0) DESC, coalesce(i.year, 0) DESC, i.first_seen_at DESC, i.id
+		LIMIT ?`, itemID, noAdult, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []CatalogItem{}
+	for rows.Next() {
+		it, err := scanItem(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
 // TitlesByTMDB finds the visible titles of a kind with these TMDB ids or
 // group keys: tmdb id → item, group key → item.
 func (s *Store) TitlesByTMDB(ctx context.Context, kind string, ids, keys []string, noAdult bool) (map[string]CatalogItem, map[string]CatalogItem, error) {
