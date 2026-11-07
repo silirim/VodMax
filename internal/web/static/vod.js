@@ -318,7 +318,12 @@
     clearTimeout(heroTimer);
     // Only if the focus is still on that card (moving on quickly with
     // the remote must not redraw the hero under the new focus).
-    heroTimer = setTimeout(() => { if (document.activeElement === card && hero.isConnected) showHero(hero, card.hero); }, 350);
+    heroTimer = setTimeout(() => {
+      if (document.activeElement !== card || !hero.isConnected) return;
+      showHero(hero, card.hero);
+      // The card's rating becomes the one the hero shows (TMDB's, once known).
+      if (card.hero.id) detailsOf(card.hero.id).then((d) => { const r = card.querySelector(".badge.rating"); if (r && d.rating) r.textContent = rating(d.rating); });
+    }, 350);
   });
 
   const QUALITY = { 4: "4K", 3: "Full HD", 2: "HD", 1: "SD" };
@@ -447,7 +452,7 @@
     const d = h.id ? await detailsOf(h.id) : {};
     if (heroShown !== h) return;
     plot.textContent = d.plot || "";
-    meta.replaceChildren(...metaLine({ ...h, rating: h.rating || d.rating, text: [...(h.text || []), ...detailText(d)] }));
+    meta.replaceChildren(...metaLine({ ...h, rating: d.rating || h.rating, text: [...(h.text || []), ...detailText(d)] }));
     if (d.logo) titleLogo(title, d.logo, h.title);
     const art = d.backdrop ? await fadedArt(d.backdrop, hero, !hero.classList.contains("under")) : null;
     if (heroShown !== h) return;
@@ -1123,7 +1128,9 @@
 
   // Year, duration, genres, versions as text; rating and quality as pills.
   function detailMeta(item, d = {}) {
-    return metaLine({ year: item.year, quality: item.quality, rating: item.rating || d.rating,
+    // TMDB's rating when known, as on the hero: the same title shows the
+    // same rating wherever its page was opened from.
+    return metaLine({ year: item.year, quality: item.quality, rating: d.rating || item.rating,
       text: [d.duration ? Math.round(d.duration / 60) + " min" : "", d.genre, item.variant_count > 1 ? t("{n} versioni", { n: item.variant_count }) : ""] });
   }
 
