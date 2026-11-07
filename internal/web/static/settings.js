@@ -155,6 +155,10 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     // An open folder picker closes first; changes not saved are asked about.
     const picker = document.querySelector(".picker-panel");
     if (picker && picker.close) { picker.close(); return; }
+    // Two columns: from inside the section, back to its row in the list
+    // first; the page is left only from the list.
+    const row = document.querySelector(".item.active");
+    if (!phone.matches && row && $("content").contains(document.activeElement)) { row.focus(); return; }
     if (!leaveAsked()) return;
     if (phone.matches && state.view) {
       const was = state.view;
@@ -1566,26 +1570,50 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       if (first) { first.focus(); first.scrollIntoView({ block: "nearest" }); }
       return;
     }
-    const a = current.getBoundingClientRect();
+    // A switch row is as wide as the box: measured at its switch, it sits
+    // in the same right-hand column as the other rows' controls.
+    const box = (e) => (e.classList.contains("look-toggle") ? e.querySelector(".switch") : e).getBoundingClientRect();
+    const a = box(current);
     const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
     // Up and Down stay in their column (the list or the section): a list
     // row on the left is not "below" a control of the section.
     const vertical = dir === "ArrowUp" || dir === "ArrowDown";
-    const inSide = $("side").contains(current);
-    let best = null, bestScore = Infinity;
+    const inSide = $("side").contains(current), inContent = $("content").contains(current);
+    let pool = [];
     for (const e of all) {
       if (e === current) continue;
-      const b = e.getBoundingClientRect();
+      const b = box(e);
       const dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
       const ok = { ArrowLeft: dx < -4, ArrowRight: dx > 4, ArrowUp: dy < -4, ArrowDown: dy > 4 }[dir];
       if (!ok) continue;
-      const along = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dx) : Math.abs(dy);
-      const across = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dy) : Math.abs(dx);
       if (vertical && $("side").contains(e) !== inSide) continue;
+      // Left from the section stays in it; at its left edge, the list (below).
+      if (dir === "ArrowLeft" && inContent && !$("content").contains(e)) continue;
+      pool.push({ e, b, dx, dy });
+    }
+    if (vertical) {
+      // The nearest row first (edge to edge), then the nearest control in
+      // it: a control further down but more in line is not skipped to.
+      const gap = (c) => Math.max(0, dir === "ArrowDown" ? c.b.top - a.bottom : a.top - c.b.bottom);
+      const near = Math.min(...pool.map(gap));
+      pool = pool.filter((c) => gap(c) <= near + 12);
+    } else if (inContent) {
+      // Left and Right stay on their row.
+      pool = pool.filter((c) => c.b.top < a.bottom && c.b.bottom > a.top);
+    }
+    let best = null, bestScore = Infinity;
+    for (const { e, dx, dy } of pool) {
+      const along = vertical ? Math.abs(dy) : Math.abs(dx);
+      const across = vertical ? Math.abs(dx) : Math.abs(dy);
       const score = along + across * 3;
       if (score < bestScore) { bestScore = score; best = e; }
     }
-    if (best) {
+    // Into a group of choices from another row: onto its chosen one (tvOS).
+    const group = best && vertical && best.parentElement.matches(".segmented, .swatches") && !best.parentElement.contains(current) ? best.parentElement : null;
+    if (group && group.querySelector('[aria-pressed="true"]')) best = group.querySelector('[aria-pressed="true"]');
+    // Out of the section: its own row in the list, not the nearest one.
+    if (!best && dir === "ArrowLeft" && inContent) best = document.querySelector(".item.active");
+    if (best && best.offsetParent !== null) {
       best.focus();
       best.scrollIntoView({ block: "nearest" });
     }
