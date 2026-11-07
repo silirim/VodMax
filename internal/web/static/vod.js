@@ -1455,7 +1455,7 @@
         ...p.sess.subtitles.map((tr) => ({ label: trackLabel(tr, "sub"), on: tr.index === p.sub, ok: tr.supported, pick: () => switchTracks(p.audio, tr.index, { sub: tr.language }) }))];
     const buttons = items.map((it) => {
       const b = document.createElement("button");
-      b.className = "focusable" + (it.on ? " on" : "");
+      b.className = "chip focusable" + (it.on ? " active" : "");
       b.textContent = (it.on ? "✓ " : "") + it.label;
       b.disabled = !it.ok;
       b.onclick = () => { closeMenu(); it.pick(); };
@@ -1465,7 +1465,7 @@
     menu.replaceChildren(title, ...buttons);
     menu.hidden = false;
     showBar();
-    (buttons.find((b) => b.classList.contains("on")) || buttons[0]).focus();
+    (buttons.find((b) => b.classList.contains("active")) || buttons[0]).focus();
   }
   function closeMenu() { $("player-menu").hidden = true; }
 

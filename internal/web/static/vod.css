@@ -114,7 +114,8 @@ html { scroll-padding-top: 6.5rem; }
 .recs .state { color: var(--soft); }
 .recs .state.recording { color: var(--rec); font-weight: 600; }
 
-/* Player */
+/* Player: the commands in a dark glass bar over the picture (.glass-dark
+   in index.html), labelled pills, the times on both sides of the bar. */
 .player { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 7; /* above the detail it starts from */ background: #000; }
 .player video { width: 100%; height: 100%; object-fit: contain; }
 .player-bar {
@@ -122,47 +123,32 @@ html { scroll-padding-top: 6.5rem; }
   left: 4vw;
   right: 4vw;
   bottom: 5vh;
-  padding: 1.3rem 1.7rem 1.2rem;
-  background: rgba(19, 21, 27, 0.92);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  transition: opacity 0.3s;
+  padding: var(--s5) var(--s6) var(--s4);
+  transition: opacity calc(var(--dur) * 2);
 }
 .player-bar.idle { opacity: 0; pointer-events: none; } /* hidden controls are not tapped by mistake */
-.player-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.4rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.player-progress { height: 6px; background: var(--raised); border-radius: 3px; overflow: hidden; }
-.player-progress div { height: 100%; width: 0; background: var(--accent-grad); }
-.player-time { display: flex; justify-content: space-between; margin: -0.2rem 0 0.8rem; color: var(--soft); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.player-title { margin-bottom: var(--s2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--t-l); font-weight: 700; letter-spacing: -0.01em; }
+.player-line { display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s3); color: var(--soft); font-size: var(--t-s); font-weight: 600; }
+.player-line > span { flex: none; min-width: 3.4em; }
+.player-line > span:last-child { text-align: right; }
+.player-progress { position: relative; height: 6px; background: rgba(255, 255, 255, 0.22); border-radius: var(--r-pill); transition: height var(--dur); }
+.player-progress div { position: relative; height: 100%; width: 0; background: var(--accent-grad); border-radius: var(--r-pill); }
+/* The knob at the playing point, grown while the pointer is on the bar. */
+.player-progress div::after { content: ""; position: absolute; top: 50%; right: -0.45rem; width: 0.9rem; height: 0.9rem; margin-top: -0.45rem;
+  background: #fff; border-radius: 50%; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5); transform: scale(0.6); transition: transform var(--dur); }
+.player-seek:hover .player-progress div::after, .player-seek.dragging .player-progress div::after { transform: scale(1); }
 .hint { color: var(--soft); font-size: 0.85rem; }
 
-/* The commands: playback on the left, Close on the right; pills like
-   the small buttons of every page. */
-.player-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-.player-buttons button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45em;
-  padding: 0.55em 1.1em;
-  font: inherit;
-  white-space: nowrap;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  cursor: pointer;
-}
+/* The commands: playback on the left, Close on the right. */
+.player-buttons { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.player-buttons .button { white-space: nowrap; }
 .player-buttons button[data-action="close"] { order: 9; margin-left: auto; }
-.player-buttons button:hover { border-color: var(--text); }
-.player-buttons button:focus { outline: none; color: #0b0c10; background: var(--focus); border-color: var(--focus); }
 .player.cursor-hidden { cursor: none; }
 
-.player-menu { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.4rem 0 0.6rem; padding: 0.6rem; background: var(--raised); border-radius: 10px; }
-.player-menu .menu-title { width: 100%; color: var(--soft); font-size: 0.9rem; }
-.player-menu button { padding: 0.45em 1em; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
-.player-menu button.on { border-color: var(--fav); color: var(--fav); }
-.player-menu button:disabled { opacity: 0.45; cursor: default; }
-.player-menu button:hover { border-color: var(--text); }
-.player-menu button:focus { outline: none; color: #0b0c10; background: var(--focus); border-color: var(--focus); }
+/* Audio and subtitles: chips in a band inside the bar. */
+.player-menu { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s3) 0 0; padding: var(--s3); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: var(--r-s); }
+.player-menu .menu-title { width: 100%; color: var(--soft); font-size: var(--t-s); }
+.player-menu .chip:disabled { opacity: 0.38; cursor: default; }
 video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 
 /* Detail page: plot and credits. */
@@ -224,10 +210,10 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .channels .what .bar div { height: 100%; background: var(--accent-grad); border-radius: var(--r-pill); }
 
 /* Seek bar: a taller area to click or drag, the time under the pointer. */
-.player-seek { position: relative; padding: 0.7rem 0; cursor: pointer; touch-action: none; }
+.player-seek { position: relative; flex: 1; min-width: 0; padding: 0.7rem 0; cursor: pointer; touch-action: none; }
 .player-seek:hover .player-progress, .player-seek.dragging .player-progress { height: 10px; }
-.player-hover { position: absolute; bottom: 1.6rem; padding: 0.15rem 0.5rem; font-size: 0.85rem; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 6px; transform: translateX(-50%); pointer-events: none; }
+.player-hover { position: absolute; bottom: 1.8rem; padding: 0.2rem 0.6rem; font-size: var(--t-s); font-weight: 600; color: var(--text); background: rgba(10, 12, 18, 0.9);
+  border: 1px solid var(--glass-line); border-radius: var(--r-xs); transform: translateX(-50%); pointer-events: none; }
 
 /* ---- Home: featured title, under the header ----
    The picture is a canvas (vod.js fadedArt) whose bottom is transparent:
@@ -386,12 +372,13 @@ body.over-hero .top::after { opacity: 0; }
 
 /* Phone: the commands as icons, the bar across the bottom. */
 @media (max-width: 700px) {
-  .player-bar { left: 0.6rem; right: 0.6rem; bottom: calc(0.6rem + env(safe-area-inset-bottom)); padding: 1rem 1rem 0.9rem; }
-  .player-title { font-size: 1.05rem; }
+  .player-bar { left: 0.6rem; right: 0.6rem; bottom: calc(0.6rem + env(safe-area-inset-bottom)); padding: var(--s4) var(--s4) var(--s3); }
+  .player-title { font-size: var(--t-m); }
+  .player-line { gap: var(--s3); }
   /* On two lines when they do not fit (episodes add Next, tracks add
      Audio and Subtitles): Close must stay on screen. */
   .player-buttons { gap: 0.4rem; justify-content: center; flex-wrap: wrap; }
-  .player-buttons button { padding: 0.6em 0.8em; }
+  .player-buttons .button { padding: 0.6em 0.8em; }
   .player-buttons button[data-action="close"] { margin-left: 0; }
   .player-buttons button .lbl { display: none; }
   .player-buttons button[data-action="back10"] .lbl, .player-buttons button[data-action="fwd30"] .lbl { display: inline; font-size: 0.85rem; }
@@ -402,22 +389,17 @@ body.over-hero .top::after { opacity: 0; }
 .player-extra { position: absolute; right: 4vw; bottom: 5vh; display: flex; flex-direction: column; align-items: flex-end; gap: 0.8rem; transition: bottom 0.2s; }
 /* The bar shows when the cursor does (no :has(): webOS 22 ignores it). */
 .player:not(.cursor-hidden) .player-extra { bottom: calc(5vh + 12.5rem); }
-.player-extra button {
-  display: inline-flex; align-items: center; gap: 0.45em;
-  padding: 0.7em 1.4em; font: inherit; font-weight: 600; color: var(--text);
-  background: rgba(19, 21, 27, 0.92); border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
-}
-.player-extra button:hover { border-color: var(--text); }
-.player-extra button:focus { outline: none; color: #0b0c10; background: var(--focus); border-color: var(--focus); }
-.next-card { display: grid; gap: 0.3rem; width: min(26rem, 88vw); padding: 1.1rem 1.3rem; background: rgba(19, 21, 27, 0.94); border: 1px solid var(--line); border-radius: 16px; }
-.next-label { color: var(--accent); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-.next-card strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.next-count { color: var(--soft); font-size: 0.9rem; }
-.next-buttons { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-.next-buttons button { padding: 0.55em 1.1em; font-weight: 400; background: var(--bg); }
+.player-extra > .button { padding: 0.7em 1.5em; font-size: var(--t-l); }
+.next-card { display: grid; gap: var(--s1); width: min(28rem, 88vw); padding: var(--s5); }
+.next-label { color: var(--text); font-size: var(--t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; }
+.next-card strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--t-l); }
+.next-count { color: var(--soft); font-size: var(--t-s); }
+.next-buttons { display: flex; gap: var(--s2); margin-top: var(--s3); }
 @media (max-width: 700px) {
   .player-extra { right: 0.6rem; left: 0.6rem; bottom: calc(0.6rem + env(safe-area-inset-bottom)); }
-  .player:not(.cursor-hidden) .player-extra { bottom: calc(9.5rem + env(safe-area-inset-bottom)); }
+  .player:not(.cursor-hidden) .player-extra { bottom: calc(14.2rem + env(safe-area-inset-bottom)); }
+  /* Over the player the toast goes to the top: the bar is at the bottom. */
+  body.with-player.has-bnav .status { top: calc(var(--s4) + env(safe-area-inset-top)); bottom: auto; }
   .next-card { width: 100%; }
 }
 
