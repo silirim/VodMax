@@ -237,7 +237,7 @@
     ]);
     const hero = el("section", { className: "hero under" });
     const parts = [hero];
-    if (await assistant()) parts.push(tonightBox());
+    const tonight = await assistant() ? tonightBox() : null;
     if (my !== renderSeq) return;
     parts.push(el("h2", { className: "section" }, t("Continua a guardare")));
     parts.push(cont.length ? el("div", { className: "row" }, ...cont.map(continueCard))
@@ -250,6 +250,9 @@
     parts.push(section(t("Nuove serie"), "series", newest("series")), el("div", { className: "row" }, ...series.items.map(itemCard)));
     const done = recordings.filter((r) => r.status === "completed").slice(0, 12);
     if (done.length) parts.push(section(t("Registrazioni recenti"), "recordings"), el("div", { className: "row" }, ...done.map(recordingCard)));
+    // "Stasera" after the first two rows: what to resume and what is new
+    // come first, the question to the assistant just below.
+    if (tonight) parts.splice(Math.min(5, parts.length), 0, tonight);
     main.replaceChildren(...parts);
     // The featured title: the first thing to continue, else the newest film.
     const first = cont[0] ? heroFromContinue(cont[0]) : films.items[0] ? heroFromItem(films.items[0]) : null;
@@ -370,6 +373,7 @@
       hero.classList.contains("compact") ? null : plot, buttons.length ? el("div", { className: "hero-actions" }, ...buttons) : null);
     const old = hero.querySelector(".hero-text");
     if (old) old.replaceWith(text); else hero.append(text);
+    heroTop();
     if (had >= 0 && buttons.length) buttons[Math.min(had, buttons.length - 1)].focus();
     if (h.art) { setArt(hero, h.art); return; } // a channel: its tile, no details
     const d = h.id ? await detailsOf(h.id) : {};
@@ -388,8 +392,10 @@
   const header = document.querySelector("header.top");
   function heroTop() {
     document.documentElement.style.setProperty("--top-h", header.offsetHeight + "px");
+    // Clear until the title and its buttons would pass under the bar.
     const hero = $("content").querySelector(".hero.under");
-    document.body.classList.toggle("over-hero", Boolean(hero) && hero.getBoundingClientRect().bottom > header.offsetHeight + 8);
+    const text = hero && hero.querySelector(".hero-text");
+    document.body.classList.toggle("over-hero", Boolean(hero) && (text ? text.getBoundingClientRect().top > header.offsetHeight : window.scrollY < 8));
   }
   window.addEventListener("scroll", heroTop, { passive: true });
   window.addEventListener("resize", heroTop);

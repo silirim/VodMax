@@ -374,8 +374,20 @@ body.over-hero .top::after { opacity: 0; }
 }
 
 /* The assistant: "tonight" on Home and the sentence in the rule form. */
-.tonight { margin-bottom: 0.5rem; }
-.tonight-form { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.4rem 0 0.8rem; }
+/* "Stasera": a compact card among the rows, glass look without blur. */
+.tonight {
+  margin: var(--s6) 0 var(--s2);
+  padding: var(--s4) var(--s5);
+  background-color: rgba(255, 255, 255, 0.06);
+  background-image: var(--glass-sheen), var(--control-base);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r);
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow-s);
+}
+.tonight > h2.section { margin: 0 0 var(--s2); }
+.tonight-form { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0; }
+.tonight-result:not(:empty) { margin-top: var(--s3); }
+@media (max-width: 700px) { .tonight { padding: var(--s4); } }
 .tonight-form input { flex: 1 1 18rem; max-width: 34rem; padding: 0.55em 0.8em; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; }
 .tonight-form input:focus { outline: none; border-color: var(--focus); }
 .tonight-intro { color: var(--text); margin: 0 0 0.6rem; }
