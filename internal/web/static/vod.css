@@ -145,7 +145,7 @@ html { scroll-padding-top: 6.5rem; }
 .hint { color: var(--soft); font-size: 0.85rem; }
 
 /* The commands: playback on the left, Close on the right. */
-.player-buttons { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.player-buttons { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: center; } /* room for the focused pill's zoom */
 .player-buttons .button { white-space: nowrap; }
 .player-buttons button[data-action="close"] { order: 9; margin-left: auto; }
 .player.cursor-hidden { cursor: none; }
@@ -374,14 +374,15 @@ body.over-hero .top::after { opacity: 0; }
   .rule-form button[type=submit] { justify-self: stretch; }
 }
 
-/* Phone: the commands as icons, the bar across the bottom. */
+/* Phone: the commands as icons (their name in aria-label), only the
+   jumps keep their "10 s" and "30 s"; the bar across the bottom. */
 @media (max-width: 700px) {
   .player-bar { left: 0.6rem; right: 0.6rem; bottom: calc(0.6rem + env(safe-area-inset-bottom)); padding: var(--s4) var(--s4) var(--s3); }
   .player-title { font-size: var(--t-m); }
   .player-line { gap: var(--s3); }
   /* On two lines when they do not fit (episodes add Next, tracks add
      Audio and Subtitles): Close must stay on screen. */
-  .player-buttons { gap: 0.4rem; justify-content: center; flex-wrap: wrap; }
+  .player-buttons { gap: var(--s2); justify-content: center; flex-wrap: wrap; }
   .player-buttons .button { padding: 0.6em 0.8em; }
   .player-buttons button[data-action="close"] { margin-left: 0; }
   .player-buttons button .lbl { display: none; }
