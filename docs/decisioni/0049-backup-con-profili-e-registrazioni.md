@@ -1,6 +1,6 @@
 # 0049 — Backup: profili compresi, registrazioni recenti tenute
 
-Stato: **Proposta** (6 novembre 2026, da una revisione di registrazioni e backup)
+Stato: **Approvata** (7 novembre 2026: "per le altre procedi")
 
 ## Il problema
 

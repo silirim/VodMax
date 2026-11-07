@@ -1,6 +1,6 @@
 # 0050 — Assistente: tutta la serata, e risposte che si possono usare
 
-Stato: **Proposta** (6 novembre 2026, da una revisione dell'assistente)
+Stato: **Approvata** (7 novembre 2026: "per le altre procedi")
 
 ## Il problema
 

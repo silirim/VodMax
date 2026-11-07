@@ -1,6 +1,6 @@
 # 0046 — Disco quasi pieno: prima le registrazioni, poi la pausa della diretta
 
-Stato: **Proposta** (6 novembre 2026, da una revisione dello streaming)
+Stato: **Approvata** (7 novembre 2026: "per le altre procedi")
 
 ## Il problema
 

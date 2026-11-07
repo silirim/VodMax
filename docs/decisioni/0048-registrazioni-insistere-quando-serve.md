@@ -1,6 +1,6 @@
 # 0048 — Registrazioni: insistere quando serve, non quando è inutile
 
-Stato: **Proposta** (6 novembre 2026, da una revisione del registratore)
+Stato: **Approvata** (7 novembre 2026: "per le altre procedi")
 
 ## Il problema
 

@@ -1,6 +1,6 @@
 # 0044 — Il token di amministrazione non resta nel browser
 
-Stato: **Proposta** (6 novembre 2026, da una revisione di sicurezza)
+Stato: **Approvata** (7 novembre 2026: "per le altre procedi")
 
 ## Il problema
 

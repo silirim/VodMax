@@ -1,7 +1,6 @@
 # 0047 — Il lettore dell'app Android a schermo intero, anche per le registrazioni
 
-Stato: **Proposta** (6 novembre 2026: "le registrazioni su android hanno il
-player senza schermo intero e non posso andare avanti con il tempo")
+Stato: **Approvata** (7 novembre 2026: "per le altre procedi")
 
 ## Il problema
 
