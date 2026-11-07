@@ -2,8 +2,6 @@
 
 .more { margin: 1.2rem 0; }
 
-.empty { color: var(--soft); }
-
 /* Detail */
 .detail {
   position: fixed;
@@ -117,50 +115,6 @@ html { scroll-padding-top: 6.5rem; }
 .player-time { display: flex; justify-content: space-between; margin: -0.2rem 0 0.8rem; color: var(--soft); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 .hint { color: var(--soft); font-size: 0.85rem; }
 
-.status {
-  position: fixed;
-  top: 5vh;
-  left: 50%;
-  z-index: 5;
-  transform: translateX(-50%);
-  padding: 0.7rem 1.2rem;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-
-/* Token request, shared with the TV page. */
-.setup-panel {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  z-index: 10;
-  transform: translate(-50%, -50%);
-  width: min(90vw, 34rem);
-  padding: 2rem;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-.setup-panel input {
-  width: 100%;
-  padding: 0.75rem;
-  margin: 0.5rem 0 1rem;
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-.setup-panel button {
-  padding: 0.7rem 1.4rem;
-  font: inherit;
-  color: var(--bg);
-  background: var(--text);
-  border: 0;
-  border-radius: 8px;
-}
-
 /* The commands: playback on the left, Close on the right; pills like
    the small buttons of every page. */
 .player-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
@@ -198,18 +152,6 @@ html { scroll-padding-top: 6.5rem; }
 }
 #server-problems.error { border-color: var(--rec); }
 #server-problems.compact { max-width: 2.6rem; max-height: 2.6rem; overflow: hidden; white-space: nowrap; padding-left: 0.75rem; padding-right: 0.75rem; }
-
-.pair-code { font-size: 3.2rem; font-weight: 700; letter-spacing: 0.2em; text-align: center; margin: 1.2rem 0; }
-.setup-panel .hint { color: var(--soft); font-size: 0.9rem; }
-.setup-panel button.link { margin-top: 1rem; padding: 0; color: var(--soft); background: none; border: 0; text-decoration: underline; cursor: pointer; font: inherit; }
-.profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 0.8rem; margin-top: 1rem; }
-.profile-choice { display: flex; flex-direction: column; gap: 0.3rem; padding: 1.2rem 0.8rem; font: inherit; color: var(--text);
-  background: var(--raised); border: 2px solid transparent; border-radius: 12px; cursor: pointer; }
-.profile-choice:focus, .profile-choice:hover { border-color: var(--text); outline: none; }
-.profile-name { font-size: 1.2rem; font-weight: 600; }
-.profile-kind { color: var(--soft); font-size: 0.85rem; min-height: 1em; }
-.setup-panel button.profile-choice { color: var(--text); background: var(--raised); border: 2px solid transparent; }
-.setup-panel button.profile-choice:focus { border-color: var(--text); }
 
 .player-menu { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.4rem 0 0.6rem; padding: 0.6rem; background: var(--raised); border-radius: 10px; }
 .player-menu .menu-title { width: 100%; color: var(--soft); font-size: 0.9rem; }

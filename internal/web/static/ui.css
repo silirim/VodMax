@@ -1,7 +1,13 @@
 /* VodMax design base, shared by every page (before the page's own CSS).
    Built for a TV seen from the sofa first (10-foot UI), then PC and
    phone: large text that grows with the screen, safe margins, one strong
-   focus style everywhere, icons from icons.js. */
+   focus style everywhere, icons from icons.js.
+
+   The "glass" theme (decisions 0051 and 0054): translucent surfaces over
+   the page's imagery. Blur is costly on a TV, so only floating surfaces
+   get it (the bars, pickers, dialogs, the toast); buttons, chips and cards
+   use the same recipe without blur. Where the engine cannot blur, the
+   surfaces are semi-opaque, never transparent: text stays readable. */
 
 /* Inter, served by VodMax itself: a TV must look the same without
    internet (decision 0051). One variable file covers every weight. */
@@ -14,23 +20,57 @@
 
 :root {
   --bg: #0b0c10;
+  --bg-rgb: 11, 12, 16; /* for rgba() fades that must follow the theme */
   --surface: #13151b;
   --raised: #1d2028;
-  --panel: rgba(17, 19, 25, 0.96);
+  --panel: rgba(17, 19, 25, 0.96); /* opaque panel, for surfaces that never blur */
   --text: #f5f5f7;
   --soft: #a9abb5;
   --faint: #6e717c;
-  /* Brand: "Aurora", mint to azure. Red stays for recording and errors. */
+  --ink: #0b0c10; /* text on a white fill (focus, primary buttons) */
+  /* Brand: "Aurora", mint to azure. Red stays for recording and errors.
+     html[data-accent] below swaps these four for the other accents. */
   --accent: #00d6ca;
   --accent-grad: linear-gradient(90deg, #00f5a0, #00b8f5);
   --accent-soft: rgba(0, 214, 202, 0.18);
+  --accent-ink: #04262a; /* text on an accent fill */
   --rec: #ff4d4f;
   --focus: #ffffff;
   --line: rgba(255, 255, 255, 0.12);
   --fav: #f2c879;
   --ok: #7fd8ad;
   --bad: #ff9a92;
-  --radius: 12px;
+  /* Glass surfaces. These are the values WITHOUT blur (semi-opaque); the
+     @supports block below swaps them for translucent ones where the
+     engine blurs. --bf is the backdrop filter, "none" until then. */
+  --glass: rgba(30, 33, 42, 0.94);
+  --glass-strong: rgba(44, 48, 58, 0.96);
+  --glass-dark: rgba(12, 14, 19, 0.96);
+  --glass-line: rgba(255, 255, 255, 0.16);
+  --glass-hi: rgba(255, 255, 255, 0.2); /* inner top highlight */
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 42%);
+  /* A neutral dark base under every white glass layer: without it white
+     glass over a warm picture goes tan. */
+  --glass-base: linear-gradient(rgba(12, 14, 20, 0.35), rgba(12, 14, 20, 0.35));
+  --blur: 0px;
+  --sat: 100%;
+  --bf: none;
+  /* Radii: exactly these. */
+  --r: 22px; /* panels, dialogs, bars */
+  --r-s: 14px; /* posters, cards, tiles, inputs */
+  --r-xs: 8px; /* badges, small tags */
+  --r-pill: 999px; /* buttons, chips, tabs, search */
+  --radius: var(--r-s); /* older name, kept for the page styles */
+  /* Depth */
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  --shadow-s: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --glow: 0 0 0 3px var(--focus), 0 0 0 7px rgba(255, 255, 255, 0.22), 0 0 40px rgba(255, 255, 255, 0.18), 0 24px 60px rgba(0, 0, 0, 0.6);
+  --text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  /* Spacing scale */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+  /* Type scale, in rem of the fluid root size below */
+  --t-xs: 0.8rem; --t-s: 0.875rem; --t-m: 1rem; --t-l: 1.25rem; --t-xl: 1.6rem; --t-2xl: 2.2rem; --t-3xl: 3.2rem;
+  --dur: 180ms;
   --gap: 1rem;
   /* Margins: 5% on TV-sized screens (overscan), smaller elsewhere. */
   --safe: clamp(16px, 4vw, 96px);
@@ -46,6 +86,38 @@
 }
 @media (min-width: 1600px) { :root { --safe: 5vw; } }
 
+/* Where the engine blurs, the surfaces turn translucent. Saturation stays
+   moderate: more and warm pictures tint the glass. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass: rgba(255, 255, 255, 0.1);
+    --glass-strong: rgba(255, 255, 255, 0.16);
+    --glass-dark: rgba(10, 12, 18, 0.62);
+    --blur: 24px;
+    --sat: 125%;
+    --bf: blur(var(--blur)) saturate(var(--sat));
+  }
+  html.oled { --glass: rgba(255, 255, 255, 0.07); --glass-strong: rgba(255, 255, 255, 0.12); --glass-dark: rgba(0, 0, 0, 0.6); }
+}
+/* "Effetti ridotti" (Impostazioni → Aspetto, look.js) and the system's
+   reduced-motion setting: no blur, no transitions. Written twice: no
+   :has(), no nesting (webOS 22). */
+html.nofx { --glass: rgba(30, 33, 42, 0.94); --glass-strong: rgba(44, 48, 58, 0.96); --glass-dark: rgba(12, 14, 19, 0.96); --blur: 0px; --sat: 100%; --bf: none; }
+html.nofx *, html.nofx *::before, html.nofx *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+@media (prefers-reduced-motion: reduce) {
+  html { --glass: rgba(30, 33, 42, 0.94); --glass-strong: rgba(44, 48, 58, 0.96); --glass-dark: rgba(12, 14, 19, 0.96); --blur: 0px; --sat: 100%; --bf: none; }
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+/* "Nero OLED": true black behind everything. */
+html.oled { --bg: #000; --bg-rgb: 0, 0, 0; --surface: #0a0b0e; --raised: #14161b; --panel: rgba(6, 7, 9, 0.96); }
+/* The accent colour (aurora is the default above). */
+html[data-accent="oceano"] { --accent: #4f8dff; --accent-grad: linear-gradient(90deg, #4f8dff, #7bd0ff); --accent-soft: rgba(79, 141, 255, 0.2); --accent-ink: #061a3a; }
+html[data-accent="tramonto"] { --accent: #ff8a3d; --accent-grad: linear-gradient(90deg, #ff6a3d, #ffb547); --accent-soft: rgba(255, 138, 61, 0.2); --accent-ink: #3a1604; }
+html[data-accent="lavanda"] { --accent: #a78bfa; --accent-grad: linear-gradient(90deg, #8b5cf6, #c4b5fd); --accent-soft: rgba(167, 139, 250, 0.2); --accent-ink: #22123f; }
+html[data-accent="menta"] { --accent: #4ade80; --accent-grad: linear-gradient(90deg, #22c55e, #86efac); --accent-soft: rgba(74, 222, 128, 0.2); --accent-ink: #052e16; }
+html[data-accent="rubino"] { --accent: #ff5c7a; --accent-grad: linear-gradient(90deg, #ff4d6d, #ff8fa3); --accent-soft: rgba(255, 92, 122, 0.2); --accent-ink: #3b0612; }
+html[data-accent="grafite"] { --accent: #e6e8ee; --accent-grad: linear-gradient(90deg, #d9dbe3, #f5f5f7); --accent-soft: rgba(230, 232, 238, 0.18); --accent-ink: #0b0c10; }
+
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); }
 /* A long word (a name, an address) breaks instead of pushing the page
@@ -54,6 +126,25 @@ body { overflow-wrap: break-word; word-break: break-word; }
 [hidden] { display: none !important; }
 
 .icon { width: 1.15em; height: 1.15em; flex: none; vertical-align: -0.2em; }
+h1 { font-weight: 800; letter-spacing: -0.02em; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ---- Glass surfaces ----
+   .glass (light, browsing pages), .glass-strong (panels and dialogs),
+   .glass-dark (over video). The shared bars, pickers and dialogs are in
+   these lists; a page adds the class to its own floating surfaces. */
+.glass, .glass-strong, .glass-dark,
+#tabs, .picker, .sheet, .bnav, #my-profile, #admin-pin.modal, #country-pick, #update-banner, .panel, .status {
+  background-color: var(--glass);
+  background-image: var(--glass-sheen), var(--glass-base);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r);
+  box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow);
+  -webkit-backdrop-filter: var(--bf);
+  backdrop-filter: var(--bf);
+}
+.glass-strong, .picker, .sheet, #my-profile, #admin-pin.modal, #country-pick, #update-banner, .panel { background-color: var(--glass-strong); }
+.glass-dark, .dialog, .status, .bnav { background-color: var(--glass-dark); border-color: rgba(255, 255, 255, 0.14); }
 
 /* ---- Focus: visible from across the room ---- */
 :focus { outline: none; }
@@ -63,49 +154,87 @@ body { overflow-wrap: break-word; word-break: break-word; }
 }
 button, a { -webkit-tap-highlight-color: transparent; }
 
-/* Buttons: filled when focused, like the big streaming apps. */
-.button, .btn {
+/* ---- Buttons: one family. Glass look without blur; filled white when
+   focused, like the big streaming apps. .primary is white, .danger red
+   text. button.small (the actions of a list item) is the same, smaller. */
+.button, .btn, button.small, .lang-picker button, .pin-form button, .me-actions button, .setup-panel button, .dialog-buttons button, #update-banner button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5em;
-  padding: 0.7em 1.4em;
+  min-height: 2.4em;
+  padding: 0.6em 1.3em;
   font: inherit;
   font-weight: 600;
+  line-height: 1.2;
   color: var(--text);
   text-decoration: none;
-  background: rgba(255, 255, 255, 0.14);
-  border: 0;
-  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.1);
+  background-image: var(--glass-sheen), var(--glass-base);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 1px 0 var(--glass-hi);
   cursor: pointer;
-  transition: transform 0.15s var(--ease), background 0.15s, color 0.15s;
+  transition: transform var(--dur) var(--ease), background-color var(--dur), color var(--dur), box-shadow var(--dur);
 }
-.button.primary, .btn.primary { color: #0b0c10; background: var(--text); }
-.button.secondary { background: rgba(255, 255, 255, 0.1); }
-.button:hover, .btn:hover { background: rgba(255, 255, 255, 0.24); }
-.button.primary:hover { background: #fff; }
-.button:focus, .btn:focus {
+.button, .btn { box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow-s); }
+button.small, .lang-picker button { min-height: 2.2em; padding: 0.4em 1em; font-size: var(--t-s); }
+.button.primary, .btn.primary, button.small.primary, .setup-panel form button, .pin-form button, .dialog-buttons button:first-child {
+  color: var(--ink);
+  background-color: var(--text);
+  background-image: none;
+  border-color: rgba(255, 255, 255, 0.9);
+}
+.button.danger, .btn.danger, button.small.danger { color: var(--bad); }
+.button.secondary { background-color: rgba(255, 255, 255, 0.1); }
+@media (hover: hover) and (pointer: fine) {
+  .button:hover, .btn:hover, button.small:hover, .lang-picker button:hover, .pin-form button:hover, .me-actions button:hover, .setup-panel button:hover, .dialog-buttons button:hover, #update-banner button:hover {
+    background-color: rgba(255, 255, 255, 0.18);
+    box-shadow: inset 0 1px 0 var(--glass-hi), 0 0 0 2px rgba(255, 255, 255, 0.55);
+  }
+  .button.primary:hover, .btn.primary:hover, button.small.primary:hover { background-color: #fff; }
+}
+.button:focus, .btn:focus, button.small:focus, .lang-picker button:focus, .pin-form button:focus, .me-actions button:focus, .setup-panel button:focus, .dialog-buttons button:focus, #update-banner button:focus {
   outline: none;
-  color: #0b0c10;
-  background: var(--focus);
+  color: var(--ink);
+  background-color: var(--focus);
+  background-image: none;
+  border-color: var(--focus);
   transform: scale(1.06);
-  box-shadow: 0 0.6em 1.8em rgba(0, 0, 0, 0.55);
+  box-shadow: var(--glow);
 }
+.button:disabled, .btn:disabled, button.small:disabled, .setup-panel button:disabled, #update-banner button:disabled { opacity: 0.38; cursor: default; transform: none; box-shadow: none; }
+button.small:disabled { cursor: wait; }
+.button.danger:focus, button.small.danger:focus { color: #7a0d0d; }
 
 /* ":focus-visible" is left out of these rules on purpose: browsers before
    Chromium 86 (old Android WebViews) drop a whole rule they cannot read. */
 
-/* ---- Header with tabs ---- */
+/* ---- Header: brand, the menu in a glass pill, search and profile ---- */
 .top {
   position: sticky;
   top: 0;
   z-index: 4;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem var(--safe);
-  background: linear-gradient(180deg, rgba(11, 12, 16, 0.95) 60%, rgba(11, 12, 16, 0));
+  gap: var(--s3);
+  padding: var(--s3) var(--safe);
+  background: linear-gradient(180deg, rgba(var(--bg-rgb), 0.85) 0%, rgba(var(--bg-rgb), 0.4) 60%, rgba(var(--bg-rgb), 0));
 }
-#tabs { display: flex; gap: 0.2rem; flex-wrap: nowrap; min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; padding: 4px; }
+/* The word mark, with the accent as a dot before it. */
+.top::before {
+  content: "VodMax";
+  flex: none;
+  padding-left: 1.15em;
+  font-size: var(--t-l);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: radial-gradient(circle at 0.36em 50%, var(--accent) 0.3em, rgba(0, 0, 0, 0) calc(0.3em + 1px));
+}
+/* The guide's bar is a toolbar (lists and times): no room for the mark. */
+body.guide-page .top::before { display: none; }
+#tabs { display: flex; gap: var(--s1); flex-wrap: nowrap; min-width: 0; flex: 0 1 auto; overflow-x: auto; scrollbar-width: none; padding: var(--s1); border-radius: var(--r-pill); box-shadow: inset 0 1px 0 var(--glass-hi), var(--shadow-s); }
 #tabs::-webkit-scrollbar { display: none; }
 .tab { flex: none; }
 .tab.icon-only .tab-text { display: none; }
@@ -121,13 +250,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
   text-decoration: none;
   background: none;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, transform 0.15s var(--ease);
+  transition: background-color var(--dur), color var(--dur), box-shadow var(--dur);
 }
-.tab:hover { color: var(--text); }
-.tab.active { color: var(--text); background: var(--raised); }
-.tab:focus { outline: none; color: #0b0c10; background: var(--focus); transform: scale(1.05); }
+.tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.08); }
+.tab.active { color: var(--text); background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 1px 0 var(--glass-hi); }
+.tab:focus { outline: none; color: var(--ink); background: var(--focus); box-shadow: var(--glow); }
+/* The profile avatar is a small glass pill of its own, next to the search. */
+#profile-chip { flex: none; padding: 0.3em 0.45em; background-color: rgba(255, 255, 255, 0.1); background-image: var(--glass-base); border: 1px solid var(--glass-line); }
+#profile-chip:focus { background-color: var(--focus); background-image: none; }
 
 #search {
   margin-left: auto;
@@ -139,49 +271,42 @@ button, a { -webkit-tap-highlight-color: transparent; }
   padding: 0.55em 1.1em;
   font: inherit;
   color: var(--text);
-  background: var(--raised);
-  border: 2px solid transparent;
-  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.1);
+  background-image: var(--glass-base);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 1px 0 var(--glass-hi);
 }
-#search:focus { border-color: var(--focus); outline: none; }
+#search::placeholder { color: var(--soft); }
+#search:focus { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); outline: none; }
 
 main { padding: 0 var(--safe) 4rem; }
-h2 { margin: 1.8rem 0 0.8rem; font-size: 1.2rem; font-weight: 600; color: var(--text); letter-spacing: 0.01em; }
+h2 { margin: 1.8rem 0 0.8rem; font-size: var(--t-l); font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
 
-/* One style for titles on every page (the settings set it): page title
-   white, section title in the accent with a line below. */
-.page-title { margin: 1.6rem 0 1rem; font-size: 1.6rem; font-weight: 700; color: var(--text); border: 0; padding: 0; }
-h2.section { margin: 2.2rem 0 1rem; padding-bottom: 0.6rem; font-size: 1.15rem; font-weight: 700; color: var(--accent); border-bottom: 1px solid var(--line); }
+/* Titles: the page title large, a section title white and bold with
+   room for "Vedi tutti ›" on the right (a .see-all link or button). */
+.page-title { margin: 1.6rem 0 1rem; font-size: var(--t-2xl); font-weight: 800; letter-spacing: -0.02em; color: var(--text); border: 0; padding: 0; }
+h2.section { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); margin: var(--s6) 0 var(--s3); padding: 0; font-size: var(--t-l); font-weight: 700; letter-spacing: -0.01em; color: var(--text); border: 0; }
 .page-title + h2.section, h2.section:first-child { margin-top: 1.6rem; }
+.see-all { flex: none; margin-left: auto; padding: 0.2em 0.6em; font: inherit; font-size: var(--t-s); font-weight: 500; color: var(--soft); text-decoration: none; background: none; border: 0; border-radius: var(--r-pill); cursor: pointer; }
+.see-all::after { content: " ›"; }
+.see-all:hover { color: var(--text); }
+.see-all:focus { outline: none; color: var(--ink); background: var(--focus); }
 
 /* Boxes: one item in a list (a subscription, a rule, a download). */
-.box { margin: 1rem 0; padding: 1.2rem 1.4rem; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; }
+.box { margin: 1rem 0; padding: 1.2rem 1.4rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
 
-/* Small buttons: the actions of an item (Edit, Delete...). */
-button.small {
-  padding: 0.5em 1.1em;
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  cursor: pointer;
-}
-button.small.primary { color: var(--bg); background: var(--text); font-weight: 600; }
-button.small.danger { color: var(--bad); }
-button.small:disabled { opacity: 0.5; cursor: wait; }
-button.small:hover { border-color: var(--text); }
-button.small:focus { outline: none; color: #0b0c10; background: var(--focus); border-color: var(--focus); }
-/* A primary button is already white: the focus is a ring around it. */
-button.small.primary:focus { box-shadow: 0 0 0 3px var(--accent); }
-.empty { color: var(--soft); }
+/* An empty list or a hint: one soft sentence, an optional icon above. */
+.empty { color: var(--soft); line-height: 1.5; }
+.empty .icon { display: block; width: 2.4em; height: 2.4em; margin: 0 auto 0.6em; color: var(--faint); }
 
-/* ---- Rows of cards (scroll sideways; focus scrolls them) ---- */
+/* ---- Rows of cards (scroll sideways; focus scrolls them). The padding
+   leaves room for the focused card to grow and glow. ---- */
 .row {
   display: flex;
   gap: var(--gap);
-  padding: 0.7rem 0.4rem 1rem;
-  margin: 0 -0.4rem;
+  padding: 1.2rem 1rem 1rem;
+  margin: 0 -1rem;
   overflow-x: auto;
   scroll-behavior: smooth;
   scrollbar-width: none;
@@ -192,11 +317,11 @@ button.small.primary:focus { box-shadow: 0 0 0 3px var(--accent); }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(clamp(8.5rem, 11vw, 13rem), 1fr));
   gap: 1.6rem var(--gap);
-  padding: 0.7rem 0.4rem 1rem;
+  padding: 1rem 0.4rem 1rem;
 }
 .grid .card { flex: none; }
 
-/* Chips: filters and choices */
+/* ---- Chips: filters and choices ---- */
 .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .chip {
   display: inline-flex;
@@ -204,27 +329,31 @@ button.small.primary:focus { box-shadow: 0 0 0 3px var(--accent); }
   gap: 0.4em;
   padding: 0.45em 1em;
   font: inherit;
-  font-size: 0.92rem;
+  font-size: var(--t-s);
+  font-weight: 500;
   color: var(--soft);
-  background: var(--raised);
-  border: 0;
-  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, transform 0.15s var(--ease);
+  transition: background-color var(--dur), color var(--dur), transform var(--dur) var(--ease), box-shadow var(--dur);
 }
 a.chip { text-decoration: none; }
-.chip.active { color: #0b0c10; background: #d9dae0; }
+.chip.active { color: var(--text); background: rgba(255, 255, 255, 0.16); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-hi); }
 .chip:hover { color: var(--text); }
-.chip:focus { outline: none; color: #0b0c10; background: var(--focus); transform: scale(1.06); }
-.chip-label { color: var(--faint); font-size: 0.85rem; margin: 0 0.2rem 0 0.6rem; }
+.chip:focus { outline: none; color: var(--ink); background: var(--focus); border-color: var(--focus); transform: scale(1.06); box-shadow: var(--glow); }
+.chip-label { color: var(--faint); font-size: var(--t-s); margin: 0 0.2rem 0 0.6rem; }
 .chip-label:first-child { margin-left: 0; }
 
+/* ---- Cards: a poster (2:3), a wide picture (16:9) or a channel tile,
+   title and meta under it. The focused card grows with a white ring and
+   a glow; the mouse gets a gentler ring. ---- */
 .card {
   position: relative;
   flex: 0 0 clamp(8.5rem, 11vw, 13rem);
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: var(--s2);
   padding: 0;
   font: inherit;
   color: var(--text);
@@ -232,6 +361,7 @@ a.chip { text-decoration: none; }
   background: none;
   border: 0;
   cursor: pointer;
+  transition: transform var(--dur) var(--ease);
 }
 .card .poster {
   display: flex;
@@ -242,9 +372,11 @@ a.chip { text-decoration: none; }
   overflow: hidden;
   font-weight: 600;
   object-fit: cover;
-  background: linear-gradient(160deg, #23262f, #14161c);
-  border-radius: var(--radius);
-  transition: transform 0.2s var(--ease), box-shadow 0.2s;
+  background: linear-gradient(160deg, var(--raised), var(--surface));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-s);
+  box-shadow: var(--shadow-s);
+  transition: box-shadow var(--dur), border-color var(--dur);
 }
 .card img.poster { padding: 0; }
 /* The title on a card without a picture: a few lines, never out of it. */
@@ -256,71 +388,133 @@ a.chip { text-decoration: none; }
 .card-wrap.wide { flex-basis: clamp(15rem, 20vw, 24rem); }
 .card-wrap > .card { flex: 1 1 auto; min-width: 0; }
 .card-x {
-  position: absolute; top: 0.45rem; right: 0.45rem; z-index: 1;
+  position: absolute; top: 0.45rem; right: 0.45rem; z-index: 3;
   display: flex; align-items: center; justify-content: center;
   width: 2.1rem; height: 2.1rem; padding: 0;
   color: #fff; background: rgba(0, 0, 0, 0.65); border: 0; border-radius: 50%;
-  cursor: pointer; opacity: 0; transition: opacity 0.15s;
+  cursor: pointer; opacity: 0; transition: opacity var(--dur);
 }
 .card-x .lbl { display: none; }
 .card-x svg { width: 1.15rem; height: 1.15rem; }
 .card-wrap:hover .card-x, .card-wrap:focus-within .card-x { opacity: 1; }
-.card-x:focus { opacity: 1; outline: none; color: #0b0c10; background: var(--focus); box-shadow: 0 0 0 3px var(--accent); }
+.card-x:focus { opacity: 1; outline: none; color: var(--ink); background: var(--focus); box-shadow: var(--glow); }
 @media (hover: none) { .card-x { opacity: 1; } }
+/* A specular sheen over the picture, shown on focus (a pseudo-element:
+   the picture is often an <img>). */
+.card.focusable::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; z-index: 1;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--r-s);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 45%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur);
+}
+.card.wide.focusable::before { aspect-ratio: 16 / 9; }
 /* webOS 22 (Chromium 87) has no aspect-ratio: posters without a picture
    would collapse to a strip. At least the height of a row's card. */
 @supports not (aspect-ratio: 2 / 3) {
-  .card .poster { min-height: calc(clamp(8.5rem, 11vw, 13rem) * 1.5); }
-  .card.wide .poster { min-height: calc(clamp(15rem, 20vw, 24rem) * 0.5625); }
+  .card .poster, .card.focusable::before { min-height: calc(clamp(8.5rem, 11vw, 13rem) * 1.5); }
+  .card.wide .poster, .card.wide.focusable::before { min-height: calc(clamp(15rem, 20vw, 24rem) * 0.5625); }
 }
 .card.wide .poster { aspect-ratio: 16 / 9; }
-.card .label { font-size: 0.92rem; line-height: 1.25; max-height: 2.5em; overflow: hidden; color: var(--soft); transition: color 0.15s; }
-.card .sub { font-size: 0.8rem; color: var(--faint); }
-.card .bar { height: 4px; background: rgba(255, 255, 255, 0.15); border-radius: 2px; overflow: hidden; }
-.card .bar div { height: 100%; background: var(--accent-grad); }
+.card .label { font-size: var(--t-s); font-weight: 600; line-height: 1.25; max-height: 2.5em; overflow: hidden; color: var(--soft); transition: color var(--dur); }
+.card .sub { font-size: var(--t-xs); color: var(--soft); }
+/* The progress bar lies over the bottom of the picture. */
+.card .bar { position: relative; z-index: 2; height: 4px; margin: calc(-1 * var(--s3) - 4px) var(--s3) var(--s1); background: rgba(255, 255, 255, 0.3); border-radius: var(--r-pill); overflow: hidden; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); }
+.card .bar div { height: 100%; background: var(--accent-grad); border-radius: var(--r-pill); }
 .card:focus { outline: none; }
-.card:focus .poster, .card:hover .poster {
-  transform: scale(1.06);
-  box-shadow: 0 0 0 3px var(--focus), 0 1rem 2.4rem rgba(0, 0, 0, 0.6);
-}
+.card.focusable:focus { transform: translateY(calc(-1 * var(--s1))) scale(1.06); z-index: 2; }
+.card.focusable:focus .poster { border-color: #fff; box-shadow: var(--glow); }
+.card.focusable:focus::before { opacity: 1; }
 .card:focus .label { color: var(--text); }
+@media (hover: hover) and (pointer: fine) {
+  .card.focusable:hover { transform: scale(1.03); z-index: 1; }
+  .card.focusable:hover .poster { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55), 0 16px 40px rgba(0, 0, 0, 0.55); }
+  .card.focusable:hover::before { opacity: 0.6; }
+  .card:hover .label { color: var(--text); }
+}
+/* Badges on a picture: top right by default; .card-badges is a row at the
+   top (the .right one goes to the right edge). */
 .badge {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  padding: 0.1em 0.5em;
-  font-size: 0.7rem;
-  font-weight: 700;
-  background: rgba(0, 0, 0, 0.72);
-  border-radius: 6px;
+  top: var(--s2);
+  right: var(--s2);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  padding: 0.15em 0.5em;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  line-height: 1.3;
+  color: #fff;
+  background: rgba(8, 9, 12, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--r-xs);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.badge.hd { background: transparent; border-color: rgba(255, 255, 255, 0.45); font-weight: 700; }
+.badge.new { color: var(--accent-ink); background: var(--accent-grad); border-color: transparent; }
+.badge.rating::before { content: "★"; color: var(--fav); font-size: 0.9em; }
+.card-badges { position: absolute; top: var(--s2); left: var(--s2); right: var(--s2); z-index: 2; display: flex; flex-wrap: wrap; gap: var(--s1); pointer-events: none; }
+.card-badges .badge { position: static; }
+.card-badges .right { margin-left: auto; }
+
+/* A channel's logo, or the tile with its initials when it has none
+   (channelArt in common.js, decision 0052). The pages size .ch-art where
+   they draw it. */
+.ch-art { object-fit: contain; }
+.ch-art.mono {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; overflow: hidden;
+  color: #fff; font-weight: 700; font-size: 0.8em; letter-spacing: 0.02em; border-radius: var(--r-xs);
 }
 
 /* ---- Loading placeholders ---- */
 .skeleton {
-  background: linear-gradient(90deg, #171920 0%, #22252e 50%, #171920 100%);
+  background: linear-gradient(90deg, var(--surface) 0%, var(--raised) 50%, var(--surface) 100%);
   background-size: 200% 100%;
-  border-radius: var(--radius);
+  border-radius: var(--r-s);
   animation: shimmer 1.4s linear infinite;
 }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; }
-  * { transition: none !important; scroll-behavior: auto !important; }
-}
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 
-/* ---- Notices ---- */
+/* ---- Notices: the toast, a dark glass pill at the top centre ---- */
 .status {
   position: fixed;
-  top: 6vh;
+  top: 5.5rem; /* under the header */
   left: 50%;
   z-index: 20;
   transform: translateX(-50%);
-  padding: 0.8rem 1.3rem;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.5);
+  max-width: min(92vw, 40rem);
+  padding: 0.7em 1.3em;
+  font-weight: 600;
+  text-align: center;
+  border-radius: var(--r-pill);
 }
+
+/* ---- Inputs: a dark field with a hairline, white when focused ---- */
+input[type="text"], input[type="search"], input[type="password"], input[type="number"], input[type="email"], input[type="url"], input[type="tel"], input:not([type]), select, textarea {
+  padding: 0.55em 0.9em;
+  font: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+input[type="text"]:focus, input[type="search"]:focus, input[type="password"]:focus, input[type="number"]:focus, input[type="email"]:focus, input[type="url"]:focus, input[type="tel"]:focus, input:not([type]):focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
+}
+select option { color: var(--text); background: var(--surface); }
+input[type="checkbox"], input[type="radio"] { width: 1.25em; height: 1.25em; margin: 0; accent-color: var(--accent); cursor: pointer; }
 
 /* ---- Phone ---- */
 @media (max-width: 700px) {
@@ -328,6 +522,10 @@ a.chip { text-decoration: none; }
   #tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
   #search { width: 100%; flex: 1 1 0; max-width: none; margin: 0; }
   .tab { padding: 0.45em 0.8em; }
+}
+/* Fingers: every target at least 44 px tall. */
+@media (pointer: coarse) {
+  .button, .btn, button.small, .chip, .tab, .see-all, .lang-picker button, .setup-panel button, .dialog-buttons button, #update-banner button { min-height: 44px; }
 }
 
 /* ---- Picker panel (categories) ---- */
@@ -341,106 +539,145 @@ a.chip { text-decoration: none; }
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
-  padding: 1.4rem;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.7);
+  padding: var(--s5);
 }
-.picker h2 { margin: 0; }
+.picker h2 { margin: 0; font-size: var(--t-xl); letter-spacing: -0.02em; }
 .picker input {
   padding: 0.6em 1em;
   font: inherit;
   color: var(--text);
-  background: var(--raised);
-  border: 2px solid transparent;
-  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 1px 0 var(--glass-hi);
 }
-.picker input:focus { border-color: var(--focus); outline: none; }
+.picker input:focus { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); outline: none; }
 /* Same-size cells in fixed columns, so the remote's arrows go straight
    up, down and across; long names end with "…". */
 .picker .options { overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); grid-auto-rows: 3rem; gap: 0.5rem; padding: 0.4rem; }
-.picker .options .chip { min-width: 0; height: 100%; justify-content: space-between; border-radius: 12px; transform: none; }
-.picker .options .chip:focus { transform: none; color: #0b0c10; background: var(--focus); box-shadow: 0 0 0 3px var(--accent); transition: none; }
+.picker .options .chip { min-width: 0; height: 100%; justify-content: space-between; border-radius: var(--r-s); transform: none; }
+.picker .options .chip:focus { transform: none; color: var(--ink); background: var(--focus); box-shadow: var(--glow); transition: none; }
 body.with-panel #server-problems { display: none; }
 .picker .chip .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; }
 .picker .chip small { flex: none; color: inherit; opacity: 0.7; }
 .scrim { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 7; background: rgba(0, 0, 0, 0.55); }
 
+/* ---- Panels and dialogs: the look is in the glass lists above; the
+   pages place them. .setup-panel (pairing, profiles, token) is centred
+   here for every page. ---- */
+.panel { padding: var(--s5) var(--s6); color: var(--text); }
+.panel h1, .dialog h1 { margin: 0 0 0.5rem; font-size: var(--t-xl); }
+.dialog { text-align: center; }
+.dialog-buttons { display: flex; justify-content: center; gap: var(--s2); margin: var(--s4) 0 var(--s2); }
+.setup-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 10;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 34rem);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: var(--s6);
+}
+.setup-panel input { width: 100%; margin: 0.5rem 0 1rem; }
+.setup-panel .hint { color: var(--soft); font-size: var(--t-s); }
+.setup-panel .hint.bad { color: var(--bad); }
+.setup-panel button.link { min-height: 0; margin-top: 1rem; padding: 0; color: var(--soft); background: none; border: 0; border-radius: 0; box-shadow: none; text-decoration: underline; cursor: pointer; font: inherit; }
+.setup-panel button.link:focus { color: var(--text); transform: none; outline: 2px solid var(--focus); outline-offset: 3px; }
+.setup-panel button.sso { display: flex; width: 100%; margin-top: 0.5rem; }
+.pair-code { font-size: var(--t-3xl); font-weight: 800; letter-spacing: 0.2em; text-align: center; margin: 1.2rem 0; font-variant-numeric: tabular-nums; }
+/* "Who is watching?": a grid of profile cards, the focused one grows. */
+#profiles.setup-panel { width: min(94vw, 60rem); box-shadow: inset 0 1px 0 var(--glass-hi), 0 0 0 100vmax rgba(var(--bg-rgb), 0.92); }
+.profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: var(--s3); margin-top: var(--s4); padding: 0.4rem; }
+.profile-choice, .setup-panel button.profile-choice {
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem; min-height: 0; padding: 1.2rem 0.8rem;
+  font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: var(--r-s);
+  box-shadow: none; cursor: pointer; transition: transform var(--dur) var(--ease), box-shadow var(--dur), border-color var(--dur);
+}
+.profile-choice:hover, .setup-panel button.profile-choice:hover { border-color: rgba(255, 255, 255, 0.55); background: rgba(255, 255, 255, 0.06); box-shadow: none; }
+.profile-choice:focus, .setup-panel button.profile-choice:focus { outline: none; color: var(--text); background: rgba(255, 255, 255, 0.1); border-color: #fff; transform: scale(1.06); box-shadow: var(--glow); }
+.profile-name { font-size: var(--t-l); font-weight: 600; }
+.profile-kind { color: var(--soft); font-size: var(--t-s); min-height: 1em; }
+
 /* ---- Phone: bottom navigation bar and the "Altro" sheet ---- */
 .bnav, .sheet { display: none; }
 @media (max-width: 800px) {
-  body.has-bnav { padding-bottom: calc(4.2rem + env(safe-area-inset-bottom)); }
+  body.has-bnav { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
   body.has-bnav .top > #tabs:not(.keep), body.has-bnav .nav-link, body.has-bnav #profile-chip { display: none; }
   body.has-bnav .top { padding-top: 0.7rem; }
+  /* A floating glass pill, above the safe area. */
   .bnav {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9;
+    position: fixed; left: var(--s3); right: var(--s3); bottom: calc(var(--s3) + env(safe-area-inset-bottom)); z-index: 9;
     display: flex; justify-content: space-around;
-    padding: 0.35rem 0.4rem calc(0.35rem + env(safe-area-inset-bottom));
-    background: rgba(13, 14, 19, 0.96); border-top: 1px solid var(--line);
-    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    padding: 0.3rem 0.3rem;
+    border-radius: var(--r-pill);
   }
   body.with-player .bnav, body.with-detail .bnav { display: none; }
   .bnav-item {
-    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
-    padding: 0.35rem 0; font: inherit; font-size: 0.72rem; font-weight: 500; color: var(--faint);
-    background: none; border: 0; border-radius: 12px; cursor: pointer;
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.15rem;
+    min-height: 44px; padding: 0.3rem 0; font: inherit; font-size: max(11px, 0.72rem); font-weight: 500; color: var(--soft);
+    background: none; border: 0; border-radius: var(--r-pill); cursor: pointer;
   }
   .bnav-item .icon { width: 1.45rem; height: 1.45rem; }
   .bnav-item.active { color: var(--text); }
   .bnav-item.active .icon { color: var(--accent); }
-  .bnav-item:focus { outline: none; color: var(--text); background: var(--raised); }
+  .bnav-item:focus { outline: none; color: var(--ink); background: var(--focus); }
+  .bnav-item:focus .icon { color: var(--ink); }
   .sheet:not([hidden]) {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 11;
     display: flex; flex-direction: column; gap: 0.2rem;
     padding: 0.6rem 0.8rem calc(1rem + env(safe-area-inset-bottom));
-    background: var(--surface); border-top: 1px solid var(--line); border-radius: 20px 20px 0 0;
-    box-shadow: 0 -1rem 3rem rgba(0, 0, 0, 0.6);
+    border-width: 1px 0 0; border-radius: var(--r) var(--r) 0 0;
+    box-shadow: inset 0 1px 0 var(--glass-hi), 0 -1rem 3rem rgba(0, 0, 0, 0.6);
   }
   #more-scrim { z-index: 10; }
-  .sheet-grip { align-self: center; width: 2.6rem; height: 0.3rem; margin-bottom: 0.6rem; background: var(--line); border-radius: 3px; }
+  .sheet-grip { align-self: center; width: 2.6rem; height: 0.3rem; margin-bottom: 0.6rem; background: var(--glass-line); border-radius: var(--r-pill); }
   .sheet-item {
-    display: flex; align-items: center; gap: 0.9rem; padding: 0.7rem 0.6rem;
-    font: inherit; font-weight: 600; color: var(--text); text-align: left; background: none; border: 0; border-radius: 12px; cursor: pointer;
+    display: flex; align-items: center; gap: 0.9rem; min-height: 44px; padding: 0.7rem 0.6rem;
+    font: inherit; font-weight: 600; color: var(--text); text-align: left; background: none; border: 0; border-radius: var(--r-s); cursor: pointer;
   }
-  .sheet-item .item-icon { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; background: var(--raised); border-radius: 10px; }
-  .sheet-item:focus, .sheet-item:active { outline: none; background: var(--raised); }
+  .sheet-item .item-icon { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; background: rgba(255, 255, 255, 0.1); border-radius: var(--r-xs); }
+  .sheet-item:focus, .sheet-item:active { outline: none; color: var(--ink); background: var(--focus); }
+  .sheet-item:focus .item-icon { background: rgba(0, 0, 0, 0.1); }
+  /* The toast sits above the bottom bar. */
+  body.has-bnav .status { top: auto; bottom: calc(5.4rem + env(safe-area-inset-bottom)); }
 }
 
-/* Language choice (profile screen, settings). */
+/* Language choice (profile screen, settings): glass pills, the chosen
+   one outlined. */
 .lang-picker { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .lang-picker.on-overlay { justify-content: center; margin-top: 2.5rem; }
-.lang-picker button { padding: 0.45em 1.1em; font: inherit; color: var(--soft); background: var(--raised); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
+.lang-picker button { color: var(--soft); }
 .lang-picker button.active { color: var(--text); border-color: var(--text); }
-.lang-picker button:focus, .lang-picker button:hover { color: #0b0c10; background: var(--focus); border-color: var(--focus); outline: none; }
-/* Inside the profile and pairing panels too (their buttons are filled). */
-.setup-panel .lang-picker button { color: var(--soft); background: var(--raised); border: 1px solid var(--line); border-radius: 999px; }
+.lang-picker button:hover { color: var(--text); }
+/* Inside the profile and pairing panels too (their form buttons are filled). */
+.setup-panel .lang-picker button { color: var(--soft); background-color: rgba(255, 255, 255, 0.1); background-image: var(--glass-sheen), var(--glass-base); border: 1px solid var(--glass-line); border-radius: var(--r-pill); }
 .setup-panel .lang-picker button.active { color: var(--text); border-color: var(--text); }
-.setup-panel .lang-picker button:focus, .setup-panel .lang-picker button:hover { color: #0b0c10; background: var(--focus); border-color: var(--focus); }
+.setup-panel .lang-picker button:focus { color: var(--ink); background-color: var(--focus); background-image: none; border-color: var(--focus); }
 
 /* Update of the Android app, offered once per session. */
 #update-banner { position: fixed; left: 50%; bottom: 1.5rem; z-index: 30; transform: translateX(-50%); width: min(34rem, calc(100% - 2rem));
-  padding: 1rem 1.2rem; background: var(--panel); border: 1px solid var(--accent); border-radius: 16px; box-shadow: 0 1rem 2.4rem rgba(0, 0, 0, 0.6); }
+  padding: var(--s5); border-color: var(--accent-soft); }
 #update-banner p { margin: 0 0 0.8rem; }
 #update-banner .buttons { display: flex; gap: 0.6rem; flex-wrap: wrap; }
-#update-banner button { padding: 0.5em 1.2em; font: inherit; color: var(--text); background: var(--raised); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
-#update-banner button.primary { color: var(--bg); background: var(--accent); border-color: var(--accent); }
-#update-banner button:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
-@media (max-width: 800px) { #update-banner { bottom: calc(4.5rem + env(safe-area-inset-bottom)); } }
+#update-banner button.primary { color: var(--accent-ink); background-color: var(--accent); background-image: none; border-color: transparent; }
+#update-banner button.primary:focus { color: var(--ink); background-color: var(--focus); }
+@media (max-width: 800px) { #update-banner { bottom: calc(5.4rem + env(safe-area-inset-bottom)); } }
 
 /* Phone: the server's warning sits above the bottom bar, never on it. */
 @media (max-width: 800px) {
-  body.has-bnav #server-problems { left: 1rem; right: 1rem; bottom: calc(4.8rem + env(safe-area-inset-bottom)); max-width: none; font-size: 0.85rem; }
+  body.has-bnav #server-problems { left: 1rem; right: 1rem; bottom: calc(5.4rem + env(safe-area-inset-bottom)); max-width: none; font-size: var(--t-s); }
 }
 
 /* "Update the app" next to the search box, with a dot. */
 #update-tab { position: relative; flex: none; margin-left: auto; color: var(--accent); }
 #update-tab + #search, #update-tab + #profile-chip { margin-left: 0; }
 #update-tab .dot { position: absolute; top: 0.3em; right: 0.35em; width: 0.5em; height: 0.5em; background: var(--accent); border-radius: 50%; }
-#update-tab:focus .dot { background: #0b0c10; }
+#update-tab:focus .dot { background: var(--ink); }
 
 /* Release notes inside the update banner. */
-#update-banner .update-notes { max-height: 40vh; overflow-y: auto; margin: 0 0 0.9rem; padding: 0.8rem 1rem; color: var(--soft); background: var(--bg); border-radius: 10px; font-size: 0.92rem; line-height: 1.5; }
+#update-banner .update-notes { max-height: 40vh; overflow-y: auto; margin: 0 0 0.9rem; padding: 0.8rem 1rem; color: var(--soft); background: rgba(0, 0, 0, 0.3); border-radius: var(--r-s); font-size: var(--t-s); line-height: 1.5; }
 #update-banner .update-notes ul { margin: 0.2rem 0 0.6rem; padding-left: 1.2rem; }
 #update-banner .update-notes li + li { margin-top: 0.35rem; }
 #update-banner .update-notes p { margin: 0 0 0.6rem; }
@@ -448,53 +685,50 @@ body.with-panel #server-problems { display: none; }
 #update-banner button.active { border-color: var(--accent); }
 
 /* ---- Avatars ---- */
-.avatar { display: inline-grid; place-items: center; flex: none; width: 2.4rem; height: 2.4rem; color: #0b0c10; border-radius: 50%; }
+.avatar { display: inline-grid; place-items: center; flex: none; width: 2.4rem; height: 2.4rem; color: var(--ink); border-radius: 50%; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); }
 .avatar .icon { width: 58%; height: 58%; stroke-width: 2.2; }
 .avatar-initial { font-weight: 700; font-size: 1.05em; line-height: 1; }
 .avatar.small { width: 1.6em; height: 1.6em; font-size: 0.85em; }
-.avatar.big { width: 5rem; height: 5rem; font-size: 2rem; }
+.avatar.big { width: 5rem; height: 5rem; font-size: 2rem; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25), var(--shadow-s); }
 .profile-choice .avatar.big { align-self: center; margin-bottom: 0.4rem; }
-#profile-chip { padding-left: 0.5em; padding-right: 0.5em; }
 
 #my-profile {
   position: fixed; top: 5vh; right: 50%; bottom: auto; left: auto; z-index: 31; transform: translateX(50%);
   width: min(94vw, 46rem); max-height: 90vh; overflow-y: auto;
-  padding: 1.4rem 1.6rem 1.6rem; background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
-  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.7);
+  padding: var(--s5) var(--s6) var(--s6);
 }
 .me-scrim { z-index: 30; }
-#my-profile h2 { margin: 1.2rem 0 0.6rem; font-size: 1rem; color: var(--accent); }
+#my-profile h2 { margin: 1.2rem 0 0.6rem; font-size: var(--t-s); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
 .me-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .me-preview { display: flex; align-items: center; gap: 1rem; }
-.me-preview strong { display: block; font-size: 1.4rem; }
-.me-close { width: 2.6rem; height: 2.6rem; font: inherit; font-size: 1.1rem; color: var(--text); background: var(--raised); border: 0; border-radius: 50%; cursor: pointer; }
+.me-preview strong { display: block; font-size: var(--t-xl); letter-spacing: -0.02em; }
+.me-close { width: 2.6rem; height: 2.6rem; font: inherit; font-size: 1.1rem; color: var(--text); background: rgba(255, 255, 255, 0.1); border: 1px solid var(--glass-line); border-radius: 50%; cursor: pointer; }
 .avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(3.6rem, 1fr)); gap: 0.5rem; }
 .avatar-pick, .color-pick { display: grid; place-items: center; padding: 0.3rem; background: none; border: 3px solid transparent; border-radius: 50%; cursor: pointer; }
 .avatar-pick .avatar { width: 2.8rem; height: 2.8rem; font-size: 1.3rem; }
 .avatar-pick.active, .color-pick.active { border-color: var(--text); }
-.avatar-pick:focus, .color-pick:focus, .me-close:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--accent); }
+.avatar-pick:focus, .color-pick:focus, .me-close:focus { outline: none; border-color: var(--focus); box-shadow: var(--glow); }
+.me-close:focus { color: var(--ink); background: var(--focus); }
 .color-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .color-pick { width: 2.8rem; height: 2.8rem; }
 .me-pin { margin-top: 1.2rem; }
-.me-pin summary { padding: 0.6rem 1rem; color: var(--text); background: var(--raised); border-radius: 999px; cursor: pointer; display: inline-block; }
-.me-pin summary:focus { outline: none; color: #0b0c10; background: var(--focus); }
+.me-pin summary { display: inline-block; padding: 0.6rem 1rem; color: var(--text); background: rgba(255, 255, 255, 0.1); border: 1px solid var(--glass-line); border-radius: var(--r-pill); cursor: pointer; }
+.me-pin summary:focus { outline: none; color: var(--ink); background: var(--focus); box-shadow: var(--glow); }
 .pin-form { display: grid; gap: 0.6rem; max-width: 22rem; margin-top: 0.8rem; }
-.pin-form label { display: grid; gap: 0.3rem; color: var(--soft); font-size: 0.9rem; }
-.pin-form input { padding: 0.6rem 0.8rem; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
-.pin-form input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus); }
-.pin-form button, .me-actions button { justify-self: start; padding: 0.6em 1.3em; font: inherit; color: var(--text); background: var(--raised); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
-.pin-form button { color: #0b0c10; background: var(--accent); border-color: var(--accent); }
-.pin-form button:focus, .me-actions button:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+.pin-form label { display: grid; gap: 0.3rem; color: var(--soft); font-size: var(--t-s); }
+.pin-form button, .me-actions button { justify-self: start; }
+.pin-form button { color: var(--accent-ink); background-color: var(--accent); border-color: transparent; }
+.pin-form button:focus { color: var(--ink); background-color: var(--focus); }
 .me-actions { display: flex; gap: 0.6rem; margin-top: 1.4rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
 #my-profile .hint { color: var(--soft); }
 #admin-pin .pin-form { max-width: none; }
 /* Setting the admin PIN: a panel of its own on every page. */
 #admin-pin.modal {
   position: fixed; top: 8vh; right: 50%; bottom: auto; left: auto; z-index: 40; transform: translateX(50%);
-  width: min(94vw, 36rem); padding: 1.6rem 1.8rem; color: var(--text); background: var(--panel);
-  border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.82);
+  width: min(94vw, 36rem); padding: var(--s5) var(--s6); color: var(--text);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 0 0 100vmax rgba(0, 0, 0, 0.82);
 }
-#admin-pin h1 { margin: 0 0 0.6rem; font-size: 1.4rem; }
+#admin-pin h1 { margin: 0 0 0.6rem; font-size: var(--t-xl); }
 #admin-pin p { color: var(--soft); line-height: 1.5; }
 #admin-pin .link { margin-top: 1rem; padding: 0; color: var(--soft); background: none; border: 0; text-decoration: underline; cursor: pointer; font: inherit; }
 #admin-pin .link:focus { outline: 2px solid var(--focus); }
@@ -502,39 +736,36 @@ body.with-panel #server-problems { display: none; }
 /* First start: the country, with flags (decision 0043). */
 #country-pick {
   position: fixed; top: 4vh; right: 50%; bottom: auto; left: auto; z-index: 1000; transform: translateX(50%);
-  width: min(94vw, 62rem); max-height: 92vh; overflow-y: auto; padding: 1.6rem 1.8rem; color: var(--text); background: var(--panel);
-  border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.85);
+  width: min(94vw, 62rem); max-height: 92vh; overflow-y: auto; padding: var(--s5) var(--s6); color: var(--text);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 0 0 100vmax rgba(0, 0, 0, 0.85);
 }
-#country-pick h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+#country-pick h1 { margin: 0 0 0.5rem; font-size: var(--t-xl); }
 #country-pick p { color: var(--soft); line-height: 1.5; margin: 0 0 1rem; }
 .country-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.5rem; }
 #country-pick .country-choice {
   display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0.8rem; min-width: 0;
-  font: inherit; color: var(--text); text-align: left; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; cursor: pointer;
+  font: inherit; color: var(--text); text-align: left; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: var(--r-s); cursor: pointer;
+  transition: border-color var(--dur), box-shadow var(--dur);
 }
-#country-pick .country-choice img { flex: none; width: 48px; height: 36px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12); }
+#country-pick .country-choice img { flex: none; width: 2.4rem; height: 1.8rem; border-radius: 0.2rem; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12); }
 #country-pick .country-choice span { overflow-wrap: break-word; word-break: break-word; }
 #country-pick .country-choice.proposed { border-color: var(--accent); }
-#country-pick .country-choice:hover { border-color: var(--text); }
-#country-pick .country-choice:focus { outline: none; color: #0b0c10; background: var(--focus); border-color: var(--focus); }
+#country-pick .country-choice:hover { border-color: rgba(255, 255, 255, 0.55); }
+#country-pick .country-choice:focus { outline: none; color: var(--ink); background: var(--focus); border-color: var(--focus); box-shadow: var(--glow); }
 #country-pick .link { margin-top: 1rem; padding: 0; color: var(--soft); background: none; border: 0; text-decoration: underline; cursor: pointer; font: inherit; }
 #country-pick .link:focus { outline: 2px solid var(--focus); outline-offset: 3px; }
-@media (max-width: 600px) { #country-pick { top: 2vh; padding: 1.1rem; } .country-grid { grid-template-columns: 1fr 1fr; } #country-pick .country-choice img { width: 36px; height: 27px; } }
+@media (max-width: 600px) { #country-pick { top: 2vh; padding: 1.1rem; } .country-grid { grid-template-columns: 1fr 1fr; } }
 
-/* The profile choice covers the page behind it. */
-.setup-panel .hint.bad { color: var(--bad); }
-.setup-panel button.sso { display: block; width: 100%; margin-top: 0.5rem; }
-#profiles.setup-panel { background: var(--surface); box-shadow: 0 0 0 100vmax rgba(11, 12, 16, 0.92); }
 /* Body classes set by common.js (no :has(): webOS 22 ignores it). */
 body.with-player #server-problems, body.with-panel #server-problems, body.with-detail #server-problems { display: none; }
-#profile-chip { flex: none; }
 #profile-chip + #search { margin-left: 0; }
-/* Medium screens: tighter menu, so it fits without scrolling sideways. */
-@media (min-width: 801px) and (max-width: 1800px) {
+/* Up to 1080p TVs: tighter menu, so it fits beside the word mark and the
+   search without scrolling sideways. */
+@media (min-width: 801px) and (max-width: 2000px) {
   #tabs .tab { padding-left: 0.75em; padding-right: 0.75em; }
   .top { gap: 0.6rem; }
 }
-@media (min-width: 801px) and (max-width: 1400px) {
+@media (min-width: 801px) and (max-width: 2000px) {
   #tabs .tab { padding-left: 0.6em; padding-right: 0.6em; gap: 0.35em; }
   /* The less used sections as icons, named when open (and as a tooltip). */
   #tabs .tab.compact:not(.active) .tab-text { display: none; }

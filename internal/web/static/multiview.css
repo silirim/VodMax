@@ -34,7 +34,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: #000; color:
 .mv-pick li .now { color: var(--soft); font-size: 0.85em; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
 .mv-pick li.selected, .mv-pick li:hover { color: #0b0c10; background: var(--focus); }
 .mv-pick li.selected .number, .mv-pick li.selected .now, .mv-pick li:hover .number, .mv-pick li:hover .now { color: #2b2d35; }
-.status { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); padding: 0.7rem 1.2rem; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.status { top: auto; bottom: 2rem; } /* under the bar, which sits at the top */
 .mv-pick-close { float: right; padding: 0.2em 0.6em; font: inherit; color: var(--soft); background: none; border: 0; cursor: pointer; }
 @media (max-width: 800px) {
   .mosaic.n2 { grid-template-columns: 1fr; grid-template-rows: auto auto; }
