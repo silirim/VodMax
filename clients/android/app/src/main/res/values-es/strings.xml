@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_title">VodMax</string>
+    <string name="setup_text">Dirección del servidor VodMax de casa (por ejemplo http://192.168.1.10:8095).</string>
+    <string name="setup_hint">http://direccion:8095</string>
+    <string name="setup_connect">Conectar</string>
+    <string name="setup_checking">Comprobando el servidor…</string>
+    <string name="setup_unreachable">El servidor no responde en esta dirección: comprueba que esté encendido y en la misma red.</string>
+    <string name="error_title">No se puede conectar con el servidor</string>
+    <string name="reconnecting">Reconectando con el servidor…</string>
+    <string name="error_retry">Reintentar</string>
+    <string name="error_change">Cambiar dirección</string>
+    <string name="local_text">¿No tienes servidor en casa? VodMax puede funcionar solo en este dispositivo: añade una suscripción y una VPN en Ajustes. Sin grabaciones ni pausa del directo.</string>
+    <string name="local_button">Usar solo este dispositivo</string>
+    <string name="local_starting">Iniciando VodMax…</string>
+    <string name="local_failed">VodMax no se ha iniciado en este dispositivo</string>
+    <string name="local_exited">el servidor interno se ha detenido (código %1$d)</string>
+    <string name="local_no_answer">el servidor interno no responde</string>
+    <string name="update_no_permission_screen">este dispositivo no tiene la pantalla para permitir instalar apps: instala el APK manualmente</string>
+    <string name="update_allow_installs">permite que VodMax instale apps y vuelve aquí: la actualización continuará</string>
+    <string name="update_no_installer">este dispositivo no tiene instalador de apps: instala el APK manualmente</string>
+    <string name="local_port_busy">otra app está usando el puerto 8095: ciérrala o reinicia el dispositivo</string>
+    <string name="save_unavailable">este dispositivo no permite elegir dónde guardar el archivo</string>
+    <string name="save_cancelled">guardado cancelado</string>
+    <string name="save_failed">archivo no guardado</string>
+    <string name="update_refused">actualización rechazada: no procede de las versiones publicadas de VodMax</string>
+    <string name="update_not_vodmax">actualización rechazada: el archivo no es la app VodMax</string>
+    <string name="update_bad_checksum">el archivo descargado no coincide con la versión publicada (checksum distinto)</string>
+    <string name="pip_play">Reproducir</string>
+    <string name="pip_pause">Pausa</string>
+    <string name="skip_intro">Saltar intro</string>
+    <string name="next_episode">Siguiente episodio</string>
+    <string name="next_in">en %1$d s</string>
+    <string name="watch_now">Ver ahora</string>
+    <string name="cancel">Cancelar</string>
+</resources>

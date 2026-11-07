@@ -6,27 +6,73 @@
   var KEY = "vodmax.server";
   var $ = function (id) { return document.getElementById(id); };
 
-  // Italian if the TV speaks Italian, else English. Keys: the Italian texts.
-  var italian = /^it/i.test(navigator.language || navigator.userLanguage || "");
-  var EN = {
-    "Avvio…": "Starting…",
-    "http://indirizzo:8095": "http://address:8095",
-    "Collega": "Connect",
-    "Riprova": "Try again",
-    "L'indirizzo del server VodMax di casa, per esempio http://192.168.1.10:8095. Poi la TV si abbina con un codice.":
-      "The address of your home VodMax server, for example http://192.168.1.10:8095. Then the TV pairs with a code.",
-    "Collegamento a {base}…": "Connecting to {base}…",
-    "Il server non risponde a {base}: controlla che sia acceso e nella stessa rete.":
-      "The server isn't responding at {base}: make sure it's on and on the same network.",
-    "Inserisci l'indirizzo del server.": "Enter the server address.",
-    "OK o Indietro: cambia server": "OK or Back: change server"
+  // The TV's language if VodMax speaks it, else English; Italian is the
+  // text itself. Keys: the Italian texts.
+  var DICTS = {
+    en: {
+      "Avvio…": "Starting…",
+      "http://indirizzo:8095": "http://address:8095",
+      "Collega": "Connect",
+      "Riprova": "Try again",
+      "L'indirizzo del server VodMax di casa, per esempio http://192.168.1.10:8095. Poi la TV si abbina con un codice.": "The address of your home VodMax server, for example http://192.168.1.10:8095. Then the TV pairs with a code.",
+      "Collegamento a {base}…": "Connecting to {base}…",
+      "Il server non risponde a {base}: controlla che sia acceso e nella stessa rete.": "The server isn't responding at {base}: make sure it's on and on the same network.",
+      "Inserisci l'indirizzo del server.": "Enter the server address.",
+      "OK o Indietro: cambia server": "OK or Back: change server"
+    },
+    de: {
+      "Avvio…": "Wird gestartet…",
+      "http://indirizzo:8095": "http://adresse:8095",
+      "Collega": "Verbinden",
+      "Riprova": "Erneut versuchen",
+      "L'indirizzo del server VodMax di casa, per esempio http://192.168.1.10:8095. Poi la TV si abbina con un codice.": "Die Adresse deines VodMax-Servers zu Hause, z. B. http://192.168.1.10:8095. Danach wird der Fernseher mit einem Code gekoppelt.",
+      "Collegamento a {base}…": "Verbindung mit {base}…",
+      "Il server non risponde a {base}: controlla che sia acceso e nella stessa rete.": "Der Server antwortet nicht unter {base}: Prüfe, ob er eingeschaltet und im selben Netzwerk ist.",
+      "Inserisci l'indirizzo del server.": "Gib die Serveradresse ein.",
+      "OK o Indietro: cambia server": "OK oder Zurück: Server wechseln"
+    },
+    es: {
+      "Avvio…": "Iniciando…",
+      "http://indirizzo:8095": "http://direccion:8095",
+      "Collega": "Conectar",
+      "Riprova": "Reintentar",
+      "L'indirizzo del server VodMax di casa, per esempio http://192.168.1.10:8095. Poi la TV si abbina con un codice.": "La dirección del servidor VodMax de casa, por ejemplo http://192.168.1.10:8095. Luego la TV se vincula con un código.",
+      "Collegamento a {base}…": "Conectando con {base}…",
+      "Il server non risponde a {base}: controlla che sia acceso e nella stessa rete.": "El servidor no responde en {base}: comprueba que esté encendido y en la misma red.",
+      "Inserisci l'indirizzo del server.": "Introduce la dirección del servidor.",
+      "OK o Indietro: cambia server": "OK o Atrás: cambiar servidor"
+    },
+    fr: {
+      "Avvio…": "Démarrage…",
+      "http://indirizzo:8095": "http://adresse:8095",
+      "Collega": "Connecter",
+      "Riprova": "Réessayer",
+      "L'indirizzo del server VodMax di casa, per esempio http://192.168.1.10:8095. Poi la TV si abbina con un codice.": "L'adresse du serveur VodMax de la maison, par exemple http://192.168.1.10:8095. Ensuite, la TV s'associe avec un code.",
+      "Collegamento a {base}…": "Connexion à {base}…",
+      "Il server non risponde a {base}: controlla che sia acceso e nella stessa rete.": "Le serveur ne répond pas à {base} : vérifiez qu'il est allumé et sur le même réseau.",
+      "Inserisci l'indirizzo del server.": "Saisissez l'adresse du serveur.",
+      "OK o Indietro: cambia server": "OK ou Retour : changer de serveur"
+    },
+    pl: {
+      "Avvio…": "Uruchamianie…",
+      "http://indirizzo:8095": "http://adres:8095",
+      "Collega": "Połącz",
+      "Riprova": "Spróbuj ponownie",
+      "L'indirizzo del server VodMax di casa, per esempio http://192.168.1.10:8095. Poi la TV si abbina con un codice.": "Adres domowego serwera VodMax, na przykład http://192.168.1.10:8095. Potem telewizor sparuje się za pomocą kodu.",
+      "Collegamento a {base}…": "Łączenie z {base}…",
+      "Il server non risponde a {base}: controlla che sia acceso e nella stessa rete.": "Serwer nie odpowiada pod adresem {base}: sprawdź, czy jest włączony i w tej samej sieci.",
+      "Inserisci l'indirizzo del server.": "Wpisz adres serwera.",
+      "OK o Indietro: cambia server": "OK lub Wstecz: zmień serwer"
+    }
   };
+  var lang = String(navigator.language || navigator.userLanguage || "").slice(0, 2).toLowerCase();
+  var dict = lang === "it" ? null : DICTS[lang] || DICTS.en;
   function t(text, base) {
-    var s = (!italian && EN[text]) || text;
+    var s = (dict && dict[text]) || text;
     return s.replace("{base}", base || "");
   }
-  if (!italian) {
-    document.documentElement.lang = "en";
+  if (dict) {
+    document.documentElement.lang = DICTS[lang] ? lang : "en";
     $("message").textContent = t($("message").textContent);
     $("server").placeholder = t($("server").placeholder);
     $("connect").textContent = t($("connect").textContent);

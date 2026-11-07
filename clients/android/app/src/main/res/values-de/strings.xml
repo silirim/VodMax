@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_title">VodMax</string>
+    <string name="setup_text">Adresse deines VodMax-Servers zu Hause (z. B. http://192.168.1.10:8095).</string>
+    <string name="setup_hint">http://adresse:8095</string>
+    <string name="setup_connect">Verbinden</string>
+    <string name="setup_checking">Server wird geprüft…</string>
+    <string name="setup_unreachable">Der Server antwortet nicht unter dieser Adresse: Prüfe, ob er eingeschaltet und im selben Netzwerk ist.</string>
+    <string name="error_title">Server nicht erreichbar</string>
+    <string name="reconnecting">Verbindung zum Server wird wiederhergestellt…</string>
+    <string name="error_retry">Erneut versuchen</string>
+    <string name="error_change">Adresse ändern</string>
+    <string name="local_text">Kein Server zu Hause? VodMax kann auch nur auf diesem Gerät laufen: Füge Abo und VPN in den Einstellungen hinzu. Ohne Aufnahmen und Live-Pause.</string>
+    <string name="local_button">Nur dieses Gerät nutzen</string>
+    <string name="local_starting">VodMax wird gestartet…</string>
+    <string name="local_failed">VodMax konnte auf diesem Gerät nicht starten</string>
+    <string name="local_exited">der interne Server wurde beendet (Code %1$d)</string>
+    <string name="local_no_answer">der interne Server antwortet nicht</string>
+    <string name="update_no_permission_screen">dieses Gerät hat keine Einstellung, um App-Installationen zu erlauben: Installiere die APK manuell</string>
+    <string name="update_allow_installs">erlaube VodMax, Apps zu installieren, und kehre dann hierher zurück: Das Update wird fortgesetzt</string>
+    <string name="update_no_installer">dieses Gerät hat kein Installationsprogramm für Apps: Installiere die APK manuell</string>
+    <string name="local_port_busy">Port 8095 wird von einer anderen App belegt: Schließe sie oder starte das Gerät neu</string>
+    <string name="save_unavailable">auf diesem Gerät lässt sich nicht wählen, wo die Datei gespeichert wird</string>
+    <string name="save_cancelled">Speichern abgebrochen</string>
+    <string name="save_failed">Datei nicht gespeichert</string>
+    <string name="update_refused">Update abgelehnt: stammt nicht aus den VodMax-Releases</string>
+    <string name="update_not_vodmax">Update abgelehnt: Die Datei ist nicht die VodMax-App</string>
+    <string name="update_bad_checksum">die heruntergeladene Datei passt nicht zum Release (andere Prüfsumme)</string>
+    <string name="pip_play">Abspielen</string>
+    <string name="pip_pause">Pause</string>
+    <string name="skip_intro">Intro überspringen</string>
+    <string name="next_episode">Nächste Folge</string>
+    <string name="next_in">in %1$d s</string>
+    <string name="watch_now">Jetzt ansehen</string>
+    <string name="cancel">Abbrechen</string>
+</resources>

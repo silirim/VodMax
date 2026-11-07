@@ -464,9 +464,12 @@ func (s *Service) TestAssistant(ctx context.Context) (string, time.Duration, err
 	return strings.TrimSpace(answer), time.Since(start), err
 }
 
+// languageNames name, for the model, the languages it answers in.
+var languageNames = map[string]string{"en": "English", "de": "German", "es": "Spanish", "fr": "French", "pl": "Polish"}
+
 func languageName(ctx context.Context) string {
-	if LangOf(ctx) == "en" {
-		return "English"
+	if n, ok := languageNames[LangOf(ctx)]; ok {
+		return n
 	}
 	return "Italian"
 }

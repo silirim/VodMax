@@ -1,6 +1,6 @@
 # Traduzioni (Weblate)
 
-VodMax è scritto in italiano e tradotto in inglese. Le altre lingue possono
+VodMax è scritto in italiano e tradotto in inglese, spagnolo, francese, tedesco e polacco. Le altre lingue possono
 arrivare dalla comunità con [Weblate](https://weblate.org), che lavora
 direttamente sul repository: chi traduce usa il sito, Weblate apre le pull
 request.
