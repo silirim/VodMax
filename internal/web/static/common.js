@@ -462,6 +462,30 @@ window.VodMax = (() => {
     (icons.querySelector(".active") || icons.firstChild).focus();
   }
 
+  // ---- Ambient background (decision 0051): the current title's backdrop,
+  // blurred and darkened by ui.css, under the whole page. Two layers swap,
+  // so the new picture fades over the old one. ----
+  const ambient = el("div", { id: "ambient" }, el("div", { className: "ambient-img" }), el("div", { className: "ambient-img" }));
+  ambient.setAttribute("aria-hidden", "true");
+  document.body.prepend(ambient);
+  let ambientURL = "";
+  function setAmbient(url) {
+    url = url || "";
+    if (url === ambientURL) return;
+    ambientURL = url;
+    const [a, b] = ambient.children;
+    const shown = a.classList.contains("on") ? a : b, next = shown === a ? b : a;
+    if (!url) { shown.classList.remove("on"); return; }
+    const img = new Image();
+    img.onload = () => {
+      if (ambientURL !== url) return; // another title came first
+      next.style.backgroundImage = "url(" + JSON.stringify(url) + ")";
+      next.classList.add("on");
+      shown.classList.remove("on");
+    };
+    img.src = url;
+  }
+
   // ---- Phone: navigation bar at the bottom, like the streaming apps;
   // "Altro" opens a sheet with the rest. On the menu page the entries
   // press its tabs; elsewhere they are links. ----
@@ -943,5 +967,5 @@ window.VodMax = (() => {
   // The Android app's native player (window.VodMaxNative), if present.
   const native = window.VodMaxNative || null;
 
-  return { countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, bottomNav, closeSheet, sheetOpen, label, channelArt, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
+  return { countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, setAmbient, bottomNav, closeSheet, sheetOpen, label, channelArt, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
 })();

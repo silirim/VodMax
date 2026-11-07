@@ -273,7 +273,7 @@
     plot.textContent = d.plot || "";
     if (d.backdrop) {
       const img = new Image();
-      img.onload = () => { if (heroShown === h) { art.style.backgroundImage = "url(" + JSON.stringify(d.backdrop) + ")"; art.classList.add("wide"); } };
+      img.onload = () => { if (heroShown === h) { art.style.backgroundImage = "url(" + JSON.stringify(d.backdrop) + ")"; art.classList.add("wide"); window.VodMax.setAmbient(d.backdrop); } };
       img.src = d.backdrop;
     }
   }
@@ -894,6 +894,7 @@
         if (state.detail !== item) return;
         panel.style.backgroundImage = "url(" + JSON.stringify(d.backdrop) + ")";
         panel.classList.add("with-backdrop");
+        window.VodMax.setAmbient(d.backdrop);
       };
       img.src = d.backdrop;
     }
