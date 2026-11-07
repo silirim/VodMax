@@ -189,8 +189,8 @@ func artwork(f string, ownFolder bool, names ...string) []string {
 var (
 	episodeCode = regexp.MustCompile(`(?i)\bS(\d{1,3})[ ._-]?E(\d{1,4})\b`)
 	episodeX    = regexp.MustCompile(`(?i)\b(\d{1,2})x(\d{1,3})\b`)
-	seasonDir   = regexp.MustCompile(`(?i)^(?:season|stagione|staffel|saison|temporada|s)[ ._-]*(\d{1,3})$`)
-	episodeOnly = regexp.MustCompile(`(?i)\b(?:e|ep|episode|episodio|puntata)[ ._-]*(\d{1,4})\b`)
+	seasonDir   = regexp.MustCompile(`(?i)^(?:season|stagione|staffel|saison|temporada|sezon|s)[ ._-]*(\d{1,3})$`)
+	episodeOnly = regexp.MustCompile(`(?i)\b(?:e|ep|episode|episodio|puntata|folge|odcinek)[ ._-]*(\d{1,4})\b`)
 )
 
 func scanSeries(root string) (*Result, error) {

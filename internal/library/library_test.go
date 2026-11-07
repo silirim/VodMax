@@ -109,11 +109,12 @@ func TestScanSeries(t *testing.T) {
 	write(t, root, "Mini/Season 1/Episodio 2.mp4", "x")
 	write(t, root, "Mini/Season 1/finale.mp4", "x")
 	write(t, root, "Vuota/leggimi.txt", "x")
+	write(t, root, "Zagubieni/Sezon 2/Odcinek 3.mkv", "x")
 	res, err := Scan(root, Series)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Items) != 2 {
+	if len(res.Items) != 3 {
 		t.Fatalf("%d serie: %+v", len(res.Items), res.Items)
 	}
 	tp := res.Items[1]
@@ -143,6 +144,9 @@ func TestScanSeries(t *testing.T) {
 	mini := res.Episodes["Mini"]
 	if len(mini) != 2 || mini[0].Number != 1 || mini[0].Title != "finale" || mini[1].Number != 2 || mini[1].Title != "Episodio 2" {
 		t.Errorf("Mini: %+v", mini)
+	}
+	if z := res.Episodes["Zagubieni"]; len(z) != 1 || z[0].Season != 2 || z[0].Number != 3 {
+		t.Errorf("Zagubieni: %+v", z)
 	}
 }
 
