@@ -339,6 +339,7 @@ body.guide-on { --gbar: 2.75rem; }
 }
 .guide-bar::-webkit-scrollbar { display: none; }
 .guide-bar .tab { color: var(--text); font-weight: 600; white-space: nowrap; }
+.guide-bar .tab:focus { color: var(--ink); } /* ui.css's focus colour, lost to the rule above */
 .guide-bar .guide-nav { flex: 1 1 auto; flex-wrap: nowrap; justify-content: flex-end; gap: var(--s1); }
 .guide-bar .guide-when { flex: 1 1 auto; min-width: 0; padding: 0 var(--s3); color: var(--soft); font-weight: 600; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .guide-bar .guide-close { margin-left: var(--s2); }
