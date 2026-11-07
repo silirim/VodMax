@@ -34,14 +34,22 @@
     return el("div", { className: "poster" }, el("span", { className: "poster-title" }, title));
   }
 
-  function itemCard(item) {
+  // "Nuovo" only where it singles a few titles out: a first import, a new
+  // subscription or a list of the newest would put it on every card.
+  const isFresh = (item) => item.first_seen_at && Date.now() / 1000 - item.first_seen_at < 7 * 86400;
+  function itemCards(items) {
+    const few = items.filter(isFresh).length <= items.length * 0.3;
+    return items.map((item) => itemCard(item, few));
+  }
+
+  function itemCard(item, showNew) {
     const title = item.display_title;
     const card = el("button", { className: "card focusable" }, poster(item, title),
       el("span", { className: "label" }, title),
       el("span", { className: "sub" }, [item.year, item.variant_count > 1 ? t("{n} versioni", { n: item.variant_count }) : ""].filter(Boolean).join(" · ")));
     // Badges from what the catalogue already says: new this week on the
     // left; 4K, else the rating, else the quality on the right.
-    const fresh = item.first_seen_at && Date.now() / 1000 - item.first_seen_at < 7 * 86400;
+    const fresh = showNew && isFresh(item);
     const q = { 4: "4K", 3: "FHD", 2: "HD" }[item.quality];
     const right = item.quality === 4 || (!item.rating && q) ? el("span", { className: "badge hd right" }, q)
       : item.rating ? el("span", { className: "badge rating right" }, rating(item.rating)) : null;
@@ -282,12 +290,12 @@
     parts.push(el("h2", { className: "section" }, t("Continua a guardare")));
     parts.push(cont.length ? el("div", { className: "row" }, ...cont.map(continueCard))
       : el("p", { className: "empty" }, t("Qui compaiono i film e gli episodi iniziati e la prossima puntata delle serie che stai seguendo.")));
-    if (mine.length) parts.push(section(t("La mia lista"), "mylist"), el("div", { className: "row" }, ...mine.slice(0, 24).map(itemCard)));
+    if (mine.length) parts.push(section(t("La mia lista"), "mylist"), el("div", { className: "row" }, ...itemCards(mine.slice(0, 24))));
     // TMDB's week, among the titles you have (with a TMDB key).
-    if (trending.length) parts.push(section(t("Di tendenza questa settimana")), el("div", { className: "row" }, ...trending.map(itemCard)));
+    if (trending.length) parts.push(section(t("Di tendenza questa settimana")), el("div", { className: "row" }, ...itemCards(trending)));
     if (favorites.length) parts.push(section(t("In onda sui tuoi canali"), "tv", () => store.set("tvList", "favorites")), el("div", { className: "row" }, ...favorites.slice(0, 20).map(channelCard)));
-    parts.push(section(t("Nuovi film"), "movie", newest("movie")), el("div", { className: "row" }, ...films.items.map(itemCard)));
-    parts.push(section(t("Nuove serie"), "series", newest("series")), el("div", { className: "row" }, ...series.items.map(itemCard)));
+    parts.push(section(t("Nuovi film"), "movie", newest("movie")), el("div", { className: "row" }, ...itemCards(films.items)));
+    parts.push(section(t("Nuove serie"), "series", newest("series")), el("div", { className: "row" }, ...itemCards(series.items)));
     const done = recordings.filter((r) => r.status === "completed").slice(0, 12);
     if (done.length) parts.push(section(t("Registrazioni recenti"), "recordings"), el("div", { className: "row" }, ...done.map(recordingCard)));
     // "Stasera" after the first two rows: what to resume and what is new
@@ -632,7 +640,7 @@
       if (page.items.length) showHero(hero, { ...heroFromItem(page.items[0]), eyebrow: kind === "movie" ? t("Film") : t("Serie") });
       else hero.remove();
     }
-    grid.append(...page.items.map(itemCard));
+    grid.append(...itemCards(page.items));
     const oldMore = main.querySelector(".more");
     if (oldMore) oldMore.remove();
     if (page.next) {
@@ -712,7 +720,7 @@
     if (state.view === "series") sections.reverse(); // the current tab's kind first
     const parts = [];
     for (const [label, items] of sections) {
-      if (items.length) parts.push(el("h2", { className: "section" }, label), el("div", { className: "grid" }, ...items.map(itemCard)));
+      if (items.length) parts.push(el("h2", { className: "section" }, label), el("div", { className: "grid" }, ...itemCards(items)));
     }
     if (!parts.length) parts.push(el("p", { className: "empty" }, t("Nessun risultato per “{query}”.", { query: state.query })));
     main.replaceChildren(...parts);
@@ -774,7 +782,7 @@
     const list = await api("GET", "/api/v1/mylist");
     if (my !== renderSeq) return;
     main.replaceChildren(el("h2", { className: "page-title" }, t("La mia lista")),
-      list.length ? el("div", { className: "grid" }, ...list.map(itemCard))
+      list.length ? el("div", { className: "grid" }, ...itemCards(list))
         : emptyState("bookmark", t("La lista è vuota. Nella scheda di un film o di una serie premi “La mia lista” per ritrovarlo qui."), ["film", t("Vai ai film"), goView("movie")]));
   }
 
@@ -1118,7 +1126,7 @@
     $("similar-row").replaceChildren();
     const list = await api("GET", "/api/v1/items/" + item.id + "/similar").catch(() => []);
     if (state.detail !== item || !list.length) return;
-    $("similar-row").replaceChildren(...list.map(itemCard));
+    $("similar-row").replaceChildren(...itemCards(list));
     $("similar").hidden = false;
   }
 
