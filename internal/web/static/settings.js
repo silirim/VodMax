@@ -677,8 +677,8 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       t("Includi o escludi le categorie una per una e scegli in quale sezione della TV vanno i canali. “Automatico” segue le regole della scheda Selezione."));
     if (!sub) return;
     const kinds = el("div", { className: "toolbar" }, ...[["live", t("Canali")], ["movie", t("Film")], ["series", t("Serie")]].map(([k, label]) => {
-      const b = button(label, () => { state.kind = k; render(); }, state.kind === k ? "primary" : "");
-      return b;
+      // Chips, the chosen one .active: a white button would read as the focus.
+      return el("button", { type: "button", className: "chip focusable" + (state.kind === k ? " active" : ""), onclick: () => { state.kind = k; render(); } }, label);
     }));
     const filter = input({ type: "search", placeholder: t("Filtra per nome"), className: "pick focusable" });
     kinds.append(filter);
@@ -1510,11 +1510,17 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       el("div", { className: "look-text" }, el("b", {}, title), el("span", {}, hint)), control);
     // A group of buttons, the chosen one pressed: the accent swatches and
     // the segmented controls.
-    const choice = (className, key, options) => {
+    const choice = (className, key, options, buttonClass = "") => {
       const group = el("div", { className });
-      const show = () => { for (const b of group.children) b.setAttribute("aria-pressed", String(b.dataset.value === String(look.get()[key]))); };
+      const show = () => {
+        for (const b of group.children) {
+          const on = b.dataset.value === String(look.get()[key]);
+          b.setAttribute("aria-pressed", String(on));
+          b.classList.toggle("active", on);
+        }
+      };
       group.append(...options.map(([value, label, ...content]) => {
-        const b = el("button", { type: "button", className: "focusable", onclick: () => { look.set({ [key]: value }); show(); } }, ...content);
+        const b = el("button", { type: "button", className: "focusable " + buttonClass, onclick: () => { look.set({ [key]: value }); show(); } }, ...content);
         b.dataset.value = String(value);
         b.setAttribute("aria-label", label);
         return b;
@@ -1536,16 +1542,18 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     const swatches = choice("swatches", "accent", look.ACCENTS.map((a) => [a, ACCENT_NAMES[a] || a,
       el("span", { className: "swatch-dot" }, icon("check")), el("span", { className: "swatch-name" }, ACCENT_NAMES[a] || a)]));
     for (const b of swatches.children) { b.classList.add("swatch"); b.dataset.accent = b.dataset.value; }
-    const size = choice("segmented", "fontScale", [[0.9, t("Piccolo")], [1, t("Normale")], [1.15, t("Grande")]].map(([v, text]) => [v, text, text]));
+    // Segmented controls: ui.css chips (focus, .active, finger size) on a track.
+    const size = choice("chips segmented", "fontScale", [[0.9, t("Piccolo")], [1, t("Medio")], [1.15, t("Grande")]].map(([v, text]) => [v, text, text]), "chip");
+    // The heading stays the page title (as Abbonamenti), the rows go in one box.
     return [el("h2", {}, t("Aspetto")),
       el("p", { className: "note" }, t("Le scelte valgono per questo dispositivo, per tutti i profili.")),
-      row(t("Colore d'accento"), t("Usato per avanzamento, ora attuale e scelte attive"), swatches),
+      el("div", { className: "box look-box" }, row(t("Colore d'accento"), t("Usato per avanzamento, ora attuale e scelte attive"), swatches),
       toggle("oled", t("Nero OLED"), t("Sfondo nero puro, per gli schermi OLED")),
       toggle("nofx", t("Effetti ridotti"), t("Niente sfocature né animazioni, consigliato sulle TV lente. Si attiva da solo se il sistema chiede meno movimento.")),
       row(t("Dimensione testo"), t("Per tutto VodMax su questo dispositivo"), size),
       toggle("screensaver", t("Salvaschermo"), t("Dopo qualche minuto senza tasti, gli sfondi del catalogo con l'ora. Mai durante un video.")),
       row(t("Salvaschermo dopo"), t("Minuti senza tasti, puntatore o tocchi"),
-        choice("segmented", "screensaverMinutes", [5, 10, 30].map((m) => [m, t("{n} minuti", { n: m }), t("{n} min", { n: m })])))];
+        choice("chips segmented", "screensaverMinutes", [5, 10, 30].map((m) => [m, t("{n} minuti", { n: m }), t("{n} min", { n: m })]), "chip")))];
   }
   async function renderLook(main) {
     main.replaceChildren(...lookSection());

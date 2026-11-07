@@ -1,3 +1,5 @@
+/* Page tokens, derived from ui.css's --ink, --ok and --bad. */
+body { --ink-soft: #4a4d57; --ok-soft: rgba(127, 216, 173, 0.14); --bad-soft: rgba(255, 154, 146, 0.14); }
 .settings { max-width: 62rem; padding: 0; }
 
 .settings h2 { color: var(--text); font-size: var(--t-l); font-weight: 700; margin-top: 1.5rem; }
@@ -12,8 +14,8 @@
 .ok { color: var(--ok); }
 .bad { color: var(--bad); }
 /* A short state ("attivo", "Inclusa", "in uso") reads as a pill. */
-span.ok, b.ok, b.bad { display: inline-block; padding: 0.1em 0.65em; font-weight: 600; border-radius: var(--r-pill); background: rgba(127, 216, 173, 0.14); }
-b.bad { background: rgba(255, 154, 146, 0.14); }
+span.ok, b.ok, b.bad { display: inline-block; padding: 0.1em 0.65em; font-weight: 600; border-radius: var(--r-pill); background: var(--ok-soft); }
+b.bad { background: var(--bad-soft); }
 /* Counts as tiles: the number big, what it counts under it. */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr)); gap: var(--s3); margin: 0.8rem 0; }
 .stat { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.8rem 1rem; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: var(--r-s); }
@@ -87,9 +89,9 @@ b.bad { background: rgba(255, 154, 146, 0.14); }
 .side-back:hover { color: var(--text); }
 .side-back:focus { color: var(--ink); background: var(--focus); outline: none; box-shadow: var(--glow); }
 
-/* The list: rows on an opaque card (no blur on lists), the open section
-   white. While the remote moves through the list only the focused row is
-   white; the open one keeps a light fill. */
+/* The list: rows on an opaque card (no blur on lists). Only the focused
+   row is white; the open section keeps a light fill and an accent bar,
+   wherever the focus is. */
 .group { margin-bottom: 1.3rem; }
 .group-title { margin: 0 0 0.55rem 1rem; font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--soft); }
 .group-list {
@@ -109,13 +111,12 @@ b.bad { background: rgba(255, 154, 146, 0.14); }
 .item-title { font-weight: 600; }
 .item-sub { font-size: var(--t-s); color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-go { color: var(--soft); display: flex; }
-.item.active, .item:focus { color: var(--ink); background: var(--focus); outline: none; }
-.item.active .item-sub, .item.active .item-go, .item:focus .item-sub, .item:focus .item-go { color: #4a4d57; }
-.item.active .item-icon, .item:focus .item-icon { color: var(--text); background: var(--ink); border-color: transparent; }
-.item:focus { z-index: 1; transform: scale(1.02); box-shadow: var(--glow); }
-.side:focus-within .item.active:not(:focus) { color: var(--text); background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 1px 0 var(--glass-hi); }
-.side:focus-within .item.active:not(:focus) .item-sub, .side:focus-within .item.active:not(:focus) .item-go { color: var(--soft); }
-.side:focus-within .item.active:not(:focus) .item-icon { background: var(--raised); border-color: var(--line); }
+.item.active { background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 1px 0 var(--glass-hi); }
+.item.active::before { content: ""; position: absolute; top: 28%; bottom: 28%; left: 0.2rem; width: 3px; background: var(--accent); border-radius: var(--r-pill); }
+.item:focus { z-index: 1; color: var(--ink); background: var(--focus); outline: none; transform: scale(1.02); box-shadow: var(--glow); }
+.item:focus::before { display: none; }
+.item:focus .item-sub, .item:focus .item-go { color: var(--ink-soft); }
+.item:focus .item-icon { color: var(--text); background: var(--ink); border-color: transparent; }
 @media (hover: hover) and (pointer: fine) {
   .item:not(.active):hover { background: rgba(255, 255, 255, 0.06); }
 }
@@ -142,6 +143,11 @@ b.bad { background: rgba(255, 154, 146, 0.14); }
   .pane-back:focus { color: var(--ink); background: var(--focus); outline: none; box-shadow: var(--glow); }
   /* The bar already shows the section name. */
   .pane .settings > h2:first-child { display: none; }
+}
+/* Fingers: 44px targets. */
+@media (pointer: coarse) {
+  .pane-back { width: max(2.75rem, 44px); height: max(2.75rem, 44px); }
+  .side-back { min-height: 44px; }
 }
 .form > button { justify-self: start; width: auto; min-width: 9rem; }
 @media (max-width: 800px) { .form > button { justify-self: stretch; } }
@@ -236,7 +242,8 @@ body.view-system #server-problems { display: none; }
 /* ---- Aspetto: a row per choice, the text left and the control right
    (under it when the pane is narrow). ---- */
 .look-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s3) var(--s5); padding: var(--s4) 0; border-top: 1px solid var(--line); }
-.card > .look-row:last-child { padding-bottom: 0; }
+.look-box { padding-top: var(--s2); padding-bottom: var(--s2); }
+.look-box > .look-row:first-child { border-top: 0; background-image: none; }
 .look-text { display: flex; flex-direction: column; gap: 0.15rem; flex: 1 1 10rem; min-width: 0; }
 .look-text b { font-weight: 600; }
 .look-text span { font-size: var(--t-s); color: var(--soft); }
@@ -250,30 +257,32 @@ body.view-system #server-problems { display: none; }
   background: linear-gradient(var(--line), var(--line)) center top / calc(100% - 2 * var(--s3)) 1px no-repeat;
 }
 .look-toggle:focus { outline: none; color: var(--ink); background: var(--focus); box-shadow: var(--glow); }
-.look-toggle:focus .look-text span { color: #4a4d57; }
+.look-toggle:focus .look-text span { color: var(--ink-soft); }
 .switch { position: relative; flex: none; width: 3.3rem; height: 1.9rem; background: rgba(255, 255, 255, 0.16); border: 1px solid var(--glass-line); border-radius: var(--r-pill); transition: background-color var(--dur); }
 .switch::after { content: ""; position: absolute; top: 50%; left: 0.2rem; width: 1.4rem; height: 1.4rem; margin-top: -0.7rem; background: #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); transition: transform var(--dur) var(--ease); }
 .look-toggle:focus .switch { background: rgba(11, 12, 16, 0.22); border-color: transparent; }
 .look-toggle[aria-checked="true"] .switch { background: var(--accent); border-color: transparent; }
 .look-toggle[aria-checked="true"] .switch::after { transform: translateX(calc(1.5rem - 2px)); }
+/* Grafite's track is near white: a dark knob keeps the switch readable. */
+html[data-accent="grafite"] .look-toggle[aria-checked="true"] .switch::after { background: var(--ink); box-shadow: none; }
 @media (hover: hover) and (pointer: fine) {
   .look-toggle:not(:focus):hover { background-color: rgba(255, 255, 255, 0.05); }
 }
-/* Segmented control: the chosen option in the accent. */
-.segmented { display: inline-flex; flex: none; gap: 2px; padding: 3px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: var(--r-pill); }
-.segmented button { min-height: 2.2em; padding: 0.35em 1.1em; font: inherit; font-size: var(--t-s); font-weight: 600; color: var(--soft); background: none; border: 0; border-radius: var(--r-pill); cursor: pointer; }
-.segmented button[aria-pressed="true"] { color: var(--accent-ink); background: var(--accent-grad); }
-.segmented button:focus { outline: none; color: var(--ink); background: var(--focus); box-shadow: var(--glow); }
+/* Segmented control: ui.css chips on a track; only the chosen (.active,
+   a lighter pill) and the focused (white) option show a fill. */
+.segmented { display: inline-flex; flex: none; flex-wrap: nowrap; gap: 2px; padding: 3px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: var(--r-pill); }
+.segmented .chip:not(.active):not(:focus) { background: none; border-color: transparent; }
+.segmented .chip.active { font-weight: 600; }
 /* Accent swatches: a round sample of each gradient, its name under it. */
 .swatches { display: flex; flex-wrap: wrap; flex: 1 1 100%; gap: var(--s2); }
 .swatch { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 4.4rem; padding: 0.35rem 0; font: inherit; font-size: var(--t-xs); color: var(--soft); background: none; border: 0; cursor: pointer; }
 .swatch-dot { display: grid; place-items: center; width: 2.6rem; height: 2.6rem; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25); transition: transform var(--dur) var(--ease); }
 .swatch-dot .icon { width: 1.3rem; height: 1.3rem; color: var(--ink); stroke-width: 3; opacity: 0; }
 .swatch[aria-pressed="true"] { color: var(--text); font-weight: 600; }
-.swatch[aria-pressed="true"] .swatch-dot { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--text); }
+/* Chosen: the check and the name; the white ring is the focus alone. */
 .swatch[aria-pressed="true"] .swatch-dot .icon { opacity: 1; }
-.swatch:focus { outline: none; color: var(--text); }
-.swatch:focus .swatch-dot { transform: scale(1.12); box-shadow: var(--glow); }
+.swatch:focus { outline: none; color: var(--text); font-weight: 700; }
+.swatch:focus .swatch-dot { transform: scale(1.12); box-shadow: 0 0 0 3px var(--surface), 0 0 0 6px var(--focus), var(--glow); }
 /* The same gradients as html[data-accent] in ui.css (which only sets them on <html>). */
 .swatch[data-accent="aurora"] .swatch-dot { background: linear-gradient(135deg, #00f5a0, #00b8f5); }
 .swatch[data-accent="oceano"] .swatch-dot { background: linear-gradient(135deg, #4f8dff, #7bd0ff); }
