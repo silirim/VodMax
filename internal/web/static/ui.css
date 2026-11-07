@@ -52,6 +52,11 @@
   /* A neutral dark base under every white glass layer: without it white
      glass over a warm picture goes tan. */
   --glass-base: linear-gradient(rgba(12, 14, 20, 0.35), rgba(12, 14, 20, 0.35));
+  /* The same for the controls that never blur (buttons, chips, search):
+     they cannot grey what is behind them, so the base is darker. Over a
+     bright amber or green picture they stay grey glass and their text
+     keeps 4.5:1. */
+  --control-base: linear-gradient(rgba(12, 14, 20, 0.65), rgba(12, 14, 20, 0.65));
   --blur: 0px;
   --sat: 100%;
   --bf: none;
@@ -86,15 +91,16 @@
 }
 @media (min-width: 1600px) { :root { --safe: 5vw; } }
 
-/* Where the engine blurs, the surfaces turn translucent. Saturation stays
-   moderate: more and warm pictures tint the glass. */
+/* Where the engine blurs, the surfaces turn translucent. The blur also
+   takes most of the colour out of what is behind: through white glass an
+   amber or green picture otherwise reads tan or olive, not lit glass. */
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :root {
     --glass: rgba(255, 255, 255, 0.1);
     --glass-strong: rgba(255, 255, 255, 0.16);
     --glass-dark: rgba(10, 12, 18, 0.62);
     --blur: 24px;
-    --sat: 125%;
+    --sat: 30%;
     --bf: blur(var(--blur)) saturate(var(--sat));
   }
   html.oled { --glass: rgba(255, 255, 255, 0.07); --glass-strong: rgba(255, 255, 255, 0.12); --glass-dark: rgba(0, 0, 0, 0.6); }
@@ -192,7 +198,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   color: var(--text);
   text-decoration: none;
   background-color: rgba(255, 255, 255, 0.1);
-  background-image: var(--glass-sheen), var(--glass-base);
+  background-image: var(--glass-sheen), var(--control-base);
   border: 1px solid var(--glass-line);
   border-radius: var(--r-pill);
   box-shadow: inset 0 1px 0 var(--glass-hi);
@@ -280,7 +286,7 @@ body.guide-page .top::before { display: none; }
 .tab.active { color: var(--text); background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 1px 0 var(--glass-hi); }
 .tab:focus { outline: none; color: var(--ink); background: var(--focus); box-shadow: var(--glow); }
 /* The profile avatar is a small glass pill of its own, next to the search. */
-#profile-chip { flex: none; padding: 0.3em 0.45em; background-color: rgba(255, 255, 255, 0.1); background-image: var(--glass-base); border: 1px solid var(--glass-line); }
+#profile-chip { flex: none; padding: 0.3em 0.45em; background-color: rgba(255, 255, 255, 0.1); background-image: var(--control-base); border: 1px solid var(--glass-line); }
 #profile-chip:focus { background-color: var(--focus); background-image: none; }
 
 #search {
@@ -294,7 +300,7 @@ body.guide-page .top::before { display: none; }
   font: inherit;
   color: var(--text);
   background-color: rgba(255, 255, 255, 0.1);
-  background-image: var(--glass-base);
+  background-image: var(--control-base);
   border: 1px solid var(--glass-line);
   border-radius: var(--r-pill);
   box-shadow: inset 0 1px 0 var(--glass-hi);
@@ -354,17 +360,18 @@ h2.section { display: flex; align-items: baseline; justify-content: space-betwee
   font-size: var(--t-s);
   font-weight: 500;
   color: var(--soft);
-  background: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.08);
+  background-image: var(--control-base);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   cursor: pointer;
   transition: background-color var(--dur), color var(--dur), transform var(--dur) var(--ease), box-shadow var(--dur);
 }
 a.chip { text-decoration: none; }
-.chip.active { color: var(--text); background: rgba(255, 255, 255, 0.16); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-hi); }
+.chip.active { color: var(--text); background-color: rgba(255, 255, 255, 0.16); border-color: var(--glass-line); box-shadow: inset 0 1px 0 var(--glass-hi); }
 .chip:hover { color: var(--text); }
 .chip:focus { outline: none; color: var(--ink); background: var(--focus); border-color: var(--focus); transform: scale(1.06); box-shadow: var(--glow); }
-.chip-label { color: var(--faint); font-size: var(--t-s); margin: 0 0.2rem 0 0.6rem; }
+.chip-label { color: var(--soft); font-size: var(--t-s); margin: 0 0.2rem 0 0.6rem; }
 .chip-label:first-child { margin-left: 0; }
 
 /* ---- Cards: a poster (2:3), a wide picture (16:9) or a channel tile,
@@ -674,7 +681,7 @@ body.with-panel #server-problems { display: none; }
 .lang-picker button.active { color: var(--text); border-color: var(--text); }
 .lang-picker button:hover { color: var(--text); }
 /* Inside the profile and pairing panels too (their form buttons are filled). */
-.setup-panel .lang-picker button { color: var(--soft); background-color: rgba(255, 255, 255, 0.1); background-image: var(--glass-sheen), var(--glass-base); border: 1px solid var(--glass-line); border-radius: var(--r-pill); }
+.setup-panel .lang-picker button { color: var(--soft); background-color: rgba(255, 255, 255, 0.1); background-image: var(--glass-sheen), var(--control-base); border: 1px solid var(--glass-line); border-radius: var(--r-pill); }
 .setup-panel .lang-picker button.active { color: var(--text); border-color: var(--text); }
 .setup-panel .lang-picker button:focus { color: var(--ink); background-color: var(--focus); background-image: none; border-color: var(--focus); }
 
