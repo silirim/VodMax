@@ -1538,7 +1538,10 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       row(t("Colore d'accento"), t("Usato per avanzamento, ora attuale e scelte attive"), swatches),
       toggle("oled", t("Nero OLED"), t("Sfondo nero puro, per gli schermi OLED")),
       toggle("nofx", t("Effetti ridotti"), t("Niente sfocature né animazioni, consigliato sulle TV lente. Si attiva da solo se il sistema chiede meno movimento.")),
-      row(t("Dimensione testo"), t("Per tutto VodMax su questo dispositivo"), size)];
+      row(t("Dimensione testo"), t("Per tutto VodMax su questo dispositivo"), size),
+      toggle("screensaver", t("Salvaschermo"), t("Dopo qualche minuto senza tasti, gli sfondi del catalogo con l'ora. Mai durante un video.")),
+      row(t("Salvaschermo dopo"), t("Minuti senza tasti, puntatore o tocchi"),
+        choice("segmented", "screensaverMinutes", [5, 10, 30].map((m) => [m, t("{n} minuti", { n: m }), t("{n} min", { n: m })])))];
   }
   async function renderLook(main) {
     main.replaceChildren(...lookSection());

@@ -805,5 +805,10 @@
   "Effetti ridotti": "Effetti ridotti",
   "Niente sfocature né animazioni, consigliato sulle TV lente. Si attiva da solo se il sistema chiede meno movimento.": "Niente sfocature né animazioni, consigliato sulle TV lente. Si attiva da solo se il sistema chiede meno movimento.",
   "Dimensione testo": "Dimensione testo",
-  "Per tutto VodMax su questo dispositivo": "Per tutto VodMax su questo dispositivo"
+  "Per tutto VodMax su questo dispositivo": "Per tutto VodMax su questo dispositivo",
+  "Salvaschermo": "Salvaschermo",
+  "Dopo qualche minuto senza tasti, gli sfondi del catalogo con l'ora. Mai durante un video.": "Dopo qualche minuto senza tasti, gli sfondi del catalogo con l'ora. Mai durante un video.",
+  "Salvaschermo dopo": "Salvaschermo dopo",
+  "Minuti senza tasti, puntatore o tocchi": "Minuti senza tasti, puntatore o tocchi",
+  "{n} min": "{n} min"
 }

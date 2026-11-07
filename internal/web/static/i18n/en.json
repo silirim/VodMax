@@ -805,5 +805,10 @@
   "Effetti ridotti": "Reduced effects",
   "Niente sfocature né animazioni, consigliato sulle TV lente. Si attiva da solo se il sistema chiede meno movimento.": "No blur or animations, recommended on slow TVs. It turns on by itself when the system asks for reduced motion.",
   "Dimensione testo": "Text size",
-  "Per tutto VodMax su questo dispositivo": "For all of VodMax on this device"
+  "Per tutto VodMax su questo dispositivo": "For all of VodMax on this device",
+  "Salvaschermo": "Screensaver",
+  "Dopo qualche minuto senza tasti, gli sfondi del catalogo con l'ora. Mai durante un video.": "After a few minutes without keys, the catalogue's backdrops with the time. Never during a video.",
+  "Salvaschermo dopo": "Screensaver after",
+  "Minuti senza tasti, puntatore o tocchi": "Minutes without keys, pointer or touch",
+  "{n} min": "{n} min"
 }
