@@ -336,6 +336,8 @@
   // While the field has the focus no row is selected: Down (or OK) goes to
   // the first one.
   search.addEventListener("focus", () => { if (state.overlay) renderList(); });
+  search.addEventListener("blur", () => { search.readOnly = false; });
+  search.addEventListener("pointerdown", () => { search.readOnly = false; });
 
   // The selected channel of the list: watch it, and zap in that list.
   function pickFromList() {
@@ -372,7 +374,8 @@
     if (o.channels.length === 0) {
       const li = document.createElement("li");
       li.className = "none";
-      li.textContent = o.listIndex === 1 ? t("Nessun preferito: premi Giallo su un canale per aggiungerlo.") : t("Nessun canale.");
+      li.textContent = o.query.trim() ? t("Nessun canale per «{q}»", { q: o.query.trim() })
+        : o.listIndex === 1 ? t("Nessun preferito: premi Giallo su un canale per aggiungerlo.") : t("Nessun canale.");
       ol.replaceChildren(li);
       return;
     }
@@ -396,15 +399,14 @@
       return li;
     });
     ol.replaceChildren(...items);
-    // Rows are taller on big screens than the first guess: as many as fit
-    // above the hint, so the selection is never hidden behind it.
+    // Rows differ in height from the first guess: as many as fit in the
+    // list's box (it fills the panel between the tabs and the hint), so the
+    // last one is never cut.
     if (!touch.matches && !o.rows && items.length) {
-      const hint = $("list").querySelector(".hint");
-      const bottom = hint && hint.offsetParent ? hint.getBoundingClientRect().top : $("list").getBoundingClientRect().bottom;
-      const top = ol.getBoundingClientRect().top, h = items[0].getBoundingClientRect().height;
+      const cs = getComputedStyle(ol), h = items[0].getBoundingClientRect().height;
       if (h > 0) {
-        o.rows = Math.max(3, Math.floor((bottom - top) / h));
-        if (o.rows < rows) renderList();
+        o.rows = Math.max(3, Math.floor((ol.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) / h));
+        if (o.rows !== rows) renderList();
       }
     }
   }
@@ -786,10 +788,16 @@
     }
 
     // Typing in the channel search: letters, digits and Backspace stay in
-    // the field; Down or OK go to the first row, Back closes the list.
+    // the field; Down or OK go to the first row (if any), Back closes the
+    // list. Reached with Up the field is read-only, so the TV's keyboard
+    // does not pop up: OK opens it, a typed character just goes in.
     if (document.activeElement === search) {
-      if (key === "ArrowDown" || key === "OK") { search.blur(); state.overlay.selected = 0; renderList(); e.preventDefault(); }
-      else if (key === "Back" && e.key !== "Backspace") { closeList(); e.preventDefault(); }
+      if (search.readOnly && key === "OK") { search.readOnly = false; search.blur(); search.focus(); e.preventDefault(); }
+      else if (key === "ArrowDown" || key === "OK") {
+        if (state.overlay.channels.length) { search.blur(); state.overlay.selected = 0; renderList(); }
+        e.preventDefault();
+      } else if (key === "Back" && e.key !== "Backspace") { closeList(); e.preventDefault(); }
+      else if (e.key.length === 1) search.readOnly = false;
       return;
     }
 
@@ -849,7 +857,7 @@
     const o = state.overlay;
     if (o) {
       switch (key) {
-        case "ArrowUp": if (o.selected > 0) { o.selected--; renderList(); } else search.focus(); break;
+        case "ArrowUp": if (o.selected > 0) { o.selected--; renderList(); } else { search.readOnly = true; search.focus(); } break;
         case "ArrowDown": o.selected = Math.min(o.channels.length - 1, o.selected + 1); renderList(); break;
         case "ChannelUp": o.selected = Math.max(0, o.selected - 10); renderList(); break;
         case "ChannelDown": o.selected = Math.min(o.channels.length - 1, o.selected + 10); renderList(); break;

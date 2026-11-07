@@ -97,12 +97,13 @@ video {
 .list-find { position: relative; display: block; flex: none; }
 .list-find .icon { position: absolute; top: 50%; left: 0.9em; margin-top: -0.575em; color: var(--soft); pointer-events: none; }
 .list-find input { width: 100%; padding-left: 2.6em; border-radius: var(--r-pill); }
-.list-find input:focus { background: rgba(255, 255, 255, 0.14); border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus); }
+.list-find input::placeholder { color: var(--soft); }
+.list-find input:focus { background: rgba(255, 255, 255, 0.14); border-color: var(--focus); box-shadow: var(--glow); }
 .list-find input::-webkit-search-cancel-button { display: none; }
 
-.tabs { flex: none; display: flex; gap: var(--s1); padding: var(--s1); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--glass-line); border-radius: var(--r-pill); }
-.tabs span { flex: 1 1 0; padding: 0.4em 0.9em; color: var(--soft); font-weight: 600; text-align: center; white-space: nowrap; border-radius: var(--r-pill); }
-.tabs span.active { color: var(--text); background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 1px 0 var(--glass-hi); }
+.list .tabs { flex: none; display: flex; gap: var(--s1); padding: var(--s1); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--glass-line); border-radius: var(--r-pill); }
+.list .tabs span { flex: 1 1 0; padding: 0.4em 0.9em; color: var(--soft); font-weight: 600; text-align: center; white-space: nowrap; border-radius: var(--r-pill); }
+.list .tabs span.active { color: var(--text); background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 1px 0 var(--glass-hi); }
 
 /* Room around the rows for the focus ring of the selected one. */
 .list ol { flex: 1 1 auto; min-height: 0; margin: 0 calc(-1 * var(--s2)); padding: var(--s2); overflow: hidden; list-style: none; }
@@ -126,7 +127,8 @@ video {
 .list li.selected { color: var(--ink); background: var(--focus); box-shadow: var(--glow); }
 .list li.selected .n, .list li.selected .p, .list li.selected .star { color: var(--ink); }
 .list li.selected .p { opacity: 0.72; }
-.list .hint { flex: none; margin: 0 var(--s2); text-align: center; }
+/* One line: a second would take a row of channels. */
+.list .hint { flex: none; margin: 0 var(--s2); overflow: hidden; font-size: var(--t-xs); text-align: center; white-space: nowrap; text-overflow: ellipsis; }
 .list li.none { display: block; padding: var(--s3); color: var(--soft); }
 
 /* The channel number being typed, top centre; under the controls bar
@@ -288,8 +290,9 @@ body.controls-on .banner { display: none; }
 @media (pointer: coarse), (max-width: 800px) {
   .list { top: 0; bottom: 0; left: 0; right: 0; width: auto; padding: calc(var(--s3) + env(safe-area-inset-top)) var(--s4) env(safe-area-inset-bottom); border-width: 0; border-radius: 0; }
   .list .tabs { overflow-x: auto; scrollbar-width: none; }
-  .list .tabs span { flex: none; padding: 0.55em 1em; }
-  .list .tabs .close { margin-left: auto; font-size: var(--t-l); line-height: 1; padding: 0.3em 0.75em; color: var(--text); background: rgba(255, 255, 255, 0.12); }
+  .list .tabs span { flex: none; display: flex; align-items: center; min-height: 44px; padding: 0 1em; }
+  #list-search { min-height: 44px; }
+  .list .tabs .close { justify-content: center; min-width: 44px; margin-left: auto; font-size: var(--t-l); line-height: 1; padding: 0 0.6em; color: var(--text); background: rgba(255, 255, 255, 0.12); }
   .list ol { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
   .list li { grid-template-columns: 2.2em 2.6em minmax(0, 1fr); column-gap: var(--s3); padding: var(--s3) var(--s2); }
   .list li.selected { color: inherit; background: none; box-shadow: none; }

@@ -787,5 +787,6 @@
   "rivedibile": "can be replayed",
   "Guida TV (Guida / E)": "TV guide (Guide / E)",
   "Rimangono {n} min": "{n} min left",
-  "Cerca un canale": "Search channels"
+  "Cerca un canale": "Search channels",
+  "Nessun canale per «{q}»": "No channels for “{q}”"
 }
