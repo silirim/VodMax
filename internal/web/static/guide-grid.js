@@ -63,6 +63,8 @@ window.GuideGrid = (() => {
     const flash = o.flash || (() => {});
     const toolbar = o.toolbar || null;
     const panel = o.panel;
+    // Dark glass over the video, the stronger light glass on the guide page.
+    panel.classList.add(container.closest(".guide-overlay") ? "glass-dark" : "glass-strong");
     // seq: windows asked, done: the last one answered (they can arrive out of
     // order). shown: the programme described in the panel, open: with its actions.
     const state = { from: slot(Date.now() / 1000), list: o.list || store.get("guideList", "all"), rows: [], kids: false, seq: 0, done: 0, shown: null, open: false };
@@ -103,6 +105,7 @@ window.GuideGrid = (() => {
       if (now >= from && now < from + span) {
         const pill = el("span", { className: "now-pill tnum" }, hhmm(now));
         pill.style.left = pct(now) + "%";
+        pill.style.left = "max(" + pct(now) + "%, 1.8rem)"; // not cut by the channel column (ignored where max() is unknown)
         scale.append(pill);
       }
       const times = el("div", { className: "guide-times" }, el("div", { className: "corner" }), scale);
@@ -139,10 +142,11 @@ window.GuideGrid = (() => {
           b.onpointerenter = () => { if (!state.open) b.focus({ preventScroll: true }); };
           line.append(b);
         });
+        // Under the cells: it shows through them without crossing their titles.
         if (now >= from && now < from + span) {
           const n = el("div", { className: "now-line" });
           n.style.left = pct(now) + "%";
-          line.append(n);
+          line.prepend(n);
         }
         const name = el("div", { className: "name" }, el("b", { className: "tnum" }, r.channel.number || ""), window.VodMax.channelArt(r.channel),
           el("span", { className: "ch-name" }, r.channel.name),
@@ -188,31 +192,38 @@ window.GuideGrid = (() => {
       state.open = open;
       const archive = row.channel.catchup_days && p.start >= now - row.channel.catchup_days * 86400 && p.start < now;
       const onAir = p.start <= now && p.stop > now;
-      const status = p.recording ? "● " + t("in registrazione") : onAir ? t("in onda") : archive ? "↺ " + t("rivedibile") : "";
+      // The states as pills after the time: on air, in the archive, recording.
+      const pills = [onAir && el("span", { className: "badge live" }, t("In onda")),
+        archive && el("span", { className: "badge replay" }, window.VodMaxIcons.icon("rotate-ccw"), t("Rivedibile")),
+        p.recording && el("span", { className: "badge rec" }, t("In registrazione"))].filter(Boolean);
       const buttons = [];
       if (open) {
         const replay = () => o.onFromStart(row.channel, p);
         if (onAir) {
-          buttons.push(iconButton("button focusable", "play", t("Guarda"), () => o.onWatch(row.channel, p)));
+          buttons.push(iconButton("button primary focusable", "play", t("Guarda"), () => o.onWatch(row.channel, p)));
           if (archive) buttons.push(iconButton("button secondary focusable", "undo-2", t("Dall'inizio"), replay));
         } else if (archive) {
-          buttons.push(iconButton("button focusable", "play", t("Riguarda"), replay));
+          buttons.push(iconButton("button primary focusable", "play", t("Riguarda"), replay));
         }
         if (p.recording && !state.kids) {
           buttons.push(el("button", { className: "button secondary focusable", onclick: () => record(row, p) }, t("Annulla la registrazione")));
         } else if (p.stop > now && !state.kids) {
-          buttons.push(iconButton("button focusable", "circle-dot", t("Registra"), () => record(row, p)));
+          buttons.push(iconButton("button rec focusable", "circle-dot", t("Registra"), () => record(row, p)));
         }
         buttons.push(el("button", { className: "button secondary focusable", onclick: () => close() }, t("Chiudi")));
       }
-      panel.replaceChildren(...[
-        p.icon ? el("img", { className: "art", src: p.icon, alt: "", onerror() { this.remove(); } }) : null,
+      // The guide's picture, else the channel's logo on a tile.
+      const tile = () => el("div", { className: "art tile" }, window.VodMax.channelArt(row.channel));
+      const plot = [p.subtitle, p.description].filter(Boolean).join(" · ");
+      panel.replaceChildren(
+        p.icon ? el("img", { className: "art", src: p.icon, alt: "", onerror() { this.replaceWith(tile()); } }) : tile(),
         el("div", { className: "text" },
           el("h2", {}, p.title),
-          el("p", { className: "meta" }, row.channel.name + " · " + dayName(p.start) + " " + hhmm(p.start) + "–" + hhmm(p.stop) +
-            (p.category ? " · " + p.category : ""), status ? el("span", { className: "state" }, status) : null),
-          ...[p.subtitle, p.description].filter(Boolean).map((text) => el("p", { className: "plot" }, text)),
-          open ? el("div", { className: "buttons" }, ...buttons) : null)].filter(Boolean));
+          el("p", { className: "meta" }, el("b", {}, row.channel.name), " · ",
+            el("span", { className: "tnum" }, dayName(p.start) + " " + hhmm(p.start) + " – " + hhmm(p.stop)),
+            p.category ? " · " + p.category : "", ...pills),
+          plot ? el("p", { className: "plot" }, plot) : null,
+          open ? el("div", { className: "buttons" }, ...buttons) : null));
       panel.classList.toggle("open", open);
       panel.hidden = false;
       if (open) buttons[0].focus();

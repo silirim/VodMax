@@ -785,5 +785,8 @@
   "Questo link abbina il browser al dispositivo «{link}» al posto di «{current}». Sostituirlo?": "This link pairs the browser with the device “{link}” instead of “{current}”. Replace it?",
   "in onda": "on air",
   "rivedibile": "can be replayed",
-  "Guida TV (Guida / E)": "TV guide (Guide / E)"
+  "Guida TV (Guida / E)": "TV guide (Guide / E)",
+  "In onda": "On air",
+  "Rivedibile": "Can be replayed",
+  "In registrazione": "Recording"
 }
