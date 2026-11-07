@@ -20,6 +20,8 @@ const (
 	ImageBase    = "https://image.tmdb.org/t/p/"
 	PosterSize   = "w342"
 	BackdropSize = "w1280"
+	LogoSize     = "w500"
+	ProfileSize  = "w185"
 )
 
 // ErrKey means TMDB refused the key.
@@ -55,8 +57,18 @@ type Title struct {
 	Runtime       int      `json:"runtime,omitempty"` // minutes
 	Rating        float64  `json:"rating,omitempty"`
 	Cast          []string `json:"cast,omitempty"`
+	People        []Person `json:"people,omitempty"` // cast with photos, longer than Cast
 	Director      string   `json:"director,omitempty"`
 	Trailer       string   `json:"trailer,omitempty"` // YouTube id
+	Logo          string   `json:"logo,omitempty"`    // title logo image URL (transparent PNG when there is one)
+	ImdbID        string   `json:"imdb_id,omitempty"`
+}
+
+// Person is a cast member with the photo TMDB has.
+type Person struct {
+	Name  string `json:"name"`
+	Role  string `json:"role,omitempty"`  // character
+	Photo string `json:"photo,omitempty"` // image URL
 }
 
 // Check verifies the key.
@@ -86,7 +98,10 @@ func (c *Client) title(ctx context.Context, kind, id string) (Title, error) {
 		VoteAverage                                        float64 `json:"vote_average"`
 		Genres                                             []struct{ Name string }
 		Credits                                            struct {
-			Cast []struct{ Name string }
+			Cast []struct {
+				Name, Character string
+				ProfilePath     string `json:"profile_path"`
+			}
 			Crew []struct{ Name, Job string }
 		}
 		CreatedBy []struct{ Name string } `json:"created_by"`
@@ -96,13 +111,23 @@ func (c *Client) title(ctx context.Context, kind, id string) (Title, error) {
 				Lang            string `json:"iso_639_1"`
 			}
 		}
+		Images struct {
+			Logos []struct {
+				FilePath string `json:"file_path"`
+				Lang     string `json:"iso_639_1"`
+			}
+		}
+		ExternalIDs struct {
+			ImdbID string `json:"imdb_id"`
+		} `json:"external_ids"`
 	}
-	q := url.Values{"language": {"it-IT"}, "append_to_response": {"credits,videos"}, "include_video_language": {"it,en"}}
+	q := url.Values{"language": {"it-IT"}, "append_to_response": {"credits,videos,images,external_ids"},
+		"include_video_language": {"it,en"}, "include_image_language": {"it,en,null"}}
 	if err := c.get(ctx, "/"+kind+"/"+id, q, &raw); err != nil {
 		return Title{}, err
 	}
 	t := Title{Title: first(raw.Title, raw.Name), OriginalTitle: first(raw.OriginalTitle, raw.OriginalName), Overview: raw.Overview,
-		Released: first(raw.ReleaseDate, raw.FirstAirDate), Runtime: raw.Runtime, Rating: raw.VoteAverage}
+		Released: first(raw.ReleaseDate, raw.FirstAirDate), Runtime: raw.Runtime, Rating: raw.VoteAverage, ImdbID: raw.ExternalIDs.ImdbID}
 	if t.Runtime == 0 && len(raw.EpisodeRunTime) > 0 {
 		t.Runtime = raw.EpisodeRunTime[0]
 	}
@@ -116,10 +141,32 @@ func (c *Client) title(ctx context.Context, kind, id string) (Title, error) {
 		t.Genres = append(t.Genres, g.Name)
 	}
 	for i, p := range raw.Credits.Cast {
-		if i == 8 {
+		if i < 8 {
+			t.Cast = append(t.Cast, p.Name)
+		}
+		if i == 12 {
 			break
 		}
-		t.Cast = append(t.Cast, p.Name)
+		person := Person{Name: p.Name, Role: p.Character}
+		if p.ProfilePath != "" {
+			person.Photo = c.images + ProfileSize + p.ProfilePath
+		}
+		t.People = append(t.People, person)
+	}
+	// Italian logo first, then English, then language-neutral; PNG beats
+	// SVG because old TV browsers render SVG poorly or not at all.
+	best := 0
+	for _, l := range raw.Images.Logos {
+		score := map[string]int{"it": 6, "en": 4, "": 2}[l.Lang]
+		if score == 0 {
+			continue
+		}
+		if strings.HasSuffix(l.FilePath, ".png") {
+			score++
+		}
+		if score > best {
+			best, t.Logo = score, c.images+LogoSize+l.FilePath
+		}
 	}
 	for _, p := range raw.Credits.Crew {
 		if p.Job == "Director" {
