@@ -542,12 +542,13 @@ a.chip { text-decoration: none; }
 
 /* The server's problems (common.js watchStatus): a dark glass notice in
    the bottom-right corner that folds to a ⚠ after a few seconds. Under
-   the toast, which is newer. */
+   the toast, which is newer, and under the phone's "Altro" sheet and the
+   dialogs, which it would cover. */
 #server-problems {
   position: fixed;
   right: 1.2rem;
   bottom: 1.2rem;
-  z-index: 19;
+  z-index: 9;
   max-width: min(36rem, 80vw);
   padding: 0.6em 1.1em;
   color: var(--text);
