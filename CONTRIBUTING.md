@@ -14,7 +14,7 @@ files keyed by the Italian text, ready for [Weblate](https://weblate.org):
 |------|-------|------|
 | Interface | `internal/web/static/i18n/<lang>.json` | `it.json` |
 | Server messages | `internal/service/i18n/<lang>.json` | `it.json` |
-| Android app | `clients/android/app/src/main/res/values-<lang>/strings.xml` | `values/strings.xml` |
+| Android app | `clients/android/app/src/main/res/values-<lang>/strings.xml` | `values/strings.xml` (English; Italian in `values-it`) |
 
 A new language is a new file: the server picks it up at the next build and
 the language appears in the picker. Keep `{name}` placeholders and `%s`,
