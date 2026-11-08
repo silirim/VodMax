@@ -79,6 +79,8 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	route("GET /api/v1/folders", levelAdmin, a.listFolders)
 	route("GET /api/v1/subscriptions", levelAdmin, a.listSubscriptions)
 	route("POST /api/v1/subscriptions", levelAdmin, a.addSubscription)
+	route("POST /api/v1/subscriptions/file", levelAdmin, a.addPlaylistFile)
+	route("PUT /api/v1/subscriptions/{id}/file", levelAdmin, a.replacePlaylistFile)
 	route("POST /api/v1/subscriptions/{id}/sync", levelAdmin, a.syncSubscription)
 	route("DELETE /api/v1/subscriptions/{id}", levelAdmin, a.deleteSubscription)
 	route("GET /api/v1/subscriptions/{id}/rules", levelAdmin, a.getRules)
@@ -462,6 +464,36 @@ func (a *api) addSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]int64{"id": id})
+}
+
+// addPlaylistFile adds an M3U subscription from a file (0057): the file
+// is the request body, as for a backup to restore; the subscription's
+// name, VPN and the file's name are in the query.
+func (a *api) addPlaylistFile(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	vpnID, _ := strconv.ParseInt(q.Get("vpn_id"), 10, 64)
+	id, err := a.svc.AddPlaylistFile(r.Context(), q.Get("name"), vpnID, q.Get("file"), r.Body)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]int64{"id": id})
+}
+
+// replacePlaylistFile gives an M3U subscription a new file (the body) in
+// place of its address or old file, and starts the sync (202, as /sync).
+func (a *api) replacePlaylistFile(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	view, err := a.svc.ReplacePlaylistFile(r.Context(), id, r.URL.Query().Get("file"), r.Body)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, view)
 }
 
 func (a *api) syncSubscription(w http.ResponseWriter, r *http.Request) {
@@ -1390,7 +1422,7 @@ func (a *api) exportBackup(w http.ResponseWriter, r *http.Request) {
 // restoreBackup takes the file as the request body and the password in a
 // header (never in the URL, which may end up in logs).
 func (a *api) restoreBackup(w http.ResponseWriter, r *http.Request) {
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64<<20))
+	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, service.BackupMaxSize))
 	if err != nil {
 		a.fail(w, r, service.Invalid("file del backup troppo grande o interrotto"))
 		return

@@ -324,5 +324,18 @@
   "questo file non è un video che si possa copiare": "ten plik nie jest wideo, które można skopiować",
   "si copia su un dispositivo abbinato, non con il token di amministrazione": "kopiuje się na sparowane urządzenie, nie tokenem administratora",
   "il file sul server è cambiato": "plik na serwerze się zmienił",
-  "cosa copiare: movie, episode o recording": "co skopiować: movie, episode lub recording"
+  "cosa copiare: movie, episode o recording": "co skopiować: movie, episode lub recording",
+  "file della playlist troppo grande (massimo 64 MB): usa un indirizzo o un link": "plik playlisty jest za duży (maksymalnie 64 MB): użyj adresu lub linku",
+  "il file non è una playlist M3U (sembra una pagina web o un altro documento)": "plik nie jest playlistą M3U (wygląda na stronę internetową lub inny dokument)",
+  "solo una playlist M3U si carica da un file": "z pliku można wczytać tylko playlistę M3U",
+  "Leggo il file della playlist": "Odczytywanie pliku playlisty",
+  "il file della playlist manca: caricalo di nuovo da Modifica": "brak pliku playlisty: prześlij go ponownie w Edytuj",
+  "OneDrive non dà un link di download senza accesso: scarica il file e caricalo da qui": "OneDrive nie daje linku do pobrania bez logowania: pobierz plik i prześlij go tutaj",
+  "questo è un documento di Google, non un file: carica il file .m3u in Google Drive e condividi quello": "to dokument Google, a nie plik: prześlij plik .m3u na Dysk Google i udostępnij go",
+  "questo è il link di una cartella di Google Drive: condividi il file della playlist, non la cartella": "to link do folderu na Dysku Google: udostępnij plik playlisty, nie folder",
+  "link di Google Drive non riconosciuto: usa “Copia link” sul file della playlist": "nie rozpoznano linku Dysku Google: użyj „Kopiuj link” na pliku playlisty",
+  "questo è il link di una cartella di Dropbox: condividi il file della playlist, non la cartella": "to link do folderu Dropbox: udostępnij plik playlisty, nie folder",
+  "Google Drive non ha dato il file nemmeno dopo la conferma: scaricalo e caricalo da qui": "Dysk Google nie wydał pliku nawet po potwierdzeniu: pobierz go i prześlij tutaj",
+  "Dropbox non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Dropbox nie wydał pliku: sprawdź, czy jest udostępniony każdemu, kto ma link",
+  "Google Drive non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Dysk Google nie wydał pliku: sprawdź, czy jest udostępniony każdemu, kto ma link"
 }

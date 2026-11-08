@@ -860,5 +860,16 @@
   "Su questo dispositivo": "Na tym urządzeniu",
   "Su USB": "Na USB",
   "Tutta la stagione {n}": "Cały sezon {n}",
-  "Usa Movies/VodMax": "Użyj Movies/VodMax"
+  "Usa Movies/VodMax": "Użyj Movies/VodMax",
+  "File": "Plik",
+  "Indirizzo": "Adres",
+  "File (.m3u, .m3u8)": "Plik (.m3u, .m3u8)",
+  "Playlist da": "Playlista z",
+  "Va bene anche il link di condivisione di un file di Google Drive o Dropbox, condiviso con “chiunque abbia il link”: non serve accedere a nessun account.": "Działa też link udostępniania pliku z Dysku Google lub Dropboxa, udostępnionego „każdemu, kto ma link”: nie trzeba logować się na żadne konto.",
+  "Sostituisci il file": "Zastąp plik",
+  "Fino a 64 MB. Il file resta sul server e non si aggiorna da solo: per una versione nuova, Modifica → “Sostituisci il file”.": "Do 64 MB. Plik zostaje na serwerze i nie aktualizuje się sam: aby wgrać nową wersję, Edytuj → „Zastąp plik”.",
+  "Scegli il file della playlist": "Wybierz plik playlisty",
+  "Il file è più grande di 64 MB: usa un indirizzo o un link": "Plik jest większy niż 64 MB: użyj adresu lub linku",
+  "File caricato: leggo il catalogo": "Plik przesłany: odczytywanie katalogu",
+  "Invio del file non riuscito": "Nie udało się wysłać pliku"
 }

@@ -349,6 +349,9 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       settings.server ? el("span", {}, "Server ", el("b", {}, settings.server)) : null,
       settings.username ? el("span", {}, t("Utente") + " ", el("b", {}, settings.username)) : null,
       settings.host ? el("span", {}, "Host ", el("b", {}, settings.host)) : null,
+      settings.file ? el("span", {}, t("File") + " ", el("b", { className: "path" }, settings.file + " · " + (settings.size < 1048576
+        ? Math.max(1, Math.round(settings.size / 1024)) + " kB" : (settings.size / 1048576).toLocaleString(locale, { maximumFractionDigits: 1 }) + " MB") +
+        " · " + when(settings.uploaded))) : null,
       el("span", {}, "VPN ", el("b", {}, vpnName[s.vpn_id] || "?")),
       a.status ? el("span", {}, "Account ", el("b", { className: a.active ? "ok" : "bad" }, a.active ? t("attivo") : a.status)) : null,
       a.expires > 0 ? el("span", {}, t("Scadenza") + " ", el("b", {}, new Date(a.expires * 1000).toLocaleDateString(locale))) : null,
@@ -485,6 +488,33 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     show(start);
   }
 
+  // Sends a file as the request body, its progress on bar: the page never
+  // reads it in memory (fetch has no upload progress).
+  function sendFile(method, path, file, bar) {
+    return new Promise((resolve, reject) => {
+      const x = new XMLHttpRequest();
+      x.open(method, path);
+      const headers = window.VodMax.authHeaders();
+      for (const k of Object.keys(headers)) x.setRequestHeader(k, headers[k]);
+      bar.hidden = false;
+      bar.firstChild.style.width = "0%";
+      x.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        bar.firstChild.style.width = Math.round(e.loaded * 100 / e.total) + "%";
+        bar.classList.toggle("busy", e.loaded >= e.total); // sent: the server reads it
+      };
+      x.onloadend = () => { bar.hidden = true; bar.classList.remove("busy"); };
+      x.onload = () => {
+        let data = null;
+        try { data = JSON.parse(x.responseText); } catch { /* no body */ }
+        if (x.status >= 200 && x.status < 300) resolve(data);
+        else reject(new Error(data && data.error ? data.error : t("errore {status}", { status: x.status })));
+      };
+      x.onerror = () => reject(new Error(t("Invio del file non riuscito")));
+      x.send(file);
+    });
+  }
+
   // Add (existing undefined) or edit a subscription.
   function subscriptionForm(vpns, existing) {
     const kind = el("select", { className: "focusable" }, el("option", { value: "xtream" }, "Xtream Codes"), el("option", { value: "m3u" }, t("Playlist M3U")),
@@ -500,21 +530,44 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     const mac = input({ autocomplete: "off", spellcheck: false, placeholder: existing ? t("lascia vuoto per non cambiarlo") : "00:1A:79:XX:XX:XX" });
     if (existing) { kind.value = existing.kind; kind.disabled = true; vpn.value = existing.vpn_id; }
     const xtreamRows = [...field("Server", server), ...field(t("Utente"), user), ...field("Password", pass)];
-    const m3uRows = [...field(t("Indirizzo della playlist"), url)];
+    // An M3U playlist from an address (a cloud share link too) or from a
+    // file (0057). No file where there is no file picker: the LG app, and
+    // TVs whose Android app finds none.
+    const native = window.VodMaxNative;
+    const canPick = native ? !native.canPickFile || native.canPickFile() : !/Web0S|webOS/.test(navigator.userAgent);
+    const hasFile = Boolean(existing && existing.kind === "m3u" && set.file);
+    const source = el("select", { className: "focusable" }, el("option", { value: "url" }, t("Indirizzo")), el("option", { value: "file" }, t("File (.m3u, .m3u8)")));
+    source.value = hasFile && canPick ? "file" : "url";
+    const file = input({ type: "file" }); // any type: the one of .m3u changes from app to app
+    const bar = el("div", { className: "progress full", hidden: true }, el("div", {}));
+    const sourceRows = [...field(t("Playlist da"), source)];
+    const urlRows = [...field(t("Indirizzo della playlist"), url),
+      el("p", { className: "note full" }, t("Va bene anche il link di condivisione di un file di Google Drive o Dropbox, condiviso con “chiunque abbia il link”: non serve accedere a nessun account."))];
+    const fileRows = [...field(hasFile ? t("Sostituisci il file") : t("File"), file), bar,
+      el("p", { className: "note full" }, t("Fino a 64 MB. Il file resta sul server e non si aggiorna da solo: per una versione nuova, Modifica → “Sostituisci il file”."))];
+    const m3uRows = [...sourceRows, ...urlRows, ...fileRows];
     const stalkerRows = [...field(t("Indirizzo del portale"), portal), ...field(t("Indirizzo MAC"), mac),
       el("p", { className: "note full" }, t("Per ora si leggono i canali in diretta; la guida si aggiunge da Guida TV → Fonti XMLTV."))];
     const form = el("form", { className: "form" }, ...field(t("Tipo"), kind), ...field(t("Nome"), name), ...field("VPN", vpn), ...xtreamRows, ...m3uRows, ...stalkerRows);
     const toggle = () => {
       for (const e of xtreamRows) e.hidden = kind.value !== "xtream";
-      for (const e of m3uRows) e.hidden = kind.value !== "m3u";
+      for (const e of sourceRows) e.hidden = kind.value !== "m3u" || !canPick;
+      for (const e of urlRows) e.hidden = kind.value !== "m3u" || source.value !== "url";
+      for (const e of fileRows) e.hidden = kind.value !== "m3u" || source.value !== "file";
+      bar.hidden = true;
       for (const e of stalkerRows) e.hidden = kind.value !== "stalker";
     };
     kind.onchange = toggle;
+    source.onchange = toggle;
     toggle();
     const save = el("button", { className: "small primary focusable full", type: "submit" }, existing ? t("Salva le modifiche") : t("Aggiungi"));
     form.append(save);
     form.onsubmit = async (e) => {
       e.preventDefault();
+      const fromFile = kind.value === "m3u" && source.value === "file";
+      const chosen = fromFile ? file.files[0] : null;
+      if (fromFile && !chosen && !hasFile) { flash(t("Scegli il file della playlist")); return; }
+      if (chosen && chosen.size > 64 * 1024 * 1024) { flash(t("Il file è più grande di 64 MB: usa un indirizzo o un link")); return; }
       save.disabled = true;
       try {
         let id = existing && existing.id;
@@ -522,9 +575,22 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
           const patch = { name: name.value, vpn_id: Number(vpn.value) };
           if (existing.kind === "xtream") Object.assign(patch, { server: server.value, username: user.value, password: pass.value });
           else if (existing.kind === "stalker") Object.assign(patch, { server: portal.value, mac: mac.value });
-          else patch.url = url.value;
+          else if (!fromFile) patch.url = url.value; // an address takes the place of the file
+          if (chosen) {
+            // The new file takes the place of the address or of the old file; the server starts the sync.
+            // Before the PATCH: saved first, a failing get.php address would turn into Xtream Codes.
+            startedHere.add(id);
+            await sendFile("PUT", "/api/v1/subscriptions/" + id + "/file?file=" + encodeURIComponent(chosen.name), chosen, bar)
+              .catch((err) => { startedHere.delete(id); throw err; });
+          }
           await api("PATCH", "/api/v1/subscriptions/" + existing.id, patch);
-          flash(t("Abbonamento aggiornato"));
+          flash(chosen ? t("File caricato: leggo il catalogo") : t("Abbonamento aggiornato"));
+        } else if (chosen) {
+          id = (await sendFile("POST", "/api/v1/subscriptions/file?name=" + encodeURIComponent(name.value) + "&vpn_id=" + Number(vpn.value) +
+            "&file=" + encodeURIComponent(chosen.name), chosen, bar)).id;
+          startedHere.add(id);
+          await api("POST", "/api/v1/subscriptions/" + id + "/sync").catch(() => startedHere.delete(id));
+          flash(t("File caricato: leggo il catalogo"));
         } else {
           const body = { name: name.value, kind: kind.value, vpn_id: Number(vpn.value) };
           if (kind.value === "xtream") Object.assign(body, { server: server.value, username: user.value, password: pass.value });
@@ -1699,7 +1765,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       best.scrollIntoView({ block: "nearest" });
     }
   }
-  const typing = (e) => e && (e.tagName === "TEXTAREA" || (e.tagName === "INPUT" && !/checkbox|radio|button|submit/.test(e.type)));
+  const typing = (e) => e && (e.tagName === "TEXTAREA" || (e.tagName === "INPUT" && !/checkbox|radio|button|submit|file/.test(e.type)));
   document.addEventListener("keydown", (e) => {
     const key = window.VodMax.keyOf(e), active = document.activeElement;
     if (window.VodMax.sheetOpen()) return;
@@ -1711,7 +1777,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       moveFocus(key);
       return;
     }
-    if (key === "OK" && active && active.tagName === "INPUT" && active.type === "checkbox") {
+    if (key === "OK" && active && active.tagName === "INPUT" && (active.type === "checkbox" || active.type === "file")) { // a file: the picker
       e.preventDefault();
       active.click();
       return;

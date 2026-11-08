@@ -240,9 +240,8 @@ public class MainActivity extends Activity {
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (picking != null) picking.onReceiveValue(null);
                 picking = callback;
-                Intent i = new Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
                 try {
-                    startActivityForResult(i, PICK);
+                    startActivityForResult(pickIntent(), PICK);
                 } catch (Exception e) {
                     picking = null;
                     callback.onReceiveValue(null);
@@ -599,6 +598,18 @@ public class MainActivity extends Activity {
         public void changeServer() {
             runOnUiThread(() -> showSetup(null));
         }
+
+        /** Is there a file picker? Many TVs have none, or a stub (0057). */
+        @JavascriptInterface
+        public boolean canPickFile() {
+            ResolveInfo r = getPackageManager().resolveActivity(pickIntent(), 0);
+            return r != null && r.activityInfo != null && !r.activityInfo.packageName.equals("com.google.android.tv.frameworkpackagestubs");
+        }
+    }
+
+    /** Any type: the one of a .m3u or a .conf changes from app to app. */
+    private static Intent pickIntent() {
+        return new Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
     }
 
     private void page(String js) {

@@ -346,7 +346,10 @@ func (s *Service) AddSubscription(ctx context.Context, in SubscriptionInput) (in
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			return 0, invalid("URL della playlist non valido (atteso http:// o https://)")
 		}
-		settings = map[string]string{"host": u.Hostname()}
+		if _, _, err := cloudLink(u.String()); err != nil {
+			return 0, err
+		}
+		settings = m3uSettings{Host: u.Hostname()}
 		sec.URL = u.String()
 	case "stalker":
 		mac, err := stalker.NormalizeMAC(in.MAC)
@@ -426,6 +429,7 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 	var settings json.RawMessage
 	var secret []byte
 	var kind *string
+	dropFile := false
 	switch sub.Kind {
 	case "xtream":
 		var set xtreamSettings
@@ -454,8 +458,12 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 				return invalid("URL della playlist non valido (atteso http:// o https://)")
 			}
+			if _, _, err := cloudLink(u.String()); err != nil {
+				return err
+			}
 			sec.URL = u.String()
-			settings, _ = json.Marshal(map[string]string{"host": u.Hostname()})
+			settings, _ = json.Marshal(m3uSettings{Host: u.Hostname()})
+			dropFile = true // an address takes the place of a file
 		}
 		// Saving converts an Xtream Codes link, new or stored, as adding does;
 		// a stored one only while its playlist fails, since the item ids and
@@ -493,7 +501,10 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 	}
 	rawSecret, _ := json.Marshal(sec)
 	secret = s.box.Seal(rawSecret, subOwner(id))
-	return s.st.UpdateSubscription(ctx, id, p.Name, kind, p.VPNID, settings, secret)
+	if err := s.st.UpdateSubscription(ctx, id, p.Name, kind, p.VPNID, settings, secret); err != nil || !dropFile {
+		return err
+	}
+	return s.st.SetPlaylistFile(ctx, id, nil)
 }
 
 // UpdateVPN renames a connection and/or replaces its configuration; a
@@ -721,6 +732,8 @@ func (s *Service) StartSync(ctx context.Context, id int64, allowDrop bool) (Subs
 	if s.beginSync(id) {
 		if sub.Kind == "local" {
 			s.syncPhase(id, "Leggo la cartella", 0) // not "Mi collego al provider"
+		} else if fromFile(sub) {
+			s.syncPhase(id, "Leggo il file della playlist", 0)
 		}
 		// The sync outlives the request: the catalog must not be left
 		// half-fetched because a page closed.
@@ -836,6 +849,9 @@ func (s *Service) fetch(ctx context.Context, id int64) (*catalog.Snapshot, error
 	if err := json.Unmarshal(raw, &sec); err != nil {
 		return nil, err
 	}
+	if sub.Kind == "m3u" && sec.URL == "" {
+		return s.playlistFromFile(ctx, id) // not even the VPN is needed
+	}
 	tun, err := s.tunnel(ctx, sub.VPNID)
 	if err != nil {
 		return nil, fmt.Errorf("VPN: %w", err)
@@ -865,17 +881,47 @@ func (s *Service) fetch(ctx context.Context, id int64) (*catalog.Snapshot, error
 		return catalog.FromXtream(ctx, client)
 	case "m3u":
 		s.syncPhase(id, "Scarico la playlist", 0)
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, sec.URL, nil)
+		// A share link of a cloud drive goes through the same client, and
+		// its redirects through the same connection.
+		drive, link, err := cloudLink(sec.URL)
 		if err != nil {
-			return nil, provider.Redact(err)
+			return nil, err
 		}
-		req.Header.Set("User-Agent", "VodMax")
-		resp, err := httpClient.Do(req)
+		get := func(link string) (*http.Response, error) {
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
+			if err != nil {
+				return nil, provider.Redact(err)
+			}
+			req.Header.Set("User-Agent", "VodMax")
+			resp, err := httpClient.Do(req)
+			if err != nil {
+				return nil, fmt.Errorf("playlist: %w", provider.Redact(err))
+			}
+			return resp, nil
+		}
+		resp, err := get(link)
 		if err != nil {
-			return nil, fmt.Errorf("playlist: %w", provider.Redact(err))
+			return nil, err
 		}
-		defer resp.Body.Close()
+		defer func() { resp.Body.Close() }()
+		body, confirmed := io.Reader(resp.Body), false
+		if drive == "Google Drive" && resp.StatusCode == http.StatusOK && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+			page, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+			body = io.MultiReader(bytes.NewReader(page), resp.Body) // a playlist served as a page
+			// A large file: once with the fields of the confirmation page.
+			if next := driveConfirm(resp.Request.URL, string(page)); next != "" {
+				resp.Body.Close()
+				again, err := get(next)
+				if err != nil {
+					return nil, err
+				}
+				resp, body, confirmed = again, again.Body, true
+			}
+		}
 		if resp.StatusCode != http.StatusOK {
+			if drive != "" {
+				return nil, cloudError(drive, confirmed)
+			}
 			if _, _, _, ok := xtreamLink(sec.URL); ok {
 				// Some panels refuse get.php (HTTP 884) but answer player_api.php;
 				// the subscription is converted only when the person saves it.
@@ -883,14 +929,16 @@ func (s *Service) fetch(ctx context.Context, id int64) (*catalog.Snapshot, error
 			}
 			return nil, fmt.Errorf("playlist: risposta HTTP %d", resp.StatusCode)
 		}
-		p, err := m3u.Parse(io.LimitReader(resp.Body, 1<<30), m3u.DefaultLimits)
+		// The content tells, not the status: Dropbox answers 200 with a
+		// page for a link that does not exist.
+		p, err := m3u.Parse(io.LimitReader(body, 1<<30), m3u.DefaultLimits)
+		if errors.Is(err, m3u.ErrNotPlaylist) && drive != "" {
+			return nil, cloudError(drive, confirmed)
+		}
 		if err != nil {
 			return nil, err
 		}
-		if len(p.Entries) == 0 {
-			return nil, errors.New("la playlist non contiene canali né titoli")
-		}
-		return catalog.FromM3U(p, s.box.Seal, id), nil
+		return s.m3uSnapshot(id, p)
 	case "stalker":
 		client, err := s.stalkerClient(ctx, sub, sec, httpClient)
 		if err != nil {

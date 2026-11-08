@@ -259,6 +259,9 @@ func (s *Service) runScheduled(ctx context.Context, log *slog.Logger, now time.T
 		}
 		var run syncRun
 		s.st.Setting(ctx, syncRunKey(sub.ID), &run)
+		if fromFile(sub) && sub.SyncedAt != nil && run.Attempts == 0 {
+			continue // the file stays as it is until replaced (0057); a first read or one cut short is done
+		}
 		if !interruptedDue(run, now) {
 			continue // nor its guide, which may be what stopped the process
 		}

@@ -860,5 +860,16 @@
   "Su questo dispositivo": "Su questo dispositivo",
   "Su USB": "Su USB",
   "Tutta la stagione {n}": "Tutta la stagione {n}",
-  "Usa Movies/VodMax": "Usa Movies/VodMax"
+  "Usa Movies/VodMax": "Usa Movies/VodMax",
+  "File": "File",
+  "Indirizzo": "Indirizzo",
+  "File (.m3u, .m3u8)": "File (.m3u, .m3u8)",
+  "Playlist da": "Playlist da",
+  "Va bene anche il link di condivisione di un file di Google Drive o Dropbox, condiviso con “chiunque abbia il link”: non serve accedere a nessun account.": "Va bene anche il link di condivisione di un file di Google Drive o Dropbox, condiviso con “chiunque abbia il link”: non serve accedere a nessun account.",
+  "Sostituisci il file": "Sostituisci il file",
+  "Fino a 64 MB. Il file resta sul server e non si aggiorna da solo: per una versione nuova, Modifica → “Sostituisci il file”.": "Fino a 64 MB. Il file resta sul server e non si aggiorna da solo: per una versione nuova, Modifica → “Sostituisci il file”.",
+  "Scegli il file della playlist": "Scegli il file della playlist",
+  "Il file è più grande di 64 MB: usa un indirizzo o un link": "Il file è più grande di 64 MB: usa un indirizzo o un link",
+  "File caricato: leggo il catalogo": "File caricato: leggo il catalogo",
+  "Invio del file non riuscito": "Invio del file non riuscito"
 }

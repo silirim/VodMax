@@ -246,6 +246,27 @@ func (s *Store) UpdateSubscription(ctx context.Context, id int64, name, kind *st
 	return nil
 }
 
+// PlaylistFile is the sealed file of an M3U subscription (0057).
+func (s *Store) PlaylistFile(ctx context.Context, subID int64) ([]byte, error) {
+	var data []byte
+	err := s.r.QueryRowContext(ctx, `SELECT data FROM playlist_file WHERE subscription_id = ?`, subID).Scan(&data)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return data, err
+}
+
+// SetPlaylistFile stores the sealed file of a subscription; nil removes it.
+func (s *Store) SetPlaylistFile(ctx context.Context, subID int64, sealed []byte) error {
+	if sealed == nil {
+		_, err := s.w.ExecContext(ctx, `DELETE FROM playlist_file WHERE subscription_id = ?`, subID)
+		return err
+	}
+	_, err := s.w.ExecContext(ctx, `INSERT INTO playlist_file (subscription_id, data) VALUES (?, ?)
+		ON CONFLICT (subscription_id) DO UPDATE SET data = excluded.data`, subID, sealed)
+	return err
+}
+
 // UpdateVPN changes the name and/or the sealed configuration.
 func (s *Store) UpdateVPN(ctx context.Context, id int64, name *string, config []byte) error {
 	res, err := s.w.ExecContext(ctx, `UPDATE vpn SET name = coalesce(?, name), config = coalesce(?, config) WHERE id = ?`,

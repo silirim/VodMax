@@ -12,10 +12,15 @@
     <!-- Movies/VodMax on Android 7-9; from 10 MediaStore needs nothing. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
-    <!-- Is there a folder picker (some TV boxes have none, or a stub)? -->
+    <!-- Is there a folder or a file picker (some TV boxes have none, or a stub)? -->
     <queries>
         <intent>
             <action android:name="android.intent.action.OPEN_DOCUMENT_TREE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+            <category android:name="android.intent.category.OPENABLE" />
+            <data android:mimeType="*/*" />
         </intent>
     </queries>
 

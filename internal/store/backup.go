@@ -71,6 +71,9 @@ type BackupSub struct {
 	Settings json.RawMessage `json:"settings"`
 	Rules    json.RawMessage `json:"rules"`
 	Secret   json.RawMessage `json:"secret"`
+	// The playlist uploaded as a file (0057), gzip as stored: the
+	// subscription comes back without uploading it again.
+	File []byte `json:"file,omitempty"`
 }
 
 type BackupCategory struct {
@@ -146,16 +149,23 @@ func (s *Store) ExportBackup(ctx context.Context, openVPN, openSub func(id int64
 	if err != nil {
 		return nil, err
 	}
-	err = eachRow(ctx, tx, `SELECT id, name, kind, coalesce(vpn_id, 0), settings, rules, secret FROM subscription ORDER BY id`, func(rows *sql.Rows) error {
+	err = eachRow(ctx, tx, `SELECT s.id, s.name, s.kind, coalesce(s.vpn_id, 0), s.settings, s.rules, s.secret, f.data
+		FROM subscription s LEFT JOIN playlist_file f ON f.subscription_id = s.id ORDER BY s.id`, func(rows *sql.Rows) error {
 		var sub BackupSub
 		var settings, rules string
-		var sealed []byte
-		if err := rows.Scan(&sub.ID, &sub.Name, &sub.Kind, &sub.VPNID, &settings, &rules, &sealed); err != nil {
+		var sealed, file []byte
+		if err := rows.Scan(&sub.ID, &sub.Name, &sub.Kind, &sub.VPNID, &settings, &rules, &sealed, &file); err != nil {
 			return err
 		}
 		plain, err := openSub(sub.ID, sealed)
 		if err != nil {
 			return fmt.Errorf("abbonamento %d: %w", sub.ID, err)
+		}
+		if file != nil {
+			// Sealed for the subscription, like its secret.
+			if sub.File, err = openSub(sub.ID, file); err != nil {
+				return fmt.Errorf("abbonamento %d: %w", sub.ID, err)
+			}
 		}
 		sub.Settings, sub.Rules, sub.Secret = json.RawMessage(settings), json.RawMessage(rules), json.RawMessage(plain)
 		b.Subscriptions = append(b.Subscriptions, sub)
@@ -390,6 +400,12 @@ func (s *Store) ImportBackup(ctx context.Context, b *Backup, sealVPN, sealSub fu
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, sub.ID, sub.Name, sub.Kind, nullID(sub.VPNID), string(sub.Settings), rules,
 			sealSub(sub.ID, sub.Secret), now); err != nil {
 			return fmt.Errorf("abbonamento %q: %w", sub.Name, err)
+		}
+		if sub.File != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO playlist_file (subscription_id, data) VALUES (?, ?)`,
+				sub.ID, sealSub(sub.ID, sub.File)); err != nil {
+				return fmt.Errorf("abbonamento %q: %w", sub.Name, err)
+			}
 		}
 	}
 	for _, c := range b.Categories {

@@ -402,6 +402,12 @@ var migrations = []string{
 		hidden_at  INTEGER NOT NULL,
 		PRIMARY KEY (profile_id, title_key)
 	)`,
+	// 21: an M3U playlist uploaded as a file (0057), apart from the
+	// subscription's secret, which is read at every play.
+	`CREATE TABLE playlist_file (
+		subscription_id INTEGER PRIMARY KEY REFERENCES subscription(id) ON DELETE CASCADE,
+		data            BLOB NOT NULL  -- sealed gzip of the file
+	)`,
 }
 
 // noForeignKeys lists migrations (1-based) that rebuild a parent table:

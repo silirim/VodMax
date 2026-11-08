@@ -324,5 +324,18 @@
   "questo file non è un video che si possa copiare": "this file is not a video that can be copied",
   "si copia su un dispositivo abbinato, non con il token di amministrazione": "copies go to a paired device, not with the admin token",
   "il file sul server è cambiato": "the file on the server has changed",
-  "cosa copiare: movie, episode o recording": "what to copy: movie, episode or recording"
+  "cosa copiare: movie, episode o recording": "what to copy: movie, episode or recording",
+  "file della playlist troppo grande (massimo 64 MB): usa un indirizzo o un link": "playlist file too large (64 MB at most): use an address or a link",
+  "il file non è una playlist M3U (sembra una pagina web o un altro documento)": "the file is not an M3U playlist (it looks like a web page or another document)",
+  "solo una playlist M3U si carica da un file": "only an M3U playlist can be loaded from a file",
+  "Leggo il file della playlist": "Reading the playlist file",
+  "il file della playlist manca: caricalo di nuovo da Modifica": "the playlist file is missing: upload it again from Edit",
+  "OneDrive non dà un link di download senza accesso: scarica il file e caricalo da qui": "OneDrive gives no download link without signing in: download the file and upload it here",
+  "questo è un documento di Google, non un file: carica il file .m3u in Google Drive e condividi quello": "this is a Google document, not a file: upload the .m3u file to Google Drive and share that",
+  "questo è il link di una cartella di Google Drive: condividi il file della playlist, non la cartella": "this is the link of a Google Drive folder: share the playlist file, not the folder",
+  "link di Google Drive non riconosciuto: usa “Copia link” sul file della playlist": "Google Drive link not recognised: use “Copy link” on the playlist file",
+  "questo è il link di una cartella di Dropbox: condividi il file della playlist, non la cartella": "this is the link of a Dropbox folder: share the playlist file, not the folder",
+  "Google Drive non ha dato il file nemmeno dopo la conferma: scaricalo e caricalo da qui": "Google Drive did not give the file even after the confirmation: download it and upload it here",
+  "Dropbox non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Dropbox did not give the file: check that it is shared with anyone with the link",
+  "Google Drive non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Google Drive did not give the file: check that it is shared with anyone with the link"
 }

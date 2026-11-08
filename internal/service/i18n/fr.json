@@ -324,5 +324,18 @@
   "questo file non è un video che si possa copiare": "ce fichier n'est pas une vidéo qui peut être copiée",
   "si copia su un dispositivo abbinato, non con il token di amministrazione": "la copie se fait sur un appareil associé, pas avec le jeton d'administration",
   "il file sul server è cambiato": "le fichier sur le serveur a changé",
-  "cosa copiare: movie, episode o recording": "quoi copier : movie, episode ou recording"
+  "cosa copiare: movie, episode o recording": "quoi copier : movie, episode ou recording",
+  "file della playlist troppo grande (massimo 64 MB): usa un indirizzo o un link": "fichier de la playlist trop volumineux (64 Mo au maximum) : utilisez une adresse ou un lien",
+  "il file non è una playlist M3U (sembra una pagina web o un altro documento)": "le fichier n'est pas une playlist M3U (on dirait une page web ou un autre document)",
+  "solo una playlist M3U si carica da un file": "seule une playlist M3U peut être chargée depuis un fichier",
+  "Leggo il file della playlist": "Lecture du fichier de la playlist",
+  "il file della playlist manca: caricalo di nuovo da Modifica": "le fichier de la playlist manque : envoyez-le à nouveau depuis Modifier",
+  "OneDrive non dà un link di download senza accesso: scarica il file e caricalo da qui": "OneDrive ne donne pas de lien de téléchargement sans connexion : téléchargez le fichier et envoyez-le d'ici",
+  "questo è un documento di Google, non un file: carica il file .m3u in Google Drive e condividi quello": "c'est un document Google, pas un fichier : envoyez le fichier .m3u dans Google Drive et partagez celui-ci",
+  "questo è il link di una cartella di Google Drive: condividi il file della playlist, non la cartella": "c'est le lien d'un dossier Google Drive : partagez le fichier de la playlist, pas le dossier",
+  "link di Google Drive non riconosciuto: usa “Copia link” sul file della playlist": "lien Google Drive non reconnu : utilisez « Copier le lien » sur le fichier de la playlist",
+  "questo è il link di una cartella di Dropbox: condividi il file della playlist, non la cartella": "c'est le lien d'un dossier Dropbox : partagez le fichier de la playlist, pas le dossier",
+  "Google Drive non ha dato il file nemmeno dopo la conferma: scaricalo e caricalo da qui": "Google Drive n'a pas donné le fichier, même après la confirmation : téléchargez-le et envoyez-le d'ici",
+  "Dropbox non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Dropbox n'a pas donné le fichier : vérifiez qu'il est partagé avec toute personne disposant du lien",
+  "Google Drive non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Google Drive n'a pas donné le fichier : vérifiez qu'il est partagé avec toute personne disposant du lien"
 }

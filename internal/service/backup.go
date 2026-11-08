@@ -31,7 +31,7 @@ import (
 const (
 	backupMagic      = "VODMAXB1"
 	backupIterations = 600_000
-	backupMaxSize    = 64 << 20
+	BackupMaxSize    = 256 << 20 // a restore reads it whole; it carries the uploaded playlists (0057)
 	backupKeep       = 14
 	backupEvery      = 24 * time.Hour
 	minBackupPass    = 8

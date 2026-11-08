@@ -324,5 +324,18 @@
   "questo file non è un video che si possa copiare": "este archivo no es un vídeo que se pueda copiar",
   "si copia su un dispositivo abbinato, non con il token di amministrazione": "se copia en un dispositivo vinculado, no con el token de administración",
   "il file sul server è cambiato": "el archivo del servidor ha cambiado",
-  "cosa copiare: movie, episode o recording": "qué copiar: movie, episode o recording"
+  "cosa copiare: movie, episode o recording": "qué copiar: movie, episode o recording",
+  "file della playlist troppo grande (massimo 64 MB): usa un indirizzo o un link": "archivo de la lista demasiado grande (máximo 64 MB): usa una dirección o un enlace",
+  "il file non è una playlist M3U (sembra una pagina web o un altro documento)": "el archivo no es una lista M3U (parece una página web u otro documento)",
+  "solo una playlist M3U si carica da un file": "solo una lista M3U se puede cargar desde un archivo",
+  "Leggo il file della playlist": "Leyendo el archivo de la lista",
+  "il file della playlist manca: caricalo di nuovo da Modifica": "falta el archivo de la lista: súbelo de nuevo desde Editar",
+  "OneDrive non dà un link di download senza accesso: scarica il file e caricalo da qui": "OneDrive no da un enlace de descarga sin iniciar sesión: descarga el archivo y súbelo aquí",
+  "questo è un documento di Google, non un file: carica il file .m3u in Google Drive e condividi quello": "esto es un documento de Google, no un archivo: sube el archivo .m3u a Google Drive y comparte ese",
+  "questo è il link di una cartella di Google Drive: condividi il file della playlist, non la cartella": "este es el enlace de una carpeta de Google Drive: comparte el archivo de la lista, no la carpeta",
+  "link di Google Drive non riconosciuto: usa “Copia link” sul file della playlist": "enlace de Google Drive no reconocido: usa “Copiar enlace” en el archivo de la lista",
+  "questo è il link di una cartella di Dropbox: condividi il file della playlist, non la cartella": "este es el enlace de una carpeta de Dropbox: comparte el archivo de la lista, no la carpeta",
+  "Google Drive non ha dato il file nemmeno dopo la conferma: scaricalo e caricalo da qui": "Google Drive no dio el archivo ni siquiera tras la confirmación: descárgalo y súbelo aquí",
+  "Dropbox non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Dropbox no dio el archivo: comprueba que esté compartido con cualquier persona que tenga el enlace",
+  "Google Drive non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Google Drive no dio el archivo: comprueba que esté compartido con cualquier persona que tenga el enlace"
 }

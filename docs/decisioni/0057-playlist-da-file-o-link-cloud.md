@@ -174,3 +174,8 @@ link dei cloud.
 4. e 5. Modulo: «Un tipo: link oppure file». "Playlist M3U" con la scelta
    Indirizzo / File; sulle TV senza selettore di file il campo File si
    nasconde.
+
+Nell'implementazione il ripristino di un backup accetta fino a 256 MB
+(prima 64): i backup ora contengono i file delle playlist, e con più liste
+grandi un backup scaricato non si sarebbe più potuto ripristinare. Il
+limite di 64 MB per ogni file resta.

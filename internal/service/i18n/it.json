@@ -324,5 +324,18 @@
   "questo file non è un video che si possa copiare": "questo file non è un video che si possa copiare",
   "si copia su un dispositivo abbinato, non con il token di amministrazione": "si copia su un dispositivo abbinato, non con il token di amministrazione",
   "il file sul server è cambiato": "il file sul server è cambiato",
-  "cosa copiare: movie, episode o recording": "cosa copiare: movie, episode o recording"
+  "cosa copiare: movie, episode o recording": "cosa copiare: movie, episode o recording",
+  "file della playlist troppo grande (massimo 64 MB): usa un indirizzo o un link": "file della playlist troppo grande (massimo 64 MB): usa un indirizzo o un link",
+  "il file non è una playlist M3U (sembra una pagina web o un altro documento)": "il file non è una playlist M3U (sembra una pagina web o un altro documento)",
+  "solo una playlist M3U si carica da un file": "solo una playlist M3U si carica da un file",
+  "Leggo il file della playlist": "Leggo il file della playlist",
+  "il file della playlist manca: caricalo di nuovo da Modifica": "il file della playlist manca: caricalo di nuovo da Modifica",
+  "OneDrive non dà un link di download senza accesso: scarica il file e caricalo da qui": "OneDrive non dà un link di download senza accesso: scarica il file e caricalo da qui",
+  "questo è un documento di Google, non un file: carica il file .m3u in Google Drive e condividi quello": "questo è un documento di Google, non un file: carica il file .m3u in Google Drive e condividi quello",
+  "questo è il link di una cartella di Google Drive: condividi il file della playlist, non la cartella": "questo è il link di una cartella di Google Drive: condividi il file della playlist, non la cartella",
+  "link di Google Drive non riconosciuto: usa “Copia link” sul file della playlist": "link di Google Drive non riconosciuto: usa “Copia link” sul file della playlist",
+  "questo è il link di una cartella di Dropbox: condividi il file della playlist, non la cartella": "questo è il link di una cartella di Dropbox: condividi il file della playlist, non la cartella",
+  "Google Drive non ha dato il file nemmeno dopo la conferma: scaricalo e caricalo da qui": "Google Drive non ha dato il file nemmeno dopo la conferma: scaricalo e caricalo da qui",
+  "Dropbox non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Dropbox non ha dato il file: controlla che sia condiviso con chiunque abbia il link",
+  "Google Drive non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Google Drive non ha dato il file: controlla che sia condiviso con chiunque abbia il link"
 }

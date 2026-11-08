@@ -324,5 +324,18 @@
   "questo file non è un video che si possa copiare": "diese Datei ist kein Video, das sich kopieren lässt",
   "si copia su un dispositivo abbinato, non con il token di amministrazione": "kopiert wird auf ein gekoppeltes Gerät, nicht mit dem Administrator-Token",
   "il file sul server è cambiato": "die Datei auf dem Server hat sich geändert",
-  "cosa copiare: movie, episode o recording": "was kopieren: movie, episode oder recording"
+  "cosa copiare: movie, episode o recording": "was kopieren: movie, episode oder recording",
+  "file della playlist troppo grande (massimo 64 MB): usa un indirizzo o un link": "Playlist-Datei zu groß (höchstens 64 MB): verwende eine Adresse oder einen Link",
+  "il file non è una playlist M3U (sembra una pagina web o un altro documento)": "die Datei ist keine M3U-Playlist (sieht aus wie eine Webseite oder ein anderes Dokument)",
+  "solo una playlist M3U si carica da un file": "nur eine M3U-Playlist kann aus einer Datei geladen werden",
+  "Leggo il file della playlist": "Playlist-Datei wird gelesen",
+  "il file della playlist manca: caricalo di nuovo da Modifica": "die Playlist-Datei fehlt: lade sie unter Bearbeiten erneut hoch",
+  "OneDrive non dà un link di download senza accesso: scarica il file e caricalo da qui": "OneDrive gibt ohne Anmeldung keinen Download-Link: lade die Datei herunter und hier hoch",
+  "questo è un documento di Google, non un file: carica il file .m3u in Google Drive e condividi quello": "das ist ein Google-Dokument, keine Datei: lade die .m3u-Datei in Google Drive hoch und teile diese",
+  "questo è il link di una cartella di Google Drive: condividi il file della playlist, non la cartella": "das ist der Link eines Google-Drive-Ordners: teile die Playlist-Datei, nicht den Ordner",
+  "link di Google Drive non riconosciuto: usa “Copia link” sul file della playlist": "Google-Drive-Link nicht erkannt: verwende „Link kopieren“ auf der Playlist-Datei",
+  "questo è il link di una cartella di Dropbox: condividi il file della playlist, non la cartella": "das ist der Link eines Dropbox-Ordners: teile die Playlist-Datei, nicht den Ordner",
+  "Google Drive non ha dato il file nemmeno dopo la conferma: scaricalo e caricalo da qui": "Google Drive hat die Datei auch nach der Bestätigung nicht geliefert: lade sie herunter und hier hoch",
+  "Dropbox non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Dropbox hat die Datei nicht geliefert: prüfe, ob sie für alle mit dem Link freigegeben ist",
+  "Google Drive non ha dato il file: controlla che sia condiviso con chiunque abbia il link": "Google Drive hat die Datei nicht geliefert: prüfe, ob sie für alle mit dem Link freigegeben ist"
 }
