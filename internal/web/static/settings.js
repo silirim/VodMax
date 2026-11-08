@@ -453,6 +453,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       e.preventDefault();
       save.disabled = true;
       try {
+        let id = existing && existing.id;
         if (existing) {
           const patch = { name: name.value, vpn_id: Number(vpn.value) };
           if (existing.kind === "xtream") Object.assign(patch, { server: server.value, username: user.value, password: pass.value });
@@ -465,8 +466,12 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
           if (kind.value === "xtream") Object.assign(body, { server: server.value, username: user.value, password: pass.value });
           else if (kind.value === "stalker") Object.assign(body, { server: portal.value, mac: mac.value });
           else body.url = url.value;
-          await api("POST", "/api/v1/subscriptions", body);
+          id = (await api("POST", "/api/v1/subscriptions", body)).id;
           flash(t("Abbonamento aggiunto: premi “Sincronizza ora” per scaricare il catalogo"));
+        }
+        // The server saves a get.php link with user and password as Xtream Codes.
+        if (kind.value === "m3u" && (await api("GET", "/api/v1/subscriptions").catch(() => [])).some((x) => x.id === id && x.kind === "xtream")) {
+          flash(t("Link Xtream Codes riconosciuto: uso server, utente e password del link"));
         }
         render();
       } catch (err) { flash(err.message); save.disabled = false; }

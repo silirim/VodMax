@@ -112,6 +112,8 @@ type localizer interface{ localized(lang string) string }
 // whole text is translated; otherwise the outermost translatable error of
 // the chain (input errors, errors with fields, known messages) has its
 // text replaced, and the rest (e.g. a "guida: " prefix) stays in Italian.
+// Errors built with fmt.Errorf ("playlist: risposta HTTP 884") are
+// translated as when they are saved and shown later (TranslateText).
 func Localize(lang string, err error) string {
 	msg := err.Error()
 	if f, ok := catalogs[lang][msg]; ok {
@@ -142,7 +144,7 @@ func Localize(lang string, err error) string {
 		}
 		return strings.Replace(msg, e.Error(), text, 1)
 	}
-	return msg
+	return TranslateText(lang, msg)
 }
 
 // Stored texts (a sync error, a rule's note, a recording's error) are

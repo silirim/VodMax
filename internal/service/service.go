@@ -319,6 +319,11 @@ func (s *Service) AddSubscription(ctx context.Context, in SubscriptionInput) (in
 	if err := s.checkSubscriptionVPN(ctx, in.VPNID); err != nil {
 		return 0, err
 	}
+	if in.Kind == "m3u" {
+		if server, user, pass, ok := xtreamLink(in.URL); ok {
+			in.Kind, in.Server, in.Username, in.Password, in.URL = "xtream", server, user, pass, ""
+		}
+	}
 	var settings any
 	var sec subscriptionSecret
 	switch in.Kind {
@@ -400,7 +405,7 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 			return err
 		}
 		settings, _ := json.Marshal(set)
-		return s.st.UpdateSubscription(ctx, id, p.Name, nil, settings, nil)
+		return s.st.UpdateSubscription(ctx, id, p.Name, nil, nil, settings, nil)
 	}
 	if p.VPNID != nil {
 		if err := s.checkSubscriptionVPN(ctx, *p.VPNID); err != nil {
@@ -415,6 +420,7 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 	json.Unmarshal(raw, &sec)
 	var settings json.RawMessage
 	var secret []byte
+	var kind *string
 	switch sub.Kind {
 	case "xtream":
 		var set xtreamSettings
@@ -446,6 +452,16 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 			sec.URL = u.String()
 			settings, _ = json.Marshal(map[string]string{"host": u.Hostname()})
 		}
+		// Saving converts an Xtream Codes link, new or stored, as adding does;
+		// a stored one only while its playlist fails, since the item ids and
+		// category choices of a working subscription change with the kind.
+		typed := p.URL != nil && *p.URL != ""
+		if server, user, pass, ok := xtreamLink(sec.URL); ok && (typed || sub.SyncStatus != "ok") {
+			kind = new(string)
+			*kind = "xtream"
+			settings, _ = json.Marshal(xtreamSettings{Server: server, Username: user})
+			sec = subscriptionSecret{Password: pass}
+		}
 	case "stalker":
 		var set xtreamSettings
 		json.Unmarshal(sub.Settings, &set)
@@ -472,7 +488,7 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 	}
 	rawSecret, _ := json.Marshal(sec)
 	secret = s.box.Seal(rawSecret, subOwner(id))
-	return s.st.UpdateSubscription(ctx, id, p.Name, p.VPNID, settings, secret)
+	return s.st.UpdateSubscription(ctx, id, p.Name, kind, p.VPNID, settings, secret)
 }
 
 // UpdateVPN renames a connection and/or replaces its configuration; a
@@ -692,6 +708,11 @@ func (s *Service) fetch(ctx context.Context, id int64) (*catalog.Snapshot, error
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
+			if _, _, _, ok := xtreamLink(sec.URL); ok {
+				// Some panels refuse get.php (HTTP 884) but answer player_api.php;
+				// the subscription is converted only when the person saves it.
+				return nil, fmt.Errorf("il provider non dà la playlist M3U (risposta HTTP %d): modifica l'abbonamento e salvalo, VodMax userà Xtream Codes con i dati del link", resp.StatusCode)
+			}
 			return nil, fmt.Errorf("playlist: risposta HTTP %d", resp.StatusCode)
 		}
 		p, err := m3u.Parse(io.LimitReader(resp.Body, 1<<30), m3u.DefaultLimits)
@@ -777,6 +798,24 @@ func (s *Service) BrowseCategories(ctx context.Context, kind string) ([]store.Br
 		return nil, invalid("tipo non valido")
 	}
 	return s.st.BrowseCategories(ctx, kind, viewerOf(ctx).Kids)
+}
+
+// xtreamLink reads an Xtream Codes playlist link
+// (http://host:port/get.php?username=…&password=…): the same panel answers
+// player_api.php with those credentials, and gives films, series, the guide
+// and the account state that a plain M3U lacks.
+func xtreamLink(raw string) (server, username, password string, ok bool) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", "", "", false
+	}
+	prefix, found := strings.CutSuffix(u.Path, "/get.php")
+	q := u.Query()
+	username, password = q.Get("username"), q.Get("password")
+	if !found || username == "" || password == "" {
+		return "", "", "", false
+	}
+	return (&url.URL{Scheme: u.Scheme, Host: u.Host, Path: prefix}).String(), username, password, true
 }
 
 // noCredentialsIn refuses a server address with a user name or password in
