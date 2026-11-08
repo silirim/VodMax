@@ -334,6 +334,19 @@ body.over-hero .top::after { opacity: 0; }
 .downloads .dl-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .dl-state { align-self: center; }
 @media (max-width: 700px) { .downloads li { flex-direction: column; align-items: stretch; } }
+/* "Su questo dispositivo": the app's copies (decision 0056). Its messages
+   are long (FAT32, a folder out of reach): they wrap. */
+#device-copies .copy-tools { margin: 0.6rem 0; }
+#device-copies .check { display: flex; align-items: center; gap: 0.6rem; margin: 0.6rem 0; color: var(--text); }
+#device-copies .check input { flex: none; width: 1.3rem; height: 1.3rem; accent-color: var(--accent); }
+#device-copies .check small { display: block; }
+#device-copies .warn { color: var(--bad); }
+.copies .dl-main span, .copies .dl-main small, #device-copies p { overflow-wrap: anywhere; word-break: break-word; }
+.copies .state.copying { color: var(--accent); }
+.copies .state.unreachable, .copies .state.expired, .copies .state.changed, .copies .state.fat32, .copies .state.space, .copies .state.folder { color: var(--bad); }
+/* The copy button next to Elimina; a long episode list scrolls. */
+@media (min-width: 801px) { .recs.with-copy .rec-actions { width: 22rem; } }
+.picker.choice { overflow-y: auto; }
 
 /* Phone: the poster above, the text below at full width; the episodes
    in a column, the cast in a row that scrolls. */

@@ -17,6 +17,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"mime"
 	"net"
 	"net/http"
 	"os"
@@ -97,6 +98,7 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	route("POST /api/v1/downloads/{id}/resume", levelMember, a.resumeDownload)
 	route("DELETE /api/v1/downloads/{id}", levelMember, a.deleteDownload)
 	route("GET /api/v1/settings/downloads", levelViewer, a.getDownloadSettings)
+	route("POST /api/v1/save/{media}/{id}", levelMember, a.saveLink)
 	route("PUT /api/v1/settings/downloads", levelAdmin, a.putDownloadSettings)
 	route("GET /api/v1/update", levelDevice, a.getUpdate)
 	route("POST /api/v1/update/check", levelAdmin, a.checkUpdate)
@@ -198,6 +200,8 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	mux.HandleFunc("GET /stream/vod/{session}/remux", a.vodRemux)
 	mux.HandleFunc("GET /stream/vod/{session}/subtitles", a.vodSubtitles)
 	mux.HandleFunc("GET /stream/recording/{ticket}", a.recordingStream)
+	// A copy on a device: the signed token is the permission (0056).
+	mux.HandleFunc("GET /stream/save/{token}", a.saveFile)
 	mux.Handle("/", web.Handler())
 	return withLang(mux)
 }
@@ -298,7 +302,8 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 		// Held by recordings: nobody can take it over (409 offers to).
 		status = http.StatusLocked
 	case errors.Is(err, store.ErrInUse), errors.Is(err, service.ErrBusy), errors.Is(err, store.ErrSuspiciousDrop),
-		errors.Is(err, service.ErrBusyRecording),
+		errors.Is(err, service.ErrBusyRecording), errors.Is(err, service.ErrNotOnServer), errors.Is(err, service.ErrConverting),
+		errors.Is(err, service.ErrNotVideo),
 		errors.As(err, new(service.ConnectionBusy)):
 		status = http.StatusConflict
 	case errors.Is(err, service.ErrTicket), errors.Is(err, service.ErrBadSignature), errors.Is(err, service.ErrSession),
@@ -309,7 +314,8 @@ func (a *api) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, service.ErrReplaced):
 		// The same player asked for something newer: this answer is stale.
 		status = http.StatusGone
-	case errors.Is(err, service.ErrPIN), errors.Is(err, service.ErrCurrentPIN), errors.Is(err, service.ErrForbidden):
+	case errors.Is(err, service.ErrPIN), errors.Is(err, service.ErrCurrentPIN), errors.Is(err, service.ErrForbidden),
+		errors.Is(err, service.ErrPairedOnly):
 		status = http.StatusForbidden
 	case errors.Is(err, service.ErrAdminPIN):
 		status = http.StatusBadRequest
@@ -1750,6 +1756,49 @@ func (a *api) downloadAction(w http.ResponseWriter, r *http.Request, do func(con
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// saveLink signs the link a device copies a film, an episode or a
+// recording of the server's disk with (0056).
+func (a *api) saveLink(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	link, err := a.svc.SaveLink(r.Context(), identity(r), r.PathValue("media"), id)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, link)
+}
+
+// saveFile serves the file of a copy, with ranges for resuming. Never
+// a.fail: it logs the path of a 500, and the path holds the token.
+func (a *api) saveFile(w http.ResponseWriter, r *http.Request) {
+	f, sf, err := a.svc.OpenSave(r.Context(), r.PathValue("token"))
+	if err != nil {
+		status := http.StatusInternalServerError
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			status = http.StatusNotFound
+		case errors.Is(err, service.ErrSaveChanged):
+			status = http.StatusGone
+		default:
+			a.log.Error("copia sul dispositivo non riuscita", "media", sf.Media, "id", sf.ID, "err", err)
+		}
+		http.Error(w, http.StatusText(status), status)
+		return
+	}
+	defer f.Close()
+	h := w.Header()
+	h.Set("Content-Type", sf.MIME)
+	h.Set("ETag", sf.ETag) // strong: ServeContent checks If-Range and If-Match with it
+	h.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": sf.Name}))
+	h.Set("Cache-Control", "private, no-store")
+	h.Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, "", sf.ModTime, f)
 }
 
 func (a *api) getDownloadSettings(w http.ResponseWriter, r *http.Request) {

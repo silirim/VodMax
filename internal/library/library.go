@@ -43,7 +43,9 @@ type Result struct {
 // Item source ids and episode source ids are slash-separated paths
 // relative to the collection's folder: Resolve turns them back into files.
 
-var videoExt = map[string]bool{"mkv": true, "mp4": true, "m4v": true, "avi": true, "mov": true, "wmv": true,
+// VideoExt are the video files of a collection; a device may copy the same
+// ones (decision 0056).
+var VideoExt = map[string]bool{"mkv": true, "mp4": true, "m4v": true, "avi": true, "mov": true, "wmv": true,
 	"ts": true, "m2ts": true, "mts": true, "webm": true, "mpg": true, "mpeg": true, "flv": true, "ogm": true, "divx": true}
 
 // Folders that hold extras, not the film or the episodes.
@@ -97,7 +99,7 @@ func videos(root, dir string) ([]string, int) {
 			}
 			return nil
 		}
-		if !videoExt[ext(name)] {
+		if !VideoExt[ext(name)] {
 			return nil
 		}
 		if sampleFile.MatchString(strings.TrimSuffix(name, filepath.Ext(name))) {

@@ -33,4 +33,9 @@
     <string name="next_in">in %1$d s</string>
     <string name="watch_now">Jetzt ansehen</string>
     <string name="cancel">Abbrechen</string>
+    <string name="copy_channel">Kopien auf diesem Gerät</string>
+    <string name="copy_wifi">Warten auf WLAN</string>
+    <string name="copy_network">Warten auf das Netzwerk</string>
+    <string name="copy_folder">Ordner nicht erreichbar: Steck den USB-Stick wieder ein oder wähle den Ordner erneut</string>
+    <string name="copy_app_folder">Auf dieser Box werden kopierte Dateien gelöscht, wenn du VodMax deinstallierst</string>
 </resources>

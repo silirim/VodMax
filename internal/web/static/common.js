@@ -1011,6 +1011,11 @@ window.VodMax = (() => {
   }
   // The Android app's native player (window.VodMaxNative), if present.
   const native = window.VodMaxNative || null;
+  // Copies onto this device (decision 0056), in apps with the methods for
+  // them. copyTarget(): "phone", "tv" with a USB stick or disk in, "" in
+  // the browser, on the LG TV, on a device running alone, in older apps.
+  const copier = native && ["copyTarget", "copy", "copies", "chooseFolder", "cancelCopy"].every((m) => typeof native[m] === "function") ? native : null;
+  const copyTarget = () => (copier ? String(copier.copyTarget() || "") : "");
 
-  return { look: window.VodMaxLook, holdKeyboard, countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, setAmbient, bottomNav, closeSheet, sheetOpen, label, channelArt, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
+  return { look: window.VodMaxLook, holdKeyboard, countryName, proposeCountry, native, copier, copyTarget, newerVersion, appUpdate, updateApp, setAmbient, bottomNav, closeSheet, sheetOpen, label, channelArt, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
 })();

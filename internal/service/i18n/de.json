@@ -318,5 +318,11 @@
   "Guida TV": "TV-Programm",
   "Leggo la cartella": "Ordner wird gelesen",
   "il provider si è fermato a metà risposta (nessun dato per un minuto)": "der Anbieter hat mitten in der Antwort aufgehört (eine Minute lang keine Daten)",
-  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "Die Synchronisierung von „%s“ wurde abgebrochen: Drücke „Jetzt synchronisieren“ unter Einstellungen → Abos"
+  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "Die Synchronisierung von „%s“ wurde abgebrochen: Drücke „Jetzt synchronisieren“ unter Einstellungen → Abos",
+  "non è ancora un file sul server: prima va scaricato sul server": "noch keine Datei auf dem Server: zuerst auf den Server herunterladen",
+  "in conversione, riprova tra poco": "wird umgewandelt, versuche es gleich erneut",
+  "questo file non è un video che si possa copiare": "diese Datei ist kein Video, das sich kopieren lässt",
+  "si copia su un dispositivo abbinato, non con il token di amministrazione": "kopiert wird auf ein gekoppeltes Gerät, nicht mit dem Administrator-Token",
+  "il file sul server è cambiato": "die Datei auf dem Server hat sich geändert",
+  "cosa copiare: movie, episode o recording": "was kopieren: movie, episode oder recording"
 }

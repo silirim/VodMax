@@ -3,7 +3,7 @@
 "use strict";
 
 (() => {
-  const { store, viewer, api, keyOf, clock, hhmm } = window.VodMax;
+  const { store, viewer, api, keyOf, clock, hhmm, copier, copyTarget } = window.VodMax;
   const t = window.VodMaxI18n.t;
   const locale = window.VodMaxI18n.locale;
   const $ = (id) => document.getElementById(id);
@@ -742,6 +742,7 @@
     const [list, space, who] = await Promise.all([api("GET", "/api/v1/recordings"), api("GET", "/api/v1/recordings/space"),
       window.VodMax.me().catch(() => null)]);
     const kids = who && who.profile && who.profile.kind === "kids";
+    const copyHere = !kids && copyTarget();
     const gb = (b) => b >= 1e9 ? (b / 1e9).toLocaleString(locale, { maximumFractionDigits: 1 }) + " GB"
       : Math.round(b / 1e6).toLocaleString(locale) + " MB"; // a short recording is not "0 GB"
     const day = (ts) => new Date(ts * 1000).toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
@@ -752,7 +753,7 @@
       "oppure registra dalla Guida, oppure crea una regola qui sotto."), ["calendar-days", t("Guida TV"), () => { location.href = "/guide.html"; }]));
     else {
       parts.push(el("p", { className: "empty" }, t("OK guarda · Giallo (P) protegge dalla cancellazione automatica · Rosso (Canc) elimina")));
-      parts.push(el("ol", { className: "recs" }, ...list.map((r) => {
+      parts.push(el("ol", { className: "recs" + (copyHere ? " with-copy" : "") }, ...list.map((r) => {
         const b = el("button", { className: "rec focusable" },
           el("span", {}, day(r.start) + " " + hhmm(r.start)),
           el("span", {}, el("strong", {}, r.title), " · " + r.channel, r.rule_id ? el("small", { className: "tag" }, " " + t("regola")) : null),
@@ -771,6 +772,7 @@
           stop.onclick = () => stopRecording(r.id);
           actions.push(stop);
         }
+        if (copyHere && r.status === "completed") actions.push(copyButton("small", () => copyFiles([["recording", r.id, r.title + " · " + r.channel]])));
         if (!kids) {
           const del = el("button", { className: "focusable small danger" });
           window.VodMax.label(del, r.status === "scheduled" ? "x" : "trash", r.status === "scheduled" ? t("Annulla") : t("Elimina"));
@@ -816,8 +818,9 @@
     const dl = await downloadList(true);
     if (my !== renderSeq) return;
     if (!dl) { main.replaceChildren(el("p", { className: "empty" }, t("I download non sono disponibili su questo dispositivo."))); return; }
-    main.replaceChildren(downloadsSection(dl));
+    main.replaceChildren(downloadsSection(dl), deviceSection() || "");
     watchDownloads(dl);
+    watchCopies();
   }
   // The Download tab appears where downloads exist (not for kids).
   function showDownloadsTab() {
@@ -836,6 +839,7 @@
         "senza togliere la connessione a chi guarda, e lo trovi nelle raccolte «Scaricati»."), ["film", t("Vai ai film"), goView("movie")]));
       return box;
     }
+    const copyHere = copyTarget();
     box.append(el("ol", { className: "downloads" }, ...list.map((d) => {
       const pct = d.total ? Math.min(100, (d.bytes / d.total) * 100) : 0;
       const size = d.total ? gb(d.bytes) + " / " + gb(d.total) : d.bytes ? gb(d.bytes) : "";
@@ -854,6 +858,7 @@
       };
       if (d.status === "downloading" || d.status === "queued") act(t("Pausa"), "POST", "/api/v1/downloads/" + d.id + "/pause");
       if (d.status === "paused" || d.status === "failed") act(t("Riprendi"), "POST", "/api/v1/downloads/" + d.id + "/resume");
+      if (copyHere && d.status === "done") buttons.append(copyButton("small", () => copyFiles([[d.media, d.media_id, d.title]])));
       act(t("Elimina"), "DELETE", "/api/v1/downloads/" + d.id);
       row.append(buttons);
       return row;
@@ -1106,7 +1111,8 @@
       return el("li", {}, face, el("strong", {}, p.name), p.role ? el("span", {}, p.role) : null);
     }));
     $("cast").hidden = !people.length;
-    if (!d.local && item.kind === "movie") addDownloadButtons(item);
+    if (d.local && item.kind === "movie") addCopyButton(item, [["movie", item.id, item.display_title]]);
+    else if (item.kind === "movie") addDownloadButtons(item);
     if (d.trailer) {
       const a = el("a", { className: "button focusable trailer", href: "https://www.youtube.com/watch?v=" + encodeURIComponent(d.trailer),
         target: "_blank", rel: "noopener noreferrer" });
@@ -1147,22 +1153,25 @@
   }
 
   // ---- Downloads to the server's disk ----
-  // The list is read once per page to know whether downloads exist here
-  // (not on a device running alone) and what is already downloaded.
+  // The list says whether downloads exist here (not on a device running
+  // alone) and what is already downloaded; a title page reads it fresh, so
+  // a download finished meanwhile shows its copy button.
   let downloads = null;
   async function downloadList(fresh) {
     if (!downloads || fresh) downloads = await api("GET", "/api/v1/downloads").catch(() => false);
     return downloads;
   }
   const dlState = { queued: t("In coda"), downloading: t("In download"), paused: t("In pausa"), done: t("Scaricato"), failed: t("Non riuscito") };
-  async function addDownloadButtons(item, season) {
+  async function addDownloadButtons(item, season, eps) {
     const who = await window.VodMax.me().catch(() => null);
-    const list = await downloadList();
+    const list = await downloadList(true);
     if (!list || state.detail !== item || (who && who.profile && who.profile.kind === "kids")) return;
     if (item.kind === "series") {
       // A series of a collection is already on disk.
       const d = await api("GET", "/api/v1/items/" + item.id + "/details").catch(() => ({}));
-      if (d.local || state.detail !== item) return;
+      if (state.detail !== item) return;
+      addCopyButton(item, (eps || []).filter((e) => d.local || list.some((x) => x.media === "episode" && x.media_id === e.id && x.status === "done")));
+      if (d.local) return;
     }
     const actions = $("detail-actions");
     const add = (label, body) => {
@@ -1183,11 +1192,157 @@
       if (d) {
         const s = el("span", { className: "empty dl-state" }, "⬇ " + (dlState[d.status] || d.status));
         actions.insertBefore(s, actions.querySelector(".trailer"));
+        if (d.status === "done") addCopyButton(item, [["movie", item.id, item.display_title]]);
       } else add(t("Scarica"), { media: "movie", id: item.id });
     } else {
       if (season) add(t("Scarica la stagione {n}", { n: season }), { media: "season", id: item.id, season });
       add(t("Scarica la serie"), { media: "series", id: item.id });
     }
+  }
+
+  // ---- Copies onto this device (decision 0056) ----
+  // The Android app copies a file of the server's disk onto the phone or a
+  // USB stick: the provider gets no request. No trace where it cannot.
+  const copyCode = {
+    "": t("Copia avviata: l'avanzamento è in Download"), already: t("Già copiato"), copying: t("Già in copia"),
+    space: t("Spazio insufficiente nella cartella"), folder: t("Nessuna cartella scelta: copia non avviata"),
+    permission: t("Permesso negato: copia non avviata"), invalid: t("Copia non possibile"),
+  };
+  const copyState = {
+    queued: t("In coda"), copying: t("In copia"), wifi: t("In attesa del Wi-Fi"), network: t("In attesa della rete"),
+    folder: t("Cartella non raggiungibile: ricollega la chiavetta o scegli di nuovo la cartella"),
+    paused: t("In pausa: riprende quando riapri VodMax"), done: t("Copiato"), unreachable: t("Server non raggiungibile da qui"),
+    expired: t("Link scaduto o non più valido"), changed: t("Il file sul server è cambiato"),
+    fat32: t("Oltre 4 GB: la chiavetta è in FAT32. Su Fire TV serve NTFS su un Cube 3; altrove exFAT"),
+    space: t("Spazio insufficiente"), failed: t("Non riuscita"),
+  };
+  const copyLabel = () => (copyTarget() === "tv" ? t("Su USB") : t("Sul telefono"));
+  function copyButton(className, onclick) {
+    const b = el("button", { className: className + " focusable copy" });
+    window.VodMax.label(b, copyTarget() === "tv" ? "usb" : "smartphone", copyLabel());
+    b.onclick = onclick;
+    return b;
+  }
+  // A folder choice or a permission request opened by copy(): the app
+  // tells how it ended (as VodMaxSaveDone).
+  let copyWait = null, copyBusy = false;
+  window.VodMaxCopyDone = (code) => { const w = copyWait; copyWait = null; if (w) w(String(code || "")); };
+  // One file: the server signs a link to it (409 when not on its disk),
+  // the app copies it; only the signed link goes, no cookie or token.
+  async function copyOne([media, id, title]) {
+    const link = await api("POST", "/api/v1/save/" + media + "/" + id);
+    const code = String(copier.copy(JSON.stringify({ ...link, title })) || "");
+    return code === "folder" || code === "permission" ? new Promise((resolve) => { copyWait = resolve; }) : code;
+  }
+  // Files one at a time, in order ("Tutta la stagione"); what stops one
+  // (no space, no folder) stops the rest.
+  async function copyFiles(list) {
+    if (copyBusy) return;
+    copyBusy = true;
+    const n = { "": 0, already: 0, copying: 0 };
+    let code = "", error = "";
+    try {
+      for (const one of list) {
+        code = await copyOne(one);
+        if (!(code in n)) break;
+        n[code]++;
+      }
+    } catch (e) { error = e.message || copyCode.invalid; } finally { copyBusy = false; } // the copies started still get said
+    const stop = error || (code in n ? "" : copyCode[code] || copyCode.invalid);
+    flash(list.length === 1 ? error || copyCode[code] || copyCode.invalid
+      : [n[""] ? t("Copie avviate: {n}", { n: n[""] }) : "", n.already ? t("già copiati: {n}", { n: n.already }) : "",
+        n.copying ? t("già in copia: {n}", { n: n.copying }) : "", stop].filter(Boolean).join(" · "));
+  }
+  // "Sul telefono" / "Su USB" on a detail page: a film on the server's
+  // disk, or a choice among the episodes there.
+  async function addCopyButton(item, ready) {
+    if (!copyTarget() || !ready.length) return;
+    const who = await window.VodMax.me().catch(() => null);
+    const actions = $("detail-actions");
+    if (state.detail !== item || (who && who.profile && who.profile.kind === "kids") || actions.querySelector(".copy")) return;
+    actions.insertBefore(copyButton("button", () => (item.kind === "movie" ? copyFiles(ready) : chooseEpisodes(item, ready))), actions.querySelector(".trailer"));
+  }
+  // The season on show (else the first with episodes on the server): all
+  // of it, or one episode. The episode cards stay as they are.
+  async function chooseEpisodes(item, ready) {
+    const chip = $("seasons").querySelector(".chip.active");
+    const shown = chip ? Number(chip.dataset.season) : 0;
+    const season = ready.some((e) => e.season === shown) ? shown : ready[0].season;
+    const eps = ready.filter((e) => e.season === season);
+    const one = (e) => ["episode", e.id, item.display_title + " · S" + e.season + "E" + e.number + (e.title ? " " + e.title : "")];
+    const pick = await choose(copyLabel() + " · " + t("Stagione {n}", { n: season }),
+      [...(eps.length > 1 ? [["all", t("Tutta la stagione {n}", { n: season }), "layers"]] : []),
+        ...eps.map((e) => [e, "E" + e.number + (e.title ? " · " + e.title : "")])]);
+    if (pick) copyFiles(pick === "all" ? eps.map(one) : [one(pick)]);
+  }
+
+  // "Su questo dispositivo" on the Download page: the folder, mobile data
+  // and the app's copies. Hidden (not missing) with nothing to show, so it
+  // appears when a stick goes in; none at all without a copier.
+  function deviceSection() {
+    if (!copier) return null;
+    const target = copyTarget();
+    let raw = "", info = {};
+    try { raw = String(copier.copies() || ""); info = JSON.parse(raw); } catch { /* an empty section */ }
+    const list = info.copies || [];
+    const box = el("section", { id: "device-copies", hidden: !target && !list.length }, el("h2", { className: "page-title" }, t("Su questo dispositivo")));
+    box.dataset.raw = target + raw;
+    if (target) {
+      box.append(el("p", { className: "empty" }, info.folder ? t("Cartella: {folder}", { folder: info.folder }) : t("Nessuna cartella: si sceglie alla prima copia")));
+      if (info.kind === "app") box.append(el("p", { className: "empty warn" }, t("Su questo box i file copiati si cancellano se disinstalli VodMax")));
+      const tools = el("div", { className: "dl-buttons copy-tools" });
+      const tool = (icon, text, onclick) => { const b = el("button", { className: "focusable small" }); window.VodMax.label(b, icon, text); b.onclick = onclick; tools.append(b); };
+      tool("folder", t("Scegli cartella"), () => copier.chooseFolder(false));
+      if (target === "phone" && info.kind !== "movies") tool("smartphone", t("Usa Movies/VodMax"), () => { copier.chooseFolder(true); redrawCopies(); });
+      box.append(tools);
+      if (typeof copier.copyMobile === "function") {
+        const mobile = el("input", { className: "focusable", type: "checkbox", checked: Boolean(info.mobile) });
+        mobile.onchange = () => copier.copyMobile(mobile.checked);
+        box.append(el("label", { className: "check copy-mobile" }, mobile,
+          el("span", {}, t("Copia anche su rete mobile"), el("small", { className: "empty" }, t("Di base solo Wi-Fi o cavo, mai in roaming")))));
+      }
+    }
+    const gb = (b) => b >= 1e9 ? (b / 1e9).toLocaleString(locale, { maximumFractionDigits: 2 }) + " GB" : Math.round(b / 1e6).toLocaleString(locale) + " MB";
+    if (!list.length) {
+      box.append(el("p", { className: "empty" }, t("Nessuna copia. Su un film, un episodio o una registrazione già sul server premi «{button}».", { button: copyLabel() })));
+      return box;
+    }
+    box.append(el("ol", { className: "downloads copies" }, ...list.map((c) => {
+      const going = !c.finished;
+      const row = el("li", {}, el("div", { className: "dl-main" }, el("strong", {}, c.title || c.name),
+        el("span", { className: "state " + c.state }, (copyState[c.state] || c.state) + (going && c.size ? " · " + (c.percent || 0) + "% · " + gb(c.done || 0) + " / " + gb(c.size) : "")),
+        c.name ? el("small", { className: "empty" }, c.name) : null,
+        going ? el("span", { className: "bar" }, el("div", { style: "width:" + Math.min(100, c.percent || 0) + "%" })) : null));
+      const b = el("button", { className: "focusable small" + (going ? " danger" : "") });
+      window.VodMax.label(b, going ? "x" : "check", going ? t("Annulla") : t("Togli"));
+      b.onclick = () => {
+        if (going && !confirm(t("Annullare la copia di “{title}”? Il pezzo già copiato si cancella.", { title: c.title || c.name }))) return;
+        copier.cancelCopy(String(c.id));
+        if (!going) flash(t("Riga tolta: il file copiato resta"));
+        redrawCopies();
+      };
+      row.append(el("div", { className: "dl-buttons" }, b));
+      return row;
+    })));
+    return box;
+  }
+  // Redrawn in place when something changed; the focus (remote) stays.
+  function redrawCopies() {
+    const old = $("device-copies"), next = deviceSection();
+    if (!old || !next || next.dataset.raw === old.dataset.raw) return;
+    const at = [...old.querySelectorAll(".focusable")].indexOf(document.activeElement);
+    old.replaceWith(next);
+    const again = next.querySelectorAll(".focusable");
+    if (at >= 0 && again.length) again[Math.min(at, again.length - 1)].focus({ preventScroll: true });
+  }
+  let copyTimer;
+  function watchCopies() {
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
+      if (state.view !== "downloads" || !$("device-copies")) return;
+      redrawCopies();
+      watchCopies();
+    }, 2000);
   }
 
   async function openDetail(item) {
@@ -1317,7 +1472,7 @@
       $("detail-actions").prepend(go);
       showSeason(next.season);
     }
-    addDownloadButtons(item, next ? next.season : 0);
+    addDownloadButtons(item, next ? next.season : 0, eps);
     focusFirst($("detail-actions"));
   }
 

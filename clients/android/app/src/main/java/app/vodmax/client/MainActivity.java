@@ -2,10 +2,13 @@ package app.vodmax.client;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -30,6 +33,7 @@ import android.widget.FrameLayout;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.net.HttpURLConnection;
@@ -45,13 +49,17 @@ import java.util.Locale;
  * this device alone (LocalServer).
  */
 public class MainActivity extends Activity {
-    private static final String PREFS = "vodmax";
+    static final String PREFS = "vodmax";
     private static final String KEY_SERVER = "server";
     private static final String KEY_LOCAL = "local";
     private static final String KEY_LOCAL_TOKEN = "localToken";
     private static final int PLAY = 1;
     private static final int PICK = 2;
     private static final int SAVE = 3;
+    private static final int FOLDER = 4;
+    private static final int WRITE_PERMISSION = 5;
+    private static final int NOTIFY_PERMISSION = 6;
+    private static final String KEY_ASKED_NOTIFY = "copyAskedNotifications";
 
     private WebView web;
     private String server;
@@ -60,6 +68,8 @@ public class MainActivity extends Activity {
     // and one it is saving (backup).
     private ValueCallback<Uri[]> picking;
     private byte[] saving;
+    // A copy waiting for the folder choice or the storage permission.
+    private volatile CopyService.Copy pendingCopy;
     private boolean signingIn;
     // A page of the server did not load: trying again before giving up.
     private boolean reconnecting;
@@ -517,6 +527,74 @@ public class MainActivity extends Activity {
             });
         }
 
+        /** Copies to this device (0056): "phone", "tv" with a stick or disk in, else "". */
+        @JavascriptInterface
+        public String copyTarget() {
+            return MainActivity.this.copyTarget();
+        }
+
+        /**
+         * {url, name, mime, size, etag, title} from POST /api/v1/save/…:
+         * "" (queued), "folder" or "permission" (a choice is open: the outcome
+         * comes to window.VodMaxCopyDone(code)), "space", "already",
+         * "copying", "invalid".
+         */
+        @JavascriptInterface
+        public String copy(String json) {
+            CopyService.Copy c = null;
+            try {
+                JSONObject o = new JSONObject(json);
+                c = CopyService.fromPage(server, o.optString("url"), o.optString("name"), o.optString("mime"),
+                    o.optLong("size"), o.optString("etag"), o.optString("title"));
+            } catch (Exception ignored) {
+            }
+            if (c == null || copyTarget().isEmpty()) return "invalid";
+            return place(c);
+        }
+
+        /** The folder picker; true: back to Movies/VodMax (phone). */
+        @JavascriptInterface
+        public void chooseFolder(boolean reset) {
+            runOnUiThread(() -> {
+                if (!reset) pickFolder();
+                else if (!tvDevice()) prefs().edit().remove(CopyService.KEY_FOLDER).apply();
+            });
+        }
+
+        /** "Copia anche su rete mobile", for this device. */
+        @JavascriptInterface
+        public void copyMobile(boolean on) {
+            prefs().edit().putBoolean(CopyService.KEY_MOBILE, on).apply();
+        }
+
+        /**
+         * {folder, kind ("movies", "tree", "app", "" none yet), mobile,
+         * copies: [{id, title, name, size, done, percent, state, finished}]}.
+         */
+        @JavascriptInterface
+        public String copies() {
+            try {
+                String folder = copyFolder();
+                JSONArray list = new JSONArray();
+                for (CopyService.Copy c : CopyService.snapshot(MainActivity.this)) {
+                    list.put(new JSONObject().put("id", c.id).put("title", c.title).put("name", c.name).put("size", c.size)
+                        .put("done", c.done).put("percent", (int) (c.done * 100 / Math.max(1, c.size))).put("state", c.state)
+                        .put("finished", CopyService.finished(c.state)));
+                }
+                String kind = folder.isEmpty() || folder.equals(CopyService.MOVIES) || folder.equals(CopyService.APP) ? folder : "tree";
+                return new JSONObject().put("folder", CopyService.folderName(MainActivity.this, folder)).put("kind", kind)
+                    .put("mobile", prefs().getBoolean(CopyService.KEY_MOBILE, false)).put("copies", list).toString();
+            } catch (Exception e) {
+                return "{\"folder\":\"\",\"kind\":\"\",\"mobile\":false,\"copies\":[]}";
+            }
+        }
+
+        /** Annulla a copy not finished (its piece is deleted), or Togli a finished one. */
+        @JavascriptInterface
+        public void cancelCopy(String id) {
+            CopyService.cancel(MainActivity.this, id);
+        }
+
         @JavascriptInterface
         public void changeServer() {
             runOnUiThread(() -> showSetup(null));
@@ -525,6 +603,100 @@ public class MainActivity extends Activity {
 
     private void page(String js) {
         if (web != null) web.evaluateJavascript(js, null);
+    }
+
+    // ---- Copies to this device (CopyService) ----
+
+    private boolean tvDevice() {
+        return PlayerActivity.tv(this) || getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK);
+    }
+
+    private String copyTarget() {
+        if (prefs().getBoolean(KEY_LOCAL, false)) return ""; // this device alone: its files are already here
+        if (!tvDevice()) return "phone";
+        return CopyService.removable(this) ? "tv" : "";
+    }
+
+    /** The folder in use: Movies/VodMax by default on the phone, none on a TV. */
+    private String copyFolder() {
+        String f = prefs().getString(CopyService.KEY_FOLDER, "");
+        return f.isEmpty() && !tvDevice() ? CopyService.MOVIES : f;
+    }
+
+    /** Queues c, or opens what it needs first (any thread). */
+    private String place(CopyService.Copy c) {
+        String folder = copyFolder();
+        if (folder.isEmpty()) {
+            pendingCopy = c;
+            runOnUiThread(this::pickFolder);
+            return "folder";
+        }
+        if (folder.equals(CopyService.MOVIES) && Build.VERSION.SDK_INT < 29
+            && checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            pendingCopy = c;
+            runOnUiThread(() -> requestPermissions(new String[] {android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, WRITE_PERMISSION));
+            return "permission";
+        }
+        c.folder = folder;
+        String code = CopyService.add(this, c);
+        if (code.isEmpty()) runOnUiThread(() -> {
+            CopyService.resume(this); // copies paused earlier go first
+            if (Build.VERSION.SDK_INT >= 33 && !prefs().getBoolean(KEY_ASKED_NOTIFY, false)
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                prefs().edit().putBoolean(KEY_ASKED_NOTIFY, true).apply();
+                requestPermissions(new String[] {android.Manifest.permission.POST_NOTIFICATIONS}, NOTIFY_PERMISSION);
+            }
+        });
+        return code;
+    }
+
+    /** After the choice: the pending copy goes on, and the page hears how. */
+    private void placePending() {
+        CopyService.Copy c = pendingCopy;
+        pendingCopy = null;
+        if (c == null) return;
+        new Thread(() -> {
+            String code = place(c);
+            if (!code.equals("folder") && !code.equals("permission")) runOnUiThread(() -> copyDone(code));
+        }).start();
+    }
+
+    /** The outcome of a copy that waited for a choice; "folder"/"permission" when refused. */
+    private void copyDone(String code) {
+        page("window.VodMaxCopyDone && window.VodMaxCopyDone(" + JSONObject.quote(code) + ")");
+    }
+
+    /**
+     * Android's folder picker. Missing on some boxes (Fire OS 7, Android TV
+     * with only Google's stub): the app's folder on the stick, after saying
+     * that uninstalling VodMax deletes it.
+     */
+    private void pickFolder() {
+        ResolveInfo r = getPackageManager().resolveActivity(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), 0);
+        if (r != null && r.activityInfo != null && !r.activityInfo.packageName.equals("com.google.android.tv.frameworkpackagestubs")) {
+            try {
+                startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), FOLDER);
+                return;
+            } catch (Exception ignored) {
+            }
+        }
+        if (!tvDevice()) {
+            if (pendingCopy != null) copyDone("folder");
+            pendingCopy = null;
+            return;
+        }
+        new AlertDialog.Builder(this).setMessage(R.string.copy_app_folder)
+            .setPositiveButton(android.R.string.ok, (d, w) -> {
+                prefs().edit().putString(CopyService.KEY_FOLDER, CopyService.APP).apply();
+                placePending();
+            })
+            .setNegativeButton(R.string.cancel, null)
+            .setOnDismissListener(d -> {
+                if (pendingCopy == null) return;
+                pendingCopy = null;
+                copyDone("folder");
+            })
+            .show();
     }
 
     private void updatePip(boolean playing, int width, int height) {
@@ -564,6 +736,26 @@ public class MainActivity extends Activity {
         if (request == PICK) {
             if (picking != null) picking.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
             picking = null;
+            return;
+        }
+        if (request == FOLDER) {
+            Uri tree = result == RESULT_OK && data != null ? data.getData() : null;
+            try {
+                // shortcut: earlier folders keep their permission (queued copies may use them); release them if the 128-grant limit bites.
+                if (tree != null) getContentResolver().takePersistableUriPermission(tree,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            } catch (SecurityException e) {
+                tree = null;
+            }
+            if (tree == null) {
+                if (pendingCopy != null) copyDone("folder");
+                pendingCopy = null;
+                return;
+            }
+            String folder = tree.toString();
+            prefs().edit().putString(CopyService.KEY_FOLDER, folder).apply();
+            new Thread(() -> CopyService.moveWaiting(this, folder)).start();
+            placePending();
             return;
         }
         if (request == SAVE) {
@@ -627,11 +819,23 @@ public class MainActivity extends Activity {
         return super.onKeyDown(keyCode, event);
     }
 
+    @Override
+    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        if (request != WRITE_PERMISSION || pendingCopy == null) return;
+        if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) placePending();
+        else {
+            pendingCopy = null;
+            copyDone("permission");
+        }
+    }
+
     // Android may stop the server while the app is in the background.
     @Override
     protected void onResume() {
         super.onResume();
         updater.resume();
+        CopyService.resume(this); // copies stopped with the app, or paused, go on
         if (!prefs().getBoolean(KEY_LOCAL, false) || web == null) return;
         new Thread(() -> {
             if (!LocalServer.ours()) runOnUiThread(this::openLocal);

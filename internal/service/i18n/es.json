@@ -318,5 +318,11 @@
   "Guida TV": "Guía de TV",
   "Leggo la cartella": "Leyendo la carpeta",
   "il provider si è fermato a metà risposta (nessun dato per un minuto)": "el proveedor se detuvo a mitad de la respuesta (sin datos durante un minuto)",
-  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "La sincronización de «%s» se interrumpió: pulsa “Sincronizar ahora” en Ajustes → Suscripciones"
+  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "La sincronización de «%s» se interrumpió: pulsa “Sincronizar ahora” en Ajustes → Suscripciones",
+  "non è ancora un file sul server: prima va scaricato sul server": "todavía no es un archivo del servidor: primero hay que descargarlo en el servidor",
+  "in conversione, riprova tra poco": "en conversión, inténtalo de nuevo en un momento",
+  "questo file non è un video che si possa copiare": "este archivo no es un vídeo que se pueda copiar",
+  "si copia su un dispositivo abbinato, non con il token di amministrazione": "se copia en un dispositivo vinculado, no con el token de administración",
+  "il file sul server è cambiato": "el archivo del servidor ha cambiado",
+  "cosa copiare: movie, episode o recording": "qué copiar: movie, episode o recording"
 }

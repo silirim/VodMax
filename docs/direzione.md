@@ -82,6 +82,10 @@ uno, la proposta cambia.
   dietro un tunnel o un reverse proxy con login, anche dall'app Android
   ([0040](decisioni/0040-fuori-casa-dietro-un-login.md)). VodMax non apre
   porte su internet.
+- **Senza rete, fuori casa** ([0056](decisioni/0056-download-sul-telefono-e-usb.md)):
+  un film, degli episodi o una registrazione già sul server si copiano
+  dall'app Android sul telefono o, da un Fire TV o un box Android TV, su una
+  chiavetta USB; si guardano poi con VLC, la Galleria o il lettore della TV.
 
 ### In famiglia
 

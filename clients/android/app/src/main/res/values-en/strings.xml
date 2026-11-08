@@ -33,4 +33,9 @@
     <string name="next_in">in %1$d s</string>
     <string name="watch_now">Watch now</string>
     <string name="cancel">Cancel</string>
+    <string name="copy_channel">Copies on this device</string>
+    <string name="copy_wifi">Waiting for Wi-Fi</string>
+    <string name="copy_network">Waiting for the network</string>
+    <string name="copy_folder">Folder not reachable: plug the USB stick back in or choose the folder again</string>
+    <string name="copy_app_folder">On this box, copied files are deleted if you uninstall VodMax</string>
 </resources>

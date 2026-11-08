@@ -33,4 +33,9 @@
     <string name="next_in">dans %1$d s</string>
     <string name="watch_now">Regarder maintenant</string>
     <string name="cancel">Annuler</string>
+    <string name="copy_channel">Copies sur cet appareil</string>
+    <string name="copy_wifi">En attente du Wi-Fi</string>
+    <string name="copy_network">En attente du réseau</string>
+    <string name="copy_folder">Dossier inaccessible : rebranchez la clé USB ou choisissez à nouveau le dossier</string>
+    <string name="copy_app_folder">Sur ce boîtier, les fichiers copiés sont supprimés si vous désinstallez VodMax</string>
 </resources>

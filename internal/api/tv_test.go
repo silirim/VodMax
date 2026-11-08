@@ -35,6 +35,7 @@ type tvProvider struct {
 	// JSON; detailHits counts the requests.
 	detailsDown, badSeries bool
 	detailHits             int
+	requests               int // all of them
 }
 
 // fakeFilm is the content served for films and episodes.
@@ -50,6 +51,9 @@ var fakeFilm = func() []byte {
 func newTVProvider() *tvProvider {
 	p := &tvProvider{logoHits: map[string]int{}}
 	p.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p.mu.Lock()
+		p.requests++
+		p.mu.Unlock()
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/logo/"):
 			p.mu.Lock()

@@ -184,7 +184,7 @@ func countVideos(root, dir string) int {
 	}
 	n := 0
 	for _, e := range entries {
-		if !e.IsDir() && videoExt[ext(e.Name())] && !sampleFile.MatchString(strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))) {
+		if !e.IsDir() && VideoExt[ext(e.Name())] && !sampleFile.MatchString(strings.TrimSuffix(e.Name(), filepath.Ext(e.Name()))) {
 			n++
 		}
 	}

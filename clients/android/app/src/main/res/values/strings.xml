@@ -33,4 +33,9 @@
     <string name="next_in">tra %1$d s</string>
     <string name="watch_now">Guarda ora</string>
     <string name="cancel">Annulla</string>
+    <string name="copy_channel">Copie su questo dispositivo</string>
+    <string name="copy_wifi">In attesa del Wi-Fi</string>
+    <string name="copy_network">In attesa della rete</string>
+    <string name="copy_folder">Cartella non raggiungibile: ricollega la chiavetta o scegli di nuovo la cartella</string>
+    <string name="copy_app_folder">Su questo box i file copiati si cancellano se disinstalli VodMax</string>
 </resources>

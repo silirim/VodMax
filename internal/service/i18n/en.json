@@ -318,5 +318,11 @@
   "Guida TV": "TV guide",
   "Leggo la cartella": "Reading the folder",
   "il provider si è fermato a metà risposta (nessun dato per un minuto)": "the provider stopped in the middle of its answer (no data for a minute)",
-  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "The sync of “%s” stopped before the end: press “Sync now” in Settings → Subscriptions"
+  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "The sync of “%s” stopped before the end: press “Sync now” in Settings → Subscriptions",
+  "non è ancora un file sul server: prima va scaricato sul server": "not on the server yet: download it to the server first",
+  "in conversione, riprova tra poco": "converting, try again shortly",
+  "questo file non è un video che si possa copiare": "this file is not a video that can be copied",
+  "si copia su un dispositivo abbinato, non con il token di amministrazione": "copies go to a paired device, not with the admin token",
+  "il file sul server è cambiato": "the file on the server has changed",
+  "cosa copiare: movie, episode o recording": "what to copy: movie, episode or recording"
 }

@@ -318,5 +318,11 @@
   "Guida TV": "Guida TV",
   "Leggo la cartella": "Leggo la cartella",
   "il provider si è fermato a metà risposta (nessun dato per un minuto)": "il provider si è fermato a metà risposta (nessun dato per un minuto)",
-  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti"
+  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti",
+  "non è ancora un file sul server: prima va scaricato sul server": "non è ancora un file sul server: prima va scaricato sul server",
+  "in conversione, riprova tra poco": "in conversione, riprova tra poco",
+  "questo file non è un video che si possa copiare": "questo file non è un video che si possa copiare",
+  "si copia su un dispositivo abbinato, non con il token di amministrazione": "si copia su un dispositivo abbinato, non con il token di amministrazione",
+  "il file sul server è cambiato": "il file sul server è cambiato",
+  "cosa copiare: movie, episode o recording": "cosa copiare: movie, episode o recording"
 }

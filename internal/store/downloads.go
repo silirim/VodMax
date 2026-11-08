@@ -96,6 +96,15 @@ func (s *Store) Download(ctx context.Context, id int64) (Download, error) {
 	return d, err
 }
 
+// DownloadOf is the download of a film or an episode (one at most).
+func (s *Store) DownloadOf(ctx context.Context, media string, mediaID int64) (Download, error) {
+	d, err := scanDownload(s.r.QueryRowContext(ctx, `SELECT `+downloadColumns+` FROM download WHERE media = ? AND media_id = ?`, media, mediaID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return d, ErrNotFound
+	}
+	return d, err
+}
+
 // NextDownload is the oldest queued download, except the ids in skip.
 func (s *Store) NextDownload(ctx context.Context, skip map[int64]bool) (Download, bool, error) {
 	rows, err := s.r.QueryContext(ctx, `SELECT `+downloadColumns+` FROM download WHERE status = 'queued' ORDER BY id`)

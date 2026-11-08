@@ -318,5 +318,11 @@
   "Guida TV": "Program TV",
   "Leggo la cartella": "Odczytywanie folderu",
   "il provider si è fermato a metà risposta (nessun dato per un minuto)": "dostawca zatrzymał się w połowie odpowiedzi (brak danych przez minutę)",
-  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "Synchronizacja „%s” została przerwana: naciśnij „Synchronizuj teraz” w Ustawienia → Subskrypcje"
+  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "Synchronizacja „%s” została przerwana: naciśnij „Synchronizuj teraz” w Ustawienia → Subskrypcje",
+  "non è ancora un file sul server: prima va scaricato sul server": "to jeszcze nie jest plik na serwerze: najpierw pobierz go na serwer",
+  "in conversione, riprova tra poco": "trwa konwersja, spróbuj za chwilę",
+  "questo file non è un video che si possa copiare": "ten plik nie jest wideo, które można skopiować",
+  "si copia su un dispositivo abbinato, non con il token di amministrazione": "kopiuje się na sparowane urządzenie, nie tokenem administratora",
+  "il file sul server è cambiato": "plik na serwerze się zmienił",
+  "cosa copiare: movie, episode o recording": "co skopiować: movie, episode lub recording"
 }

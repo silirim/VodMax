@@ -4,6 +4,20 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Updates from the project's releases (the user confirms each one). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Copies of the server's files to this device (CopyService, 0056). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Movies/VodMax on Android 7-9; from 10 MediaStore needs nothing. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+
+    <!-- Is there a folder picker (some TV boxes have none, or a stub)? -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT_TREE" />
+        </intent>
+    </queries>
 
     <!-- One APK for phones and Android TV. -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -11,6 +25,7 @@
 
     <application
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:banner="@drawable/banner"
         android:icon="@mipmap/ic_launcher"
         android:label="VodMax"
@@ -44,5 +59,10 @@
             android:exported="false"
             android:supportsPictureInPicture="true"
             android:theme="@style/VodMax.Player" />
+
+        <service
+            android:name=".CopyService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

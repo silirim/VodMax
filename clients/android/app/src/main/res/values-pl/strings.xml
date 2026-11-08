@@ -33,4 +33,9 @@
     <string name="next_in">za %1$d s</string>
     <string name="watch_now">Oglądaj teraz</string>
     <string name="cancel">Anuluj</string>
+    <string name="copy_channel">Kopie na tym urządzeniu</string>
+    <string name="copy_wifi">Oczekiwanie na Wi-Fi</string>
+    <string name="copy_network">Oczekiwanie na sieć</string>
+    <string name="copy_folder">Folder niedostępny: podłącz ponownie pendrive lub wybierz folder jeszcze raz</string>
+    <string name="copy_app_folder">Na tym urządzeniu skopiowane pliki zostaną usunięte, jeśli odinstalujesz VodMax</string>
 </resources>

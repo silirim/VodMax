@@ -155,6 +155,15 @@ func (s *Store) DeviceByToken(ctx context.Context, tokenHash []byte) (Device, er
 	return d, err
 }
 
+// Device is a paired device by id.
+func (s *Store) Device(ctx context.Context, id int64) (Device, error) {
+	d, err := scanDevice(s.r.QueryRowContext(ctx, `SELECT `+deviceColumns+` FROM device WHERE id = ?`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return d, ErrNotFound
+	}
+	return d, err
+}
+
 func (s *Store) Devices(ctx context.Context) ([]Device, error) {
 	rows, err := s.r.QueryContext(ctx, `SELECT `+deviceColumns+` FROM device ORDER BY last_seen DESC, id`)
 	if err != nil {

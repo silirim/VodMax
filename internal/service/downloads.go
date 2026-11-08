@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/silirim/vodmax/internal/library"
 	"github.com/silirim/vodmax/internal/playlist/xtream"
@@ -330,7 +331,11 @@ func fileName(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
 	s = strings.Trim(s, ". ")
 	if len(s) > 120 {
-		s = strings.TrimSpace(s[:120])
+		n := 120
+		for !utf8.RuneStart(s[n]) { // never half a character
+			n--
+		}
+		s = strings.Trim(s[:n], ". ")
 	}
 	if s == "" {
 		s = "VodMax"
