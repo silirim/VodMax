@@ -70,7 +70,7 @@ func TestFilmDirectPlaybackAndProgress(t *testing.T) {
 		t.Fatalf("resume offered: %s", body)
 	}
 	e.do(t, "PUT", "/api/v1/progress/movie/"+id, map[string]int{"position": 5800, "duration": 6000}, true)
-	if _, body = e.do(t, "GET", "/api/v1/continue", nil, true); strings.Contains(string(body), "1408") {
+	if _, body = e.do(t, "GET", "/api/v1/continue", nil, true); strings.Contains(string(body), `"title":"1408"`) {
 		t.Fatalf("finished film still in continue: %s", body)
 	}
 	if code, _ := e.do(t, "PUT", "/api/v1/progress/movie/"+id, map[string]int{"position": 9999, "duration": 100}, true); code != 400 {
@@ -338,7 +338,7 @@ func TestContinueFollowsSelection(t *testing.T) {
 			t.Fatalf("exclude %s: %d %s", cat, code, b)
 		}
 	}
-	if c := cont(); strings.Contains(c, "1408") || strings.Contains(c, "Twin Peaks") {
+	if c := cont(); strings.Contains(c, `"title":"1408"`) || strings.Contains(c, "Twin Peaks") {
 		t.Fatalf("excluded titles still in continue: %s", c)
 	}
 	for _, cat := range []string{"movie/10", "movie/11", "series/20"} {
@@ -384,11 +384,11 @@ func TestMyList(t *testing.T) {
 	}
 	// Each profile has its own list.
 	kid := addKids(t, e)
-	if code, body := e.call(t, "GET", "/api/v1/mylist", nil, kid.device, kid.profile); code != 200 || strings.Contains(string(body), "1408") {
+	if code, body := e.call(t, "GET", "/api/v1/mylist", nil, kid.device, kid.profile); code != 200 || strings.Contains(string(body), `"title":"1408"`) {
 		t.Fatalf("kids list: %d %s", code, body)
 	}
 	e.do(t, "PUT", "/api/v1/mylist/"+strconv.FormatInt(film, 10), map[string]bool{"on": false}, true)
-	if l := list(); strings.Contains(l, "1408") || !strings.Contains(l, "Twin Peaks") {
+	if l := list(); strings.Contains(l, `"title":"1408"`) || !strings.Contains(l, "Twin Peaks") {
 		t.Fatalf("after removing: %s", l)
 	}
 }
