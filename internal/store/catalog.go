@@ -220,11 +220,13 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 	}
 	// References still on the keys of 0.6.6 (a backup restored, another
 	// subscription synchronised later) are carried as if the key had just
-	// changed: the database may never have held the old key.
+	// changed: the database may never have held the old key. CROSS JOIN
+	// keeps json_each outside: without statistics the planner scanned the
+	// whole list once per title of the kind, hours for a large catalog.
 	for kind, pairs := range legacy {
 		list, _ := json.Marshal(pairs)
 		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO temp.moved_item SELECT i.id, i.kind, j.value ->> 1 FROM json_each(?) j
-			JOIN item i ON i.subscription_id = ? AND i.kind = ? AND i.source_id = j.value ->> 0`, string(list), subID, kind); err != nil {
+			CROSS JOIN item i ON i.subscription_id = ? AND i.kind = ? AND i.source_id = j.value ->> 0`, string(list), subID, kind); err != nil {
 			return res, err
 		}
 	}

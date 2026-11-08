@@ -572,13 +572,9 @@ func (s *Service) Subscriptions(ctx context.Context) ([]SubscriptionView, error)
 }
 
 func (s *Service) subscriptionView(ctx context.Context, sub store.Subscription) (SubscriptionView, error) {
-	counts, err := s.st.Counts(ctx, sub.ID)
-	if err != nil {
-		return SubscriptionView{}, err
-	}
 	sub.Settings = withoutCredentials(sub.Settings)
 	sub.SyncError = TranslateText(LangOf(ctx), sub.SyncError) // saved in Italian
-	v := SubscriptionView{Subscription: sub, Counts: counts}
+	v := SubscriptionView{Subscription: sub}
 	s.mu.Lock()
 	if st := s.syncs[sub.ID]; st != nil {
 		v.Syncing = st.running
@@ -596,6 +592,13 @@ func (s *Service) subscriptionView(ctx context.Context, sub store.Subscription) 
 		}
 	}
 	s.mu.Unlock()
+	// Counted after the phase is read: a phase past the selection ("Guida
+	// TV", the end) never comes with the counts from before it.
+	counts, err := s.st.Counts(ctx, sub.ID)
+	if err != nil {
+		return SubscriptionView{}, err
+	}
+	v.Counts = counts
 	if !v.Syncing {
 		var run syncRun
 		s.st.Setting(ctx, syncRunKey(sub.ID), &run)
