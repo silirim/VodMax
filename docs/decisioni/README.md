@@ -62,6 +62,7 @@ Una decisione approvata si cambia solo con una nuova scheda che la sostituisce.
 | [0054](0054-aspetto-accento-oled-effetti.md) | Aspetto: accento, nero OLED, effetti ridotti, salvaschermo | **Approvata** |
 | [0055](0055-voti-esterni.md) | Voti esterni (Rotten Tomatoes, IMDb, Metacritic) | **Respinta** |
 | [0056](0056-download-sul-telefono-e-usb.md) | Download sul telefono e su USB | **Approvata** |
+| [0057](0057-playlist-da-file-o-link-cloud.md) | Playlist da un file o da un link di Google Drive e Dropbox | **Approvata** |
 
 ## Ordine consigliato per decidere
 
