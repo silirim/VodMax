@@ -1,6 +1,6 @@
 {
   "id": "app.vodmax.client",
-  "version": "0.6.12",
+  "version": "0.6.13",
   "vendor": "VodMax",
   "type": "web",
   "main": "index.html",
