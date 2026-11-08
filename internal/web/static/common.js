@@ -957,7 +957,7 @@ window.VodMax = (() => {
       const error = problems.some((p) => p.level === "error");
       box.classList.toggle("error", error);
       box.classList.toggle("warning", !error);
-      box.href = "/settings.html?view=" + (problems[0].area === "profile" ? "profiles" : "system");
+      box.href = "/settings.html?view=" + ({ profile: "profiles", subscription: "subscriptions" }[problems[0].area] || "system");
       const text = "⚠ " + (problems.length > 1 ? t("{text} (e altri {count})", { text: problems[0].text, count: problems.length - 1 }) : problems[0].text);
       // Read once, then a small ⚠ that does not cover the page; focus or
       // the pointer show the text again. A new problem shows it again too.

@@ -74,10 +74,10 @@ func TestBackupRestoreOnNewInstallation(t *testing.T) {
 	}
 	// The provider password works (re-encrypted with the new key). The
 	// restore starts a download of the catalogs by itself: wait for it.
-	code, body = n.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true)
+	code, body = n.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true)
 	for deadline := time.Now().Add(30 * time.Second); code == 409 && time.Now().Before(deadline); {
 		time.Sleep(200 * time.Millisecond)
-		code, body = n.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true)
+		code, body = n.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true)
 	}
 	if code != 200 {
 		t.Fatalf("sync after restore: %d %s", code, body)

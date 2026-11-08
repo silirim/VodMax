@@ -41,6 +41,9 @@ const (
 // SyncGuide downloads the provider's XMLTV guide through the VPN and keeps
 // the programmes of the channels the user can see.
 func (s *Service) SyncGuide(ctx context.Context, subID int64) (GuideResult, error) {
+	// Up to 2 GiB of programmes: where Android likeliest stops the process.
+	s.markRun(ctx, guideRunKey(subID))
+	defer s.unmarkRun(ctx, guideRunKey(subID))
 	started := time.Now()
 	client, err := s.xtreamClient(ctx, subID, 10*time.Minute)
 	if err != nil {

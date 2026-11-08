@@ -307,5 +307,16 @@
   "guida compressa illeggibile: %w": "unreadable compressed guide: %w",
   "guida XMLTV: %w": "XMLTV guide: %w",
   "codifica %q non supportata": "unsupported encoding %q",
-  "orario XMLTV non valido %q": "invalid XMLTV time %q"
+  "orario XMLTV non valido %q": "invalid XMLTV time %q",
+  "Mi collego al provider": "Connecting to the provider",
+  "Scarico i canali": "Downloading channels",
+  "Scarico i film": "Downloading movies",
+  "Scarico le serie": "Downloading series",
+  "Scarico la playlist": "Downloading the playlist",
+  "Scarico il catalogo": "Downloading the catalog",
+  "Salvo il catalogo": "Saving the catalog",
+  "Guida TV": "TV guide",
+  "Leggo la cartella": "Reading the folder",
+  "il provider si è fermato a metà risposta (nessun dato per un minuto)": "the provider stopped in the middle of its answer (no data for a minute)",
+  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "The sync of “%s” stopped before the end: press “Sync now” in Settings → Subscriptions"
 }

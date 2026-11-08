@@ -193,7 +193,7 @@ func TestFullFlow(t *testing.T) {
 		t.Fatal("provider contacted before sync")
 	}
 
-	code, body = e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true)
+	code, body = e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true)
 	if code != 200 {
 		t.Fatalf("sync: %d %s", code, body)
 	}
@@ -235,7 +235,7 @@ func TestNoProviderTrafficWithoutVPN(t *testing.T) {
 	e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "B", "kind": "xtream", "vpn_id": 1,
 		"server": provider.URL, "username": "mario", "password": password}, true)
 
-	code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true)
+	code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true)
 	if code == 200 || !strings.Contains(string(body), vpn.ErrNotConnected.Error()) {
 		t.Fatalf("sync without VPN: %d %s", code, body)
 	}
@@ -256,19 +256,19 @@ func TestUpdateSubscriptionAndVPN(t *testing.T) {
 	e.do(t, "POST", "/api/v1/vpn", map[string]string{"name": "VPN", "config": wgConf(t)}, true)
 	e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "B", "kind": "xtream", "vpn_id": 1,
 		"server": provider.URL, "username": "mario", "password": "sbagliata"}, true)
-	if code, _ := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code == 200 {
+	if code, _ := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true); code == 200 {
 		t.Fatal("sync with wrong password succeeded")
 	}
 	// Fix only the password: server and username are kept.
 	if code, body := e.do(t, "PATCH", "/api/v1/subscriptions/1", map[string]any{"password": password, "name": "Provider B"}, true); code != 204 {
 		t.Fatalf("patch: %d %s", code, body)
 	}
-	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code != 200 {
+	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true); code != 200 {
 		t.Fatalf("sync after fixing the password: %d %s", code, body)
 	}
 	// An empty password keeps the stored one.
 	e.do(t, "PATCH", "/api/v1/subscriptions/1", map[string]any{"password": ""}, true)
-	if code, _ := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code != 200 {
+	if code, _ := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true); code != 200 {
 		t.Fatal("empty password replaced the stored one")
 	}
 	_, body := e.do(t, "GET", "/api/v1/subscriptions", nil, true)
@@ -333,7 +333,7 @@ func TestSystemVPN(t *testing.T) {
 	}
 	e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "B", "kind": "xtream", "vpn_id": 1,
 		"server": provider.URL, "username": "mario", "password": password}, true)
-	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code != 200 {
+	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true); code != 200 {
 		t.Fatalf("sync through the system network: %d %s", code, body)
 	}
 	_, body := e.do(t, "GET", "/api/v1/vpn", nil, true)

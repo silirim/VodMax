@@ -17,7 +17,7 @@ import (
 
 // messageCalls are the functions whose first string argument is a message
 // for people: name → index of that argument.
-var messageCalls = map[string]int{"invalid": 0, "Invalid": 0, "T": 1, "tr": 1, "New": 0}
+var messageCalls = map[string]int{"invalid": 0, "Invalid": 0, "T": 1, "tr": 1, "New": 0, "syncPhase": 1}
 
 // sourceMessages finds the literal messages passed to messageCalls in the
 // Go files of dirs ("errors.New" only, not other New functions).
@@ -190,7 +190,7 @@ func errorTexts(t *testing.T, dir string, funcs ...string) map[string]string {
 // functions that fetch a catalog or a guide need a translation too.
 func TestSyncErrorsTranslated(t *testing.T) {
 	found := map[string]string{}
-	for _, dir := range []string{"../playlist/xtream", "../playlist/m3u", "../playlist/stalker", "../catalog", "../epg"} {
+	for _, dir := range []string{"../playlist/xtream", "../playlist/m3u", "../playlist/stalker", "../catalog", "../epg", "../provider"} {
 		maps.Copy(found, errorTexts(t, dir))
 	}
 	maps.Copy(found, errorTexts(t, ".", "fetch", "SyncGuide", "syncGuideSource", "directGet"))

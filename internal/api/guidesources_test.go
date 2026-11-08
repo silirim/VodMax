@@ -139,7 +139,7 @@ func TestSyncProviderDownIs502(t *testing.T) {
 	e.do(t, "POST", "/api/v1/vpn", map[string]string{"name": "VPN", "config": wgConf(t)}, true)
 	e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "Giù", "kind": "xtream", "vpn_id": 1,
 		"server": "http://127.0.0.1:1", "username": "u", "password": "p"}, true)
-	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code != http.StatusBadGateway {
+	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true); code != http.StatusBadGateway {
 		t.Fatalf("sync with the provider down: %d %s", code, body)
 	}
 }

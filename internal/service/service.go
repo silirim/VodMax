@@ -41,10 +41,14 @@ type Service struct {
 	st    *store.Store
 	box   *secret.Box
 	start StartTunnel
+	// life ends when the process stops (StartMaintenance); set once in New,
+	// since goroutines started before StartMaintenance may read it.
+	life    context.Context
+	endLife context.CancelFunc
 
 	mu      sync.Mutex
 	tunnels map[int64]Tunnel
-	syncing map[int64]bool
+	syncs   map[int64]*syncState
 	vpnOff  map[int64]bool // disconnected by the user
 
 	selMu  sync.Mutex // serialises selection recomputation
@@ -71,7 +75,8 @@ func New(st *store.Store, box *secret.Box, start StartTunnel) *Service {
 	if start == nil {
 		start = func(ctx context.Context, cfg *vpn.Config) (Tunnel, error) { return vpn.Start(ctx, cfg, nil) }
 	}
-	return &Service{st: st, box: box, start: start, tunnels: map[int64]Tunnel{}, syncing: map[int64]bool{}, vpnOff: map[int64]bool{},
+	life, endLife := context.WithCancel(context.Background())
+	return &Service{st: st, box: box, start: start, life: life, endLife: endLife, tunnels: map[int64]Tunnel{}, syncs: map[int64]*syncState{}, vpnOff: map[int64]bool{},
 		maint: maintenanceState{vpn: map[int64]*vpnHealth{}, guideErr: map[int64]string{}, guideRetry: map[int64]time.Time{}}}
 }
 
@@ -522,11 +527,20 @@ func (s *Service) UpdateVPN(ctx context.Context, id int64, name, conf *string) e
 	return nil
 }
 
-// SubscriptionView adds catalog counts.
+// SubscriptionView adds catalog counts and the state of the sync.
 type SubscriptionView struct {
 	store.Subscription
-	Counts  map[string]int `json:"counts"`
-	Syncing bool           `json:"syncing"`
+	Counts      map[string]int `json:"counts"`
+	Syncing     bool           `json:"syncing"`
+	SyncPhase   string         `json:"sync_phase,omitempty"`
+	SyncCount   int            `json:"sync_count,omitempty"`   // entries of the phase read so far
+	SyncStarted int64          `json:"sync_started,omitempty"` // Unix seconds
+	SyncSeconds int64          `json:"sync_seconds,omitempty"` // since it started, by the server's clock
+	// A sync left running by a process that ended (Android stopped the
+	// app's server, a restart): the catalog is the one before it.
+	SyncInterrupted bool `json:"sync_interrupted,omitempty"`
+	// The last sync this process finished, for the page that waited on it.
+	LastSync *SyncResult `json:"last_sync,omitempty"`
 }
 
 func (s *Service) Subscriptions(ctx context.Context) ([]SubscriptionView, error) {
@@ -536,24 +550,64 @@ func (s *Service) Subscriptions(ctx context.Context) ([]SubscriptionView, error)
 	}
 	out := make([]SubscriptionView, 0, len(subs))
 	for _, sub := range subs {
-		counts, err := s.st.Counts(ctx, sub.ID)
+		v, err := s.subscriptionView(ctx, sub)
 		if err != nil {
 			return nil, err
 		}
-		s.mu.Lock()
-		syncing := s.syncing[sub.ID]
-		s.mu.Unlock()
-		sub.Settings = withoutCredentials(sub.Settings)
-		sub.SyncError = TranslateText(LangOf(ctx), sub.SyncError) // saved in Italian
-		out = append(out, SubscriptionView{Subscription: sub, Counts: counts, Syncing: syncing})
+		out = append(out, v)
 	}
 	return out, nil
 }
 
+func (s *Service) subscriptionView(ctx context.Context, sub store.Subscription) (SubscriptionView, error) {
+	counts, err := s.st.Counts(ctx, sub.ID)
+	if err != nil {
+		return SubscriptionView{}, err
+	}
+	sub.Settings = withoutCredentials(sub.Settings)
+	sub.SyncError = TranslateText(LangOf(ctx), sub.SyncError) // saved in Italian
+	v := SubscriptionView{Subscription: sub, Counts: counts}
+	s.mu.Lock()
+	if st := s.syncs[sub.ID]; st != nil {
+		v.Syncing = st.running
+		if st.running {
+			v.SyncPhase, v.SyncCount = T(ctx, st.phase), st.count
+			v.SyncStarted, v.SyncSeconds = st.started.Unix(), int64(time.Since(st.started)/time.Second)
+		} else if st.err != nil {
+			v.LastSync = &SyncResult{Error: Localize(LangOf(ctx), st.err)}
+		} else if st.result != nil {
+			r := *st.result
+			if st.guideErr != nil {
+				r.GuideError = Localize(LangOf(ctx), st.guideErr)
+			}
+			v.LastSync = &r
+		}
+	}
+	s.mu.Unlock()
+	if !v.Syncing {
+		var run syncRun
+		s.st.Setting(ctx, syncRunKey(sub.ID), &run)
+		v.SyncInterrupted = run.Attempts > 0
+	}
+	return v, nil
+}
+
 func (s *Service) DeleteSubscription(ctx context.Context, id int64) error {
+	// A running sync would save its catalog under the id, which a new
+	// subscription may get.
+	if s.syncRunning(id) {
+		return ErrBusy
+	}
 	if err := s.st.DeleteSubscription(ctx, id); err != nil {
 		return err
 	}
+	s.mu.Lock()
+	if st := s.syncs[id]; st != nil && !st.running {
+		delete(s.syncs, id) // nor its last result
+	}
+	s.mu.Unlock()
+	s.st.DeleteSetting(ctx, syncRunKey(id))
+	s.st.DeleteSetting(ctx, guideRunKey(id))
 	// Variants of removed items may have been primary for other
 	// subscriptions' groups.
 	_, err := s.ApplySelection(ctx)
@@ -579,30 +633,129 @@ type SyncResult struct {
 	Guide      *GuideResult  `json:"guide,omitempty"`
 	GuideError string        `json:"guide_error,omitempty"`
 	Duration   time.Duration `json:"duration_ms"`
+	Error      string        `json:"error,omitempty"` // a failed sync, in the subscription view
+}
+
+// syncState is a subscription's sync as this process sees it: the phase
+// while it runs (an Italian text, translated when shown), then the outcome.
+type syncState struct {
+	running  bool
+	phase    string
+	count    int
+	started  time.Time
+	result   *SyncResult
+	err      error
+	guideErr error // of a sync that ended, shown in the viewer's language
+}
+
+// syncRun marks a sync in the database while it runs: a mark left when
+// nothing runs means the process ended in the middle of it.
+type syncRun struct {
+	Started  time.Time `json:"started"`
+	Attempts int       `json:"attempts"` // runs in a row that did not finish
+}
+
+func syncRunKey(subID int64) string  { return fmt.Sprintf("sync_running:%d", subID) }
+func guideRunKey(subID int64) string { return fmt.Sprintf("guide_running:%d", subID) }
+
+// markRun notes in the database that the work of key (a syncRunKey or a
+// guideRunKey) starts, counting the runs that did not finish.
+func (s *Service) markRun(ctx context.Context, key string) {
+	var run syncRun
+	s.st.Setting(ctx, key, &run)
+	s.st.SetSetting(ctx, key, syncRun{Started: time.Now(), Attempts: run.Attempts + 1})
+}
+
+// unmarkRun notes that it finished; work cut by the end of the process
+// stays marked, as when Android kills it.
+func (s *Service) unmarkRun(ctx context.Context, key string) {
+	if s.life.Err() == nil {
+		s.st.DeleteSetting(context.WithoutCancel(ctx), key)
+	}
+}
+
+// beginSync marks a sync of id as running; false if one already runs.
+func (s *Service) beginSync(id int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if st := s.syncs[id]; st != nil && st.running {
+		return false
+	}
+	s.syncs[id] = &syncState{running: true, phase: "Mi collego al provider", started: time.Now()}
+	return true
+}
+
+// syncPhase tells what a running sync is doing; count is the entries read.
+func (s *Service) syncPhase(id int64, phase string, count int) {
+	s.mu.Lock()
+	if st := s.syncs[id]; st != nil {
+		st.phase, st.count = phase, count
+	}
+	s.mu.Unlock()
+}
+
+func (s *Service) syncRunning(id int64) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.syncs[id]
+	return st != nil && st.running
 }
 
 // Sync reads the full catalog of a subscription through its VPN and
 // replaces the stored one. allowDrop accepts a catalog that shrank by more
 // than half.
 func (s *Service) Sync(ctx context.Context, id int64, allowDrop bool) (SyncResult, error) {
-	s.mu.Lock()
-	if s.syncing[id] {
-		s.mu.Unlock()
+	if !s.beginSync(id) {
 		return SyncResult{}, ErrBusy
 	}
-	s.syncing[id] = true
-	s.mu.Unlock()
+	return s.runSync(ctx, id, allowDrop)
+}
+
+// StartSync runs Sync in the background and returns the subscription as
+// listed, with the phase of its sync, which may be one already running.
+func (s *Service) StartSync(ctx context.Context, id int64, allowDrop bool) (SubscriptionView, error) {
+	sub, err := s.st.Subscription(ctx, id)
+	if err != nil {
+		return SubscriptionView{}, err
+	}
+	if s.beginSync(id) {
+		if sub.Kind == "local" {
+			s.syncPhase(id, "Leggo la cartella", 0) // not "Mi collego al provider"
+		}
+		// The sync outlives the request: the catalog must not be left
+		// half-fetched because a page closed.
+		bg, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Minute)
+		go func() {
+			defer cancel()
+			defer context.AfterFunc(s.life, cancel)() // but not the process
+			s.runSync(bg, id, allowDrop)
+		}()
+	}
+	return s.subscriptionView(ctx, sub)
+}
+
+func (s *Service) runSync(ctx context.Context, id int64, allowDrop bool) (res SyncResult, err error) {
+	s.markRun(ctx, syncRunKey(id))
+	var guideErr error
 	defer func() {
+		s.unmarkRun(ctx, syncRunKey(id))
 		s.mu.Lock()
-		delete(s.syncing, id)
+		st := s.syncs[id]
+		st.running, st.err, st.result, st.guideErr = false, err, nil, guideErr
+		if err == nil {
+			st.result = &res
+		}
 		s.mu.Unlock()
 	}()
+	// Failures are saved with s.life: past the sync's own timeout, but not
+	// when the process stops (the sync stays marked as interrupted).
 
 	started := time.Now()
 	if sub, err := s.st.Subscription(ctx, id); err == nil && sub.Kind == "local" {
+		s.syncPhase(id, "Leggo la cartella", 0)
 		res, err := s.syncLocal(ctx, sub, allowDrop)
 		if err != nil {
-			s.st.SetSyncResult(context.Background(), id, "error", err.Error(), nil)
+			s.st.SetSyncResult(s.life, id, "error", err.Error(), nil)
 			return SyncResult{}, err
 		}
 		if err := s.st.SetSyncResult(ctx, id, "ok", "", nil); err != nil {
@@ -623,16 +776,17 @@ func (s *Service) Sync(ctx context.Context, id int64, allowDrop bool) (SyncResul
 		if snap != nil {
 			account = snap.Account
 		}
-		s.st.SetSyncResult(context.Background(), id, "error", err.Error(), account)
+		s.st.SetSyncResult(s.life, id, "error", err.Error(), account)
 		var bad ErrInvalid
 		if errors.As(err, &bad) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return SyncResult{}, err
 		}
 		return SyncResult{}, &ProviderError{Err: err}
 	}
-	res, err := s.st.ReplaceCatalog(ctx, id, snap.Kinds, snap.Categories, snap.Items, allowDrop)
+	s.syncPhase(id, "Salvo il catalogo", 0)
+	imported, err := s.st.ReplaceCatalog(ctx, id, snap.Kinds, snap.Categories, snap.Items, allowDrop)
 	if err != nil {
-		s.st.SetSyncResult(context.Background(), id, "error", err.Error(), snap.Account)
+		s.st.SetSyncResult(s.life, id, "error", err.Error(), snap.Account)
 		return SyncResult{}, err
 	}
 	// Hidden titles and watch progress from a restored backup.
@@ -642,6 +796,7 @@ func (s *Service) Sync(ctx context.Context, id int64, allowDrop bool) (SyncResul
 	if err := s.st.SetSyncResult(ctx, id, "ok", "", snap.Account); err != nil {
 		return SyncResult{}, err
 	}
+	s.unmarkRun(ctx, syncRunKey(id)) // the catalog is in; the guide has its own mark
 	if _, err := s.ApplySelection(ctx); err != nil {
 		return SyncResult{}, err
 	}
@@ -649,13 +804,15 @@ func (s *Service) Sync(ctx context.Context, id int64, allowDrop bool) (SyncResul
 	if err != nil {
 		return SyncResult{}, err
 	}
-	result := SyncResult{ImportResult: res, Skipped: snap.Skipped, Selection: stats}
-	// The guide is refreshed with the catalog; a guide failure does not
-	// invalidate the catalog.
+	result := SyncResult{ImportResult: imported, Skipped: snap.Skipped, Selection: stats}
+	// The catalog is in and shown from here on; the guide follows, and its
+	// failure does not invalidate the catalog.
 	if sub, err := s.st.Subscription(ctx, id); err == nil && sub.Kind == "xtream" {
+		s.syncPhase(id, "Guida TV", 0)
 		g, err := s.SyncGuide(ctx, id)
 		s.guideDone(ctx, id, err)
 		if err != nil {
+			guideErr = err
 			result.GuideError = Localize(LangOf(ctx), err)
 		} else {
 			result.Guide = &g
@@ -695,8 +852,19 @@ func (s *Service) fetch(ctx context.Context, id int64) (*catalog.Snapshot, error
 		if err != nil {
 			return nil, err
 		}
+		client.Progress = func(action string, n int) {
+			switch action {
+			case "get_live_streams":
+				s.syncPhase(id, "Scarico i canali", n)
+			case "get_vod_streams":
+				s.syncPhase(id, "Scarico i film", n)
+			case "get_series":
+				s.syncPhase(id, "Scarico le serie", n)
+			}
+		}
 		return catalog.FromXtream(ctx, client)
 	case "m3u":
+		s.syncPhase(id, "Scarico la playlist", 0)
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, sec.URL, nil)
 		if err != nil {
 			return nil, provider.Redact(err)
@@ -728,6 +896,7 @@ func (s *Service) fetch(ctx context.Context, id int64) (*catalog.Snapshot, error
 		if err != nil {
 			return nil, err
 		}
+		s.syncPhase(id, "Scarico il catalogo", 0)
 		snap, err := catalog.FromStalker(ctx, client, s.box.Seal, id)
 		s.stalkerTokens.Store(id, client.Token())
 		return snap, err

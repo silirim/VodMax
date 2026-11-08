@@ -307,5 +307,16 @@
   "guida compressa illeggibile: %w": "guía comprimida ilegible: %w",
   "guida XMLTV: %w": "guía XMLTV: %w",
   "codifica %q non supportata": "codificación %q no admitida",
-  "orario XMLTV non valido %q": "hora XMLTV no válida %q"
+  "orario XMLTV non valido %q": "hora XMLTV no válida %q",
+  "Mi collego al provider": "Conectando con el proveedor",
+  "Scarico i canali": "Descargando canales",
+  "Scarico i film": "Descargando películas",
+  "Scarico le serie": "Descargando series",
+  "Scarico la playlist": "Descargando la lista",
+  "Scarico il catalogo": "Descargando el catálogo",
+  "Salvo il catalogo": "Guardando el catálogo",
+  "Guida TV": "Guía de TV",
+  "Leggo la cartella": "Leyendo la carpeta",
+  "il provider si è fermato a metà risposta (nessun dato per un minuto)": "el proveedor se detuvo a mitad de la respuesta (sin datos durante un minuto)",
+  "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti": "La sincronización de «%s» se interrumpió: pulsa “Sincronizar ahora” en Ajustes → Suscripciones"
 }

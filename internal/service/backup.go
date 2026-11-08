@@ -193,6 +193,16 @@ func (s *Service) RestoreBackup(ctx context.Context, data []byte, password strin
 	if busy {
 		return ErrBusyRecording
 	}
+	// A running sync would save its catalog over a restored subscription
+	// with the same id.
+	s.mu.Lock()
+	for _, st := range s.syncs {
+		busy = busy || st.running
+	}
+	s.mu.Unlock()
+	if busy {
+		return ErrBusy
+	}
 	// A safety copy of what is being replaced.
 	if _, err := s.AutoBackup(ctx); err != nil && !errors.Is(err, errNoBackupDir) {
 		return fmt.Errorf("copia di sicurezza prima del ripristino non riuscita: %w", err)

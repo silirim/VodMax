@@ -39,14 +39,14 @@ func TestProviderNetwork(t *testing.T) {
 	if code != 201 || json.Unmarshal(body, &created) != nil || created.ID == 0 {
 		t.Fatalf("no VPN allowed: %d %s", code, body)
 	}
-	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code != 200 || !strings.Contains(string(body), `"programmes":4`) || hits.Load() == 0 {
+	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true); code != 200 || !strings.Contains(string(body), `"programmes":4`) || hits.Load() == 0 {
 		t.Fatalf("sync on the normal network: %d %s (%d requests)", code, body, hits.Load())
 	}
 
 	// On again: the subscription without a VPN is not contacted.
 	e.do(t, "PUT", "/api/v1/settings/network", map[string]bool{"vpn_only": true}, true)
 	before := hits.Load()
-	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code == 200 || !strings.Contains(string(body), "VPN") || hits.Load() != before {
+	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true); code == 200 || !strings.Contains(string(body), "VPN") || hits.Load() != before {
 		t.Fatalf("VPN only again: %d %s (%d requests)", code, body, hits.Load()-before)
 	}
 	if code, body := e.do(t, "GET", "/api/v1/tv/channels", nil, true); code != 200 {

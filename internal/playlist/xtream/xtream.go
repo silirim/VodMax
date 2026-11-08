@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,9 @@ type Client struct {
 	password string
 	http     *http.Client
 	agent    string
+	// Progress, if set, is told how many entries of a list (action) were
+	// read: 0 when it starts, then every 1000.
+	Progress func(action string, n int)
 }
 
 // New validates the server address. The password is kept in memory only.
@@ -343,24 +347,49 @@ func (c *Client) CatchupURL(streamID string, start time.Time, duration time.Dura
 		start.In(loc).Format("2006-01-02:15-04"), streamID+".ts").String()
 }
 
-// getList reads a list, leaving out the entries that do not decode: one
-// malformed title must not stop the whole catalog from updating.
+// getList reads a list entry by entry, leaving out the entries that do not
+// decode: one malformed title must not stop the whole catalog from
+// updating. Read as a stream, a 60 MB answer is never held whole, which
+// matters on a phone.
 func getList[T any](ctx context.Context, c *Client, action string) ([]T, error) {
-	var raw []json.RawMessage
-	if err := c.get(ctx, action, nil, &raw); err != nil {
-		return nil, err
-	}
-	out := make([]T, 0, len(raw))
-	for _, r := range raw {
-		var v T
-		if json.Unmarshal(r, &v) == nil {
-			out = append(out, v)
+	var out []T
+	progress := func(n int) {
+		if c.Progress != nil && n%1000 == 0 {
+			c.Progress(action, n)
 		}
 	}
-	return out, nil
+	progress(0)
+	err := c.read(ctx, action, nil, func(dec *json.Decoder) error {
+		tok, err := dec.Token()
+		if err != nil || tok == nil { // null: no entries
+			return err
+		}
+		if tok != json.Delim('[') {
+			return &json.UnmarshalTypeError{Value: fmt.Sprint(tok), Type: reflect.TypeOf(out)}
+		}
+		for n := 1; dec.More(); n++ {
+			var raw json.RawMessage
+			if err := dec.Decode(&raw); err != nil {
+				return err
+			}
+			var v T
+			if json.Unmarshal(raw, &v) == nil {
+				out = append(out, v)
+			}
+			progress(n)
+		}
+		_, err = dec.Token()
+		return err
+	})
+	return out, err
 }
 
 func (c *Client) get(ctx context.Context, action string, extra url.Values, out any) error {
+	return c.read(ctx, action, extra, func(dec *json.Decoder) error { return dec.Decode(out) })
+}
+
+// read asks the player API for action and lets decode read the answer.
+func (c *Client) read(ctx context.Context, action string, extra url.Values, decode func(*json.Decoder) error) error {
 	q := url.Values{"username": {c.username}, "password": {c.password}}
 	if action != "" {
 		q.Set("action", action)
@@ -385,9 +414,12 @@ func (c *Client) get(ctx context.Context, action string, extra url.Values, out a
 		return fmt.Errorf("xtream %s: risposta HTTP %d", label(action), resp.StatusCode)
 	}
 	body := &io.LimitedReader{R: resp.Body, N: MaxResponse + 1}
-	if err := json.NewDecoder(body).Decode(out); err != nil {
+	if err := decode(json.NewDecoder(body)); err != nil {
 		if body.N <= 0 {
 			return fmt.Errorf("xtream %s: risposta oltre %d MiB", label(action), MaxResponse>>20)
+		}
+		if errors.Is(err, provider.ErrStalled) {
+			return fmt.Errorf("xtream %s: %w", label(action), err)
 		}
 		return fmt.Errorf("xtream %s: %w: %w", label(action), ErrUnreadable, err)
 	}

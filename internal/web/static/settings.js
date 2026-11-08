@@ -232,9 +232,73 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     }
   }
 
+  // ---- Syncs run on the server ----
+  // While one runs, its box shows the phase and the time, and the page asks
+  // every 3 s how far it got; at the end it says the result and draws the
+  // page again. A sync started here is announced even if it ends before
+  // the first look.
+  let syncPoll;
+  let syncBoxes = {}; // subscription id → { syncing, show(s), done(s) } of the page shown
+  const startedHere = new Set();
+  function pollSyncs() {
+    clearTimeout(syncPoll);
+    const view = state.view;
+    syncPoll = setTimeout(async () => {
+      if (state.view !== view) return;
+      const all = await api("GET", "/api/v1/subscriptions").catch(() => null);
+      if (state.view !== view) return;
+      if (!all) { pollSyncs(); return; } // the server restarting, or the network: look again
+      let ended = false, running = false;
+      for (const s of all) {
+        const b = syncBoxes[s.id];
+        if (!b) continue;
+        if (b.syncing && !s.syncing) { ended = true; startedHere.delete(s.id); b.done(s); }
+        b.show(s);
+        running = running || s.syncing;
+      }
+      // Not over a form being filled in: the boxes already show the outcome.
+      if (ended && !unsaved() && !document.querySelector("main .box form")) render();
+      else if (running) pollSyncs();
+    }, 3000);
+  }
+  // The sync button of a box, the line with its phase and its counts:
+  // tiles(s) draws the counts and the last outcome, done(s) says how the
+  // sync ended. The button is busy, not disabled, while a sync runs: a
+  // disabled button loses the focus, and the remote would jump to the menu.
+  function syncControl(s, idle, busy, tiles, done) {
+    let counts = tiles(s);
+    const line = el("p", { className: "note" });
+    const b = button(idle, async () => {
+      if (b.getAttribute("aria-busy") === "true") return;
+      b.setAttribute("aria-busy", "true");
+      startedHere.add(s.id);
+      try { show(await api("POST", "/api/v1/subscriptions/" + s.id + "/sync")); }
+      catch (e) { startedHere.delete(s.id); flash(e.message); } // the answer may be lost with the sync started: the next look says
+      pollSyncs();
+    }, "primary");
+    const entry = { done };
+    function show(x) {
+      entry.syncing = x.syncing || startedHere.has(x.id);
+      const secs = x.sync_seconds || 0;
+      b.setAttribute("aria-busy", String(!!x.syncing));
+      b.textContent = x.syncing ? busy + " " + Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0") : idle;
+      line.hidden = !x.syncing;
+      line.textContent = (x.sync_phase || "") + (x.sync_count ? " (" + x.sync_count.toLocaleString(locale) + ")" : "");
+      const fresh = tiles(x);
+      counts.replaceWith(fresh);
+      counts = fresh;
+    }
+    entry.show = show;
+    syncBoxes[s.id] = entry;
+    show(s);
+    return { button: b, line, counts };
+  }
+  const anySyncing = () => Object.keys(syncBoxes).some((id) => syncBoxes[id].syncing);
+
   // ---- Subscriptions ----
   async function renderSubscriptions(main) {
     const [all, list, net] = await Promise.all([api("GET", "/api/v1/subscriptions"), api("GET", "/api/v1/vpn"), api("GET", "/api/v1/settings/network")]);
+    syncBoxes = {};
     const subs = all.filter((s) => s.kind !== "local");
     // "No VPN" is a choice only when the providers may be reached without
     // one (Settings → VPN); a subscription left without one says so.
@@ -248,6 +312,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     parts.push(el("h2", {}, t("Aggiungi un abbonamento")));
     parts.push(vpns.length ? subscriptionForm(vpns) : reachChoice());
     main.replaceChildren(...parts);
+    if (anySyncing()) pollSyncs();
   }
 
   // First playlist with "only through a VPN" on and no VPN yet: instead of
@@ -288,26 +353,27 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       a.status ? el("span", {}, "Account ", el("b", { className: a.active ? "ok" : "bad" }, a.active ? t("attivo") : a.status)) : null,
       a.expires > 0 ? el("span", {}, t("Scadenza") + " ", el("b", {}, new Date(a.expires * 1000).toLocaleDateString(locale))) : null,
       a.max_connections ? el("span", {}, t("Connessioni") + " ", el("b", {}, (a.active_cons || 0) + " / " + a.max_connections)) : null);
-    const counts = s.counts || {};
-    const sync = el("div", { className: "facts" },
-      el("span", {}, t("Ultima sincronizzazione") + " ", el("b", { className: s.sync_status === "error" ? "bad" : "" }, when(s.synced_at) +
-        (s.sync_status === "error" ? " " + t("(errore)") : ""))));
-    const box = el("section", { className: "box" }, el("h3", {}, s.name), facts, sync,
-      stats([[counts.live, t("Canali")], [counts.movie, t("Film")], [counts.series, t("Serie")]]),
-      s.sync_error ? el("p", { className: "note bad" }, s.sync_error) : null);
-    const syncButton = button(s.syncing ? t("Sincronizzazione in corso…") : t("Sincronizza ora"), async () => {
-      syncButton.disabled = true;
-      syncButton.textContent = t("Sincronizzazione in corso… (anche un minuto)");
-      try {
-        const r = await api("POST", "/api/v1/subscriptions/" + s.id + "/sync");
-        const sel = r.selection || {};
-        const n = fromEntries(["live", "movie", "series"].map((k) => [k, sel[k] ? sel[k].cards : 0]));
-        flash(r.guide ? t("Sincronizzato: {live} canali, {movie} film, {series} serie, guida {programmes} programmi", { ...n, programmes: r.guide.programmes })
-          : t("Sincronizzato: {live} canali, {movie} film, {series} serie", n));
-      } catch (e) { flash(e.message); }
-      render();
-    }, "primary");
-    syncButton.disabled = s.syncing;
+    const stopped = t("La sincronizzazione si è interrotta prima della fine: il server si è chiuso. Premi “Sincronizza ora” per riprovare.");
+    const ctl = syncControl(s, t("Sincronizza ora"), t("Sincronizzazione in corso…"), (x) => {
+      const counts = x.counts || {};
+      const mark = x.sync_interrupted ? " " + t("(interrotta)") : x.sync_status === "error" ? " " + t("(errore)") : "";
+      return el("div", {},
+        el("div", { className: "facts" },
+          el("span", {}, t("Ultima sincronizzazione") + " ", el("b", { className: mark ? "bad" : "" }, when(x.synced_at) + mark))),
+        stats([[counts.live, t("Canali")], [counts.movie, t("Film")], [counts.series, t("Serie")]]),
+        x.sync_error ? el("p", { className: "note bad" }, x.sync_error) : null,
+        x.sync_interrupted && !x.syncing ? el("p", { className: "note bad" }, stopped) : null);
+    }, (x) => {
+      const r = x.last_sync;
+      if (!r) { if (x.sync_interrupted) flash(stopped); return; }
+      if (r.error) { flash(r.error); return; }
+      const sel = r.selection || {};
+      const n = fromEntries(["live", "movie", "series"].map((k) => [k, sel[k] ? sel[k].cards : 0]));
+      flash(r.guide ? t("Sincronizzato: {live} canali, {movie} film, {series} serie, guida {programmes} programmi", { ...n, programmes: r.guide.programmes })
+        : t("Sincronizzato: {live} canali, {movie} film, {series} serie", n));
+    });
+    const box = el("section", { className: "box" }, el("h3", {}, s.name), facts, ctl.counts, ctl.line);
+    const syncButton = ctl.button;
     const edit = button(t("Modifica"), () => {
       edit.disabled = true;
       box.append(subscriptionForm(vpns, s));
@@ -329,33 +395,34 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     const parts = [el("h2", {}, t("Raccolte")),
       el("p", { className: "note" }, t("Cartelle di film o di serie che il server legge così come sono: titolo e anno dai nomi (“Il Padrino (1972).mkv”, “Twin Peaks/Stagione 1/S01E03.mkv”), " +
         "trama e locandine dai file .nfo e dalle immagini accanto ai video, se ci sono. Non passano dalla VPN. Si aggiornano ogni notte e con “Aggiorna ora”."))];
+    syncBoxes = {};
     for (const l of libs) parts.push(libraryBox(l));
     parts.push(el("h2", {}, t("Aggiungi una raccolta")), libraryForm());
     main.replaceChildren(...parts);
+    if (anySyncing()) pollSyncs();
   }
 
   function libraryBox(l) {
-    const set = l.settings || {}, counts = l.counts || {};
+    const set = l.settings || {};
+    const ctl = syncControl(l, t("Aggiorna ora"), t("Aggiornamento in corso…"),
+      (x) => el("div", {}, el("div", { className: "facts" },
+        el("span", {}, t("Ultimo aggiornamento") + " ", el("b", { className: x.sync_status === "error" ? "bad" : "" }, when(x.synced_at) + (x.sync_status === "error" ? " " + t("(errore)") : ""))),
+        el("span", {}, CONTENT[set.content] || t("Titoli"), " ", el("b", {}, (x.counts || {})[set.content] || 0))),
+      x.sync_error ? el("p", { className: "note bad" }, x.sync_error) : null),
+      (x) => {
+        const r = x.last_sync;
+        if (!r) return;
+        if (r.error) { flash(r.error); return; }
+        const sel = (r.selection || {})[set.content];
+        const n = sel ? sel.visible : 0;
+        flash(set.content === "series" ? t("Raccolta aggiornata: {n} serie", { n }) : t("Raccolta aggiornata: {n} film", { n }));
+      });
     const box = el("section", { className: "box" }, el("h3", {}, l.name),
       el("div", { className: "facts" },
         el("span", {}, t("Contenuto") + " ", el("b", {}, CONTENT[set.content] || "?")),
         el("span", {}, t("Cartella") + " ", el("b", { className: "path" }, set.path || "?"))),
-      el("div", { className: "facts" },
-        el("span", {}, t("Ultimo aggiornamento") + " ", el("b", { className: l.sync_status === "error" ? "bad" : "" }, when(l.synced_at) + (l.sync_status === "error" ? " " + t("(errore)") : ""))),
-        el("span", {}, CONTENT[set.content] || t("Titoli"), " ", el("b", {}, counts[set.content] || 0))),
-      l.sync_error ? el("p", { className: "note bad" }, l.sync_error) : null);
-    const scan = button(l.syncing ? t("Aggiornamento in corso…") : t("Aggiorna ora"), async () => {
-      scan.disabled = true;
-      scan.textContent = t("Lettura della cartella…");
-      try {
-        const r = await api("POST", "/api/v1/subscriptions/" + l.id + "/sync");
-        const sel = (r.selection || {})[set.content];
-        const n = sel ? sel.visible : 0;
-        flash(set.content === "series" ? t("Raccolta aggiornata: {n} serie", { n }) : t("Raccolta aggiornata: {n} film", { n }));
-      } catch (e) { flash(e.message); }
-      render();
-    }, "primary");
-    scan.disabled = l.syncing;
+      ctl.counts, ctl.line);
+    const scan = ctl.button;
     const edit = button(t("Modifica"), () => { edit.disabled = true; box.append(libraryForm(l)); });
     const del = button(t("Elimina"), async () => {
       if (!confirm(t("Togliere la raccolta “{name}” da VodMax? I file nella cartella non vengono toccati.", { name: l.name }))) return;
@@ -385,11 +452,8 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
         let id = existing && existing.id;
         if (existing) await api("PATCH", "/api/v1/subscriptions/" + id, body);
         else id = (await api("POST", "/api/v1/subscriptions", { ...body, kind: "local" })).id;
-        save.textContent = t("Lettura della cartella…");
-        const r = await api("POST", "/api/v1/subscriptions/" + id + "/sync");
-        const sel = (r.selection || {})[content.value];
-        const n = sel ? sel.visible : 0;
-        flash(content.value === "series" ? t("Raccolta pronta: {n} serie", { n }) : t("Raccolta pronta: {n} film", { n }));
+        startedHere.add(id); // its box says when the folder is read
+        await api("POST", "/api/v1/subscriptions/" + id + "/sync");
         render();
       } catch (err) { flash(err.message); save.disabled = false; render(); }
     };
@@ -467,7 +531,10 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
           else if (kind.value === "stalker") Object.assign(body, { server: portal.value, mac: mac.value });
           else body.url = url.value;
           id = (await api("POST", "/api/v1/subscriptions", body)).id;
-          flash(t("Abbonamento aggiunto: premi “Sincronizza ora” per scaricare il catalogo"));
+          // The catalog comes at once (or the server already started it).
+          startedHere.add(id);
+          await api("POST", "/api/v1/subscriptions/" + id + "/sync").catch(() => startedHere.delete(id));
+          flash(t("Abbonamento aggiunto: scarico il catalogo"));
         }
         // The server saves a get.php link with user and password as Xtream Codes.
         if (kind.value === "m3u" && (await api("GET", "/api/v1/subscriptions").catch(() => [])).some((x) => x.id === id && x.kind === "xtream")) {

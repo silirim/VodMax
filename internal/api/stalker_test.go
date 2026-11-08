@@ -93,7 +93,7 @@ func TestStalkerPortal(t *testing.T) {
 	if _, body := e.do(t, "GET", "/api/v1/subscriptions", nil, true); strings.Contains(string(body), "12:34:56") {
 		t.Fatalf("MAC returned: %s", body)
 	}
-	code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true)
+	code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true)
 	if code != 200 || !strings.Contains(string(body), `"live":3`) {
 		t.Fatalf("sync: %d %s", code, body)
 	}
@@ -130,7 +130,7 @@ func TestStalkerPortal(t *testing.T) {
 	}
 	// A MAC the portal does not know: the sync says so.
 	p.badMAC = true
-	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code == 200 || !strings.Contains(string(body), "MAC") {
+	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true); code == 200 || !strings.Contains(string(body), "MAC") {
 		t.Fatalf("unknown MAC: %d %s", code, body)
 	}
 }
@@ -155,7 +155,7 @@ func TestM3ULiveThroughServer(t *testing.T) {
 	if code, body := e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "Lista", "kind": "m3u", "vpn_id": 1, "url": srv.URL + "/list.m3u"}, true); code != 201 {
 		t.Fatalf("add: %d %s", code, body)
 	}
-	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true); code != 200 {
+	if code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true); code != 200 {
 		t.Fatalf("sync: %d %s", code, body)
 	}
 	list := channels(t, e, "")

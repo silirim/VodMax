@@ -26,6 +26,9 @@ const (
 	vpnStaleAfter = 75 * time.Second
 	vpnMaxBackoff = 5 * time.Minute
 	syncRetry     = time.Hour // after a failed nightly sync
+	// A sync left running by a process that ended (see interruptedDue).
+	interruptedRetry = 30 * time.Minute
+	maxInterrupted   = 3
 	// Logos and posters in the database: older or beyond the budget they
 	// go, and are fetched again when asked.
 	imageCacheAge    = 30 * 24 * time.Hour
@@ -79,6 +82,7 @@ func (s *Service) SetSchedule(ctx context.Context, sc Schedule) error {
 // StartMaintenance runs, until ctx ends, the VPN watchdog and the scheduled
 // catalog and guide refreshes.
 func (s *Service) StartMaintenance(ctx context.Context, log *slog.Logger) {
+	context.AfterFunc(ctx, s.endLife)
 	go func() {
 		t := time.NewTicker(vpnCheckTick)
 		defer t.Stop()
@@ -250,6 +254,14 @@ func (s *Service) runScheduled(ctx context.Context, log *slog.Logger, now time.T
 		if ctx.Err() != nil {
 			return
 		}
+		if s.syncRunning(sub.ID) {
+			continue // its guide comes with it
+		}
+		var run syncRun
+		s.st.Setting(ctx, syncRunKey(sub.ID), &run)
+		if !interruptedDue(run, now) {
+			continue // nor its guide, which may be what stopped the process
+		}
 		if catalogDue(sc, sub.SyncedAt, sub.SyncStatus, now) {
 			res, err := s.Sync(ctx, sub.ID, false)
 			if err != nil {
@@ -264,10 +276,12 @@ func (s *Service) runScheduled(ctx context.Context, log *slog.Logger, now time.T
 		}
 		var last time.Time
 		s.st.Setting(ctx, guideKey(sub.ID), &last)
+		var guide syncRun // a guide cut short by the end of the process
+		s.st.Setting(ctx, guideRunKey(sub.ID), &guide)
 		s.mu.Lock()
 		retry := s.maint.guideRetry[sub.ID]
 		s.mu.Unlock()
-		if now.Sub(last) < time.Duration(sc.GuideHours)*time.Hour || now.Before(retry) {
+		if now.Sub(last) < time.Duration(sc.GuideHours)*time.Hour || now.Before(retry) || !interruptedDue(guide, now) {
 			continue
 		}
 		_, err := s.SyncGuide(ctx, sub.ID)
@@ -335,6 +349,14 @@ func catalogDue(sc Schedule, synced *time.Time, status string, now time.Time) bo
 		slot = slot.AddDate(0, 0, -1)
 	}
 	return synced.Before(slot)
+}
+
+// interruptedDue: a sync cut short by the end of the process (Android
+// stops the app's server when memory is short) is not started again at
+// every start, which could stop it again: it waits attempts ×
+// interruptedRetry, and after maxInterrupted runs only the person starts it.
+func interruptedDue(run syncRun, now time.Time) bool {
+	return run.Attempts == 0 || run.Attempts < maxInterrupted && now.Sub(run.Started) >= time.Duration(run.Attempts)*interruptedRetry
 }
 
 func guideKey(subID int64) string { return fmt.Sprintf("guide_synced:%d", subID) }
@@ -448,6 +470,13 @@ func (s *Service) Status(ctx context.Context) (SystemStatus, error) {
 		if sub.SyncStatus == "error" {
 			out.Problems = append(out.Problems, Problem{Level: "error", Area: "subscription",
 				Text: T(ctx, "Ultima sincronizzazione di “%s” non riuscita: %s", sub.Name, TranslateText(LangOf(ctx), sub.SyncError))})
+		}
+		// Seen from any page: after Android stops the app's server the app
+		// opens on the empty home, and maintenance waits before trying again.
+		var run syncRun
+		if s.st.Setting(ctx, syncRunKey(sub.ID), &run); run.Attempts > 0 && sub.Kind != "local" && !s.syncRunning(sub.ID) {
+			out.Problems = append(out.Problems, Problem{Level: "error", Area: "subscription",
+				Text: T(ctx, "La sincronizzazione di “%s” si è interrotta: premi “Sincronizza ora” in Impostazioni → Abbonamenti", sub.Name)})
 		}
 		var acc struct {
 			Active  *bool `json:"active"`

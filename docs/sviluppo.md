@@ -58,7 +58,8 @@ guasto; il client la ignora.
 | `POST /api/v1/subscriptions` `{name, kind, vpn_id, server, username, password}` o `{…, url}` | Aggiunge un abbonamento Xtream o M3U |
 | `POST /api/v1/subscriptions` `{name, kind: "local", path, content: movie\|series}` | Aggiunge una raccolta locale (cartella del server, senza VPN) |
 | `GET /api/v1/folders?path=` | Cartelle del server, per scegliere una raccolta |
-| `POST /api/v1/subscriptions/{id}/sync` | Sincronizza il catalogo (`?allow_drop=true` per accettare un calo anomalo) |
+| `GET /api/v1/subscriptions` | Abbonamenti e raccolte con conteggi e stato della sincronizzazione: `syncing`, `sync_phase` (tradotta), `sync_count`, `sync_started`, `sync_seconds`; `sync_interrupted` per una lasciata a metà da un processo chiuso; `last_sync`, il risultato (o `error`) dell'ultima finita da questo processo |
+| `POST /api/v1/subscriptions/{id}/sync` | Avvia la sincronizzazione in background e risponde subito (202) con l'abbonamento come in `GET`, anche se ne era già in corso una; `?wait=true` aspetta la fine e risponde con il risultato (409 se già in corso); `?allow_drop=true` accetta un calo anomalo. Mentre una gira, eliminare l'abbonamento o ripristinare un backup risponde 409 |
 | `GET /api/v1/catalog/{live\|movie\|series}` | Catalogo selezionato, una scheda per titolo: `q`, `section` (tv, sport, radio), `category` (con `category_subscription`, l'abbonamento della categoria: gli id si ripetono tra abbonamenti), `subscription`, `sort=recent`, `cursor`, `limit`, `all=true` per vedere anche l'escluso |
 | `GET` · `PUT /api/v1/subscriptions/{id}/rules` | Regole di selezione (il proprio paese `home`, altri paesi, adulti, SD, anno minimo; 0042) |
 | `POST /api/v1/subscriptions/{id}/rules/preview` | Effetto di nuove regole senza salvarle |

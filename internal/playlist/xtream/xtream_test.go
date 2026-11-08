@@ -2,6 +2,8 @@ package xtream
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -160,5 +162,49 @@ func TestRejectsBadServer(t *testing.T) {
 		if _, err := New(s, "u", "p", nil); err == nil {
 			t.Errorf("%q accepted", s)
 		}
+	}
+}
+
+// Lists are read as a stream: progress is told as entries come, null is
+// an empty list and an object is not a list.
+func TestListStreamed(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Query().Get("action") {
+		case "get_vod_streams":
+			w.Write([]byte("["))
+			for i := range 2500 {
+				if i > 0 {
+					w.Write([]byte(","))
+				}
+				fmt.Fprintf(w, `{"name":"Film %d","stream_id":%d}`, i, i)
+			}
+			w.Write([]byte("]"))
+		case "get_series":
+			w.Write([]byte("null"))
+		default:
+			w.Write([]byte(`{"0":{"name":"x"}}`))
+		}
+	}))
+	defer srv.Close()
+	c := newClient(t, srv, "p")
+	var seen []int
+	c.Progress = func(action string, n int) {
+		if action == "get_vod_streams" {
+			seen = append(seen, n)
+		}
+	}
+	ctx := context.Background()
+	vod, err := c.VODStreams(ctx)
+	if err != nil || len(vod) != 2500 || vod[2499].Name != "Film 2499" {
+		t.Fatalf("vod: %d %v", len(vod), err)
+	}
+	if fmt.Sprint(seen) != "[0 1000 2000]" {
+		t.Fatalf("progress: %v", seen)
+	}
+	if series, err := c.Series(ctx); err != nil || len(series) != 0 {
+		t.Fatalf("null list: %v %v", series, err)
+	}
+	if _, err := c.LiveStreams(ctx); !errors.Is(err, ErrUnreadable) {
+		t.Fatalf("object as a list: %v", err)
 	}
 }

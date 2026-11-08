@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -66,6 +67,11 @@ func main() {
 }
 
 func run(data, listen, recordings, downloads, ffmpeg, ffprobe string, device bool, log *slog.Logger) error {
+	if device && os.Getenv("GOMEMLIMIT") == "" {
+		// Android kills an app that grows too much, in the middle of a
+		// sync: near this size the collector works harder instead.
+		debug.SetMemoryLimit(384 << 20)
+	}
 	if err := os.MkdirAll(data, 0o700); err != nil {
 		return err
 	}

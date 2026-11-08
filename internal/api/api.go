@@ -464,11 +464,23 @@ func (a *api) syncSubscription(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	// The sync outlives a dropped client: the catalog must not be left
-	// half-fetched because a browser tab closed.
+	allowDrop := r.URL.Query().Get("allow_drop") == "true"
+	if r.URL.Query().Get("wait") != "true" {
+		// The sync runs in the background; the page follows its phase in
+		// GET /api/v1/subscriptions.
+		view, err := a.svc.StartSync(r.Context(), id, allowDrop)
+		if err != nil {
+			a.fail(w, r, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, view)
+		return
+	}
+	// With wait=true (scripts) the answer is the result. The sync outlives
+	// a dropped client: the catalog must not be left half-fetched.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 30*time.Minute)
 	defer cancel()
-	res, err := a.svc.Sync(ctx, id, r.URL.Query().Get("allow_drop") == "true")
+	res, err := a.svc.Sync(ctx, id, allowDrop)
 	if err != nil {
 		a.fail(w, r, err)
 		return

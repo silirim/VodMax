@@ -56,7 +56,7 @@ func TestLocalCollections(t *testing.T) {
 		t.Fatalf("raccolta serie: %d %s", code, body)
 	}
 	for _, id := range []string{"2", "3"} {
-		if code, body := e.do(t, "POST", "/api/v1/subscriptions/"+id+"/sync", nil, true); code != 200 {
+		if code, body := e.do(t, "POST", "/api/v1/subscriptions/"+id+"/sync?wait=true", nil, true); code != 200 {
 			t.Fatalf("sync %s: %d %s", id, code, body)
 		}
 	}
@@ -133,7 +133,7 @@ func TestLocalCollections(t *testing.T) {
 
 	// A film removed from the folder leaves the catalog at the next scan.
 	os.Remove(filepath.Join(films, "Film di casa.mkv"))
-	e.do(t, "POST", "/api/v1/subscriptions/2/sync", nil, true)
+	e.do(t, "POST", "/api/v1/subscriptions/2/sync?wait=true", nil, true)
 	if _, body := e.do(t, "GET", "/api/v1/catalog/movie?q=casa", nil, true); strings.Contains(string(body), `"id"`) {
 		t.Fatalf("film rimosso ancora in catalogo: %s", body)
 	}

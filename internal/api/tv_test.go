@@ -223,7 +223,7 @@ func tvSetupWith(t *testing.T, p *tvProvider, extra string) (*env, *tvProvider) 
 	e.do(t, "POST", "/api/v1/vpn", map[string]string{"name": "VPN", "config": wgConf(t)}, true)
 	e.do(t, "POST", "/api/v1/subscriptions", map[string]any{"name": "B", "kind": "xtream", "vpn_id": 1,
 		"server": p.URL, "username": "u", "password": "p"}, true)
-	code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true)
+	code, body := e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true)
 	if code != 200 || !strings.Contains(string(body), `"programmes":4`) {
 		t.Fatalf("sync with guide: %d %s", code, body)
 	}
@@ -282,7 +282,7 @@ func TestTVLineupGuideAndFavorites(t *testing.T) {
 		t.Fatalf("remove favorite: %+v", fav)
 	}
 	// Favourites survive a new synchronisation.
-	e.do(t, "POST", "/api/v1/subscriptions/1/sync", nil, true)
+	e.do(t, "POST", "/api/v1/subscriptions/1/sync?wait=true", nil, true)
 	if fav := channels(t, e, "?list=favorites"); len(fav) != 1 {
 		t.Fatalf("favorites lost after sync: %+v", fav)
 	}
