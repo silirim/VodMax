@@ -219,7 +219,7 @@ func catalogService(t *testing.T, kind string, items []store.Item) (*Service, *s
 	for i := range items {
 		items[i].CategoryID = "1"
 	}
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{kind}, []store.Category{{Kind: kind, SourceID: "1", Name: "Italia", Country: "IT"}}, items, false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{kind}, []store.Category{{Kind: kind, SourceID: "1", Name: "Italia", Country: "IT"}}, items, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.SetHomeCountry(ctx, "IT"); err != nil {

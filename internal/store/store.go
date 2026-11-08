@@ -42,7 +42,10 @@ func Open(path string) (*Store, error) {
 		}
 		return "file:" + path + "?" + q.Encode()
 	}
-	w, err := sql.Open("sqlite", dsn(""))
+	// The writer gets a larger page cache (2 MB by default): a catalog
+	// import or a selection writes to eight indexes of item, and with
+	// the default the pages went back and forth to the WAL for every row.
+	w, err := sql.Open("sqlite", dsn("cache_size(-32768)"))
 	if err != nil {
 		return nil, err
 	}

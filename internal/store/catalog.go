@@ -65,8 +65,9 @@ const dropMinimum = 50
 // subscription, in a single write transaction. Existing rows keep their id
 // (and so favourites and progress); missing ones become unavailable
 // (deleted a month later by PurgeGoneItems). Readers keep seeing the previous
-// catalog until commit.
-func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string, categories []Category, items []Item, allowDrop bool) (ImportResult, error) {
+// catalog until commit. progress, when not nil, gets the rows saved so far
+// out of len(items), and done == total when the search index is rebuilt.
+func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string, categories []Category, items []Item, allowDrop bool, progress func(done, total int)) (ImportResult, error) {
 	res := ImportResult{Total: map[string]int{}}
 	covered := map[string]bool{}
 	for _, k := range kinds {
@@ -85,6 +86,9 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 		return res, err
 	}
 	defer tx.Rollback()
+	if err := coldCache(ctx, tx); err != nil {
+		return res, err
+	}
 
 	for _, kind := range kinds {
 		var current int
@@ -98,11 +102,8 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 	}
 
 	// Keys that change in this import are noted, to carry over what is
-	// kept by group key (see carryGroupKeys). seen_item lists what the
-	// provider still offers: unchanged rows are not written at all.
+	// kept by group key (see carryGroupKeys).
 	for _, q := range []string{
-		`CREATE TEMP TABLE IF NOT EXISTS seen_item (kind TEXT NOT NULL, source_id TEXT NOT NULL, PRIMARY KEY (kind, source_id)) WITHOUT ROWID`,
-		`DELETE FROM temp.seen_item`,
 		`CREATE TEMP TABLE IF NOT EXISTS moved_item (id INTEGER PRIMARY KEY, kind TEXT NOT NULL, old TEXT NOT NULL)`,
 		`CREATE TEMP TRIGGER IF NOT EXISTS item_key_moved AFTER UPDATE OF group_key ON item
 			WHEN old.group_key <> new.group_key AND new.group_key <> ''
@@ -114,67 +115,108 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 		}
 	}
 
+	// The rows the subscription already has: a title seen before is an
+	// UPDATE of its row, a new one a plain INSERT. An upsert (INSERT … ON
+	// CONFLICT DO UPDATE) wrote every row to a statement journal too, in
+	// a temporary file: gigabytes for a large catalog, and minutes of a
+	// first sync on a TV box. What is not seen here goes.
+	type key struct{ kind, source string }
+	type row struct {
+		id          int64
+		seen, added bool
+	}
+	known := map[key]row{}
+	rows, err := tx.QueryContext(ctx, `SELECT id, kind, source_id FROM item WHERE subscription_id = ?`, subID)
+	if err != nil {
+		return res, err
+	}
+	for rows.Next() {
+		var k key
+		var r row
+		if err := rows.Scan(&r.id, &k.kind, &k.source); err != nil {
+			rows.Close()
+			return res, err
+		}
+		if covered[k.kind] {
+			known[k] = r
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return res, err
+	}
+
 	now := time.Now().UnixNano() // unique per import: identifies rows added now
 	// New rows start hidden and the selection that follows the import
 	// shows them: if it fails or the process stops in between, a title of
 	// an adult category or an excluded country is not open to every
-	// profile, kids included, until the next selection.
-	// A row whose fields are all the same is left alone (no RETURNING
-	// row): the import holds the only writer connection, and rewriting
-	// every row and its indexes made a nightly re-import of a large
-	// catalog keep progress saves and favourites waiting for seconds.
-	stmt, err := tx.PrepareContext(ctx, `
+	// profile, kids included, until the next selection. Not primary
+	// either, as the selection leaves most of them: it then rewrites only
+	// their labels, not the browse indexes (see WriteSelection).
+	insert, err := tx.PrepareContext(ctx, `
 		INSERT INTO item (subscription_id, kind, source_id, title, display_title, year, category_id, image, epg_id,
 			number, rating, tmdb_id, extension, catchup_days, added_at, locator, first_seen_at, last_seen_at, available,
-			quality, group_key, lcn, name_key, visible)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 0)
-		ON CONFLICT (subscription_id, kind, source_id) DO UPDATE SET
-			title = excluded.title, display_title = excluded.display_title, year = excluded.year,
-			category_id = excluded.category_id, image = excluded.image, epg_id = excluded.epg_id,
-			number = excluded.number, rating = excluded.rating, tmdb_id = excluded.tmdb_id,
-			extension = excluded.extension, catchup_days = excluded.catchup_days, added_at = excluded.added_at,
-			locator = excluded.locator, last_seen_at = excluded.last_seen_at,
-			available = 1, quality = excluded.quality, group_key = excluded.group_key,
-			lcn = excluded.lcn, name_key = excluded.name_key
-		WHERE (item.title, item.display_title, item.year, item.category_id, item.image, item.epg_id, item.number, item.rating,
-				item.tmdb_id, item.extension, item.catchup_days, item.added_at, item.locator, item.available, item.quality,
-				item.group_key, item.lcn, item.name_key)
-			IS NOT (excluded.title, excluded.display_title, excluded.year, excluded.category_id, excluded.image, excluded.epg_id,
-				excluded.number, excluded.rating, excluded.tmdb_id, excluded.extension, excluded.catchup_days, excluded.added_at,
-				excluded.locator, excluded.available, excluded.quality, excluded.group_key, excluded.lcn, excluded.name_key)
-		RETURNING first_seen_at`)
+			quality, group_key, lcn, name_key, visible, primary_variant)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 0, 0)`)
 	if err != nil {
 		return res, err
 	}
-	defer stmt.Close()
-	written, seen, legacy := 0, map[string][]string{}, map[string][][2]string{}
-	for _, it := range items {
+	defer insert.Close()
+	// A row whose fields are all the same is left alone: the import holds
+	// the only writer connection, and rewriting every row and its indexes
+	// made a nightly re-import of a large catalog keep progress saves and
+	// favourites waiting for seconds. OR FAIL: one row has nothing to back
+	// out, and without ABORT the statement keeps no journal (the trigger
+	// above would otherwise make it keep one).
+	update, err := tx.PrepareContext(ctx, `
+		UPDATE OR FAIL item SET title = ?1, display_title = ?2, year = ?3, category_id = ?4, image = ?5, epg_id = ?6,
+			number = ?7, rating = ?8, tmdb_id = ?9, extension = ?10, catchup_days = ?11, added_at = ?12,
+			locator = ?13, last_seen_at = ?14, available = 1, quality = ?15, group_key = ?16, lcn = ?17, name_key = ?18
+		WHERE id = ?19 AND (title, display_title, year, category_id, image, epg_id, number, rating, tmdb_id, extension,
+				catchup_days, added_at, locator, available, quality, group_key, lcn, name_key)
+			IS NOT (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 1, ?15, ?16, ?17, ?18)`)
+	if err != nil {
+		return res, err
+	}
+	defer update.Close()
+	written, legacy := 0, map[string][][2]string{}
+	for i, it := range items {
+		if progress != nil && i%5000 == 0 {
+			progress(i, len(items))
+		}
 		if it.LegacyKey != "" && it.LegacyKey != it.GroupKey {
 			legacy[it.Kind] = append(legacy[it.Kind], [2]string{it.SourceID, it.LegacyKey})
 		}
-		var first int64
-		err := stmt.QueryRowContext(ctx, subID, it.Kind, it.SourceID, it.Title, it.DisplayTitle, zeroNull(it.Year),
-			it.CategoryID, it.Image, it.EPGID, zeroNull(it.Number), zeroNullF(it.Rating), it.TMDBID, it.Extension,
-			it.CatchupDays, zeroNull64(it.AddedAt), it.Locator, now, now, max(it.Quality, 1), it.GroupKey, zeroNull(it.LCN), it.NameKey).Scan(&first)
-		switch {
-		case errors.Is(err, sql.ErrNoRows): // unchanged
-		case err != nil:
-			return res, fmt.Errorf("titolo %q: %w", it.Title, err)
-		default:
+		k := key{it.Kind, it.SourceID}
+		r, ok := known[k]
+		year, number, rating, added, lcn := zeroNull(it.Year), zeroNull(it.Number), zeroNullF(it.Rating), zeroNull64(it.AddedAt), zeroNull(it.LCN)
+		if !ok {
+			x, err := insert.ExecContext(ctx, subID, it.Kind, it.SourceID, it.Title, it.DisplayTitle, year, it.CategoryID, it.Image,
+				it.EPGID, number, rating, it.TMDBID, it.Extension, it.CatchupDays, added, it.Locator, now, now,
+				max(it.Quality, 1), it.GroupKey, lcn, it.NameKey)
+			if err != nil {
+				return res, fmt.Errorf("titolo %q: %w", it.Title, err)
+			}
+			if r.id, err = x.LastInsertId(); err != nil {
+				return res, err
+			}
+			r.added = true
 			written++
-			if first == now {
-				res.Added++
+			res.Added++
+		} else {
+			x, err := update.ExecContext(ctx, it.Title, it.DisplayTitle, year, it.CategoryID, it.Image, it.EPGID, number, rating,
+				it.TMDBID, it.Extension, it.CatchupDays, added, it.Locator, now, max(it.Quality, 1), it.GroupKey, lcn, it.NameKey, r.id)
+			if err != nil {
+				return res, fmt.Errorf("titolo %q: %w", it.Title, err)
+			}
+			if n, _ := x.RowsAffected(); n > 0 {
+				written++
+				if r.added { // listed twice, and changed: counted twice, as the upsert did
+					res.Added++
+				}
 			}
 		}
-		seen[it.Kind] = append(seen[it.Kind], it.SourceID)
-	}
-	// One statement per kind: a statement per title would cost as much
-	// as the upserts.
-	for kind, ids := range seen {
-		list, _ := json.Marshal(ids)
-		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO temp.seen_item SELECT ?, value FROM json_each(?)`, kind, string(list)); err != nil {
-			return res, err
-		}
+		r.seen = true
+		known[k] = r
 	}
 	// References still on the keys of 0.6.6 (a backup restored, another
 	// subscription synchronised later) are carried as if the key had just
@@ -187,15 +229,24 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 		}
 	}
 
-	for _, kind := range kinds {
-		// last_seen_at of a row that goes is when it went (PurgeGoneItems).
-		r, err := tx.ExecContext(ctx, `UPDATE item SET available = 0, last_seen_at = ? WHERE subscription_id = ? AND kind = ? AND available = 1
-			AND NOT EXISTS (SELECT 1 FROM temp.seen_item s WHERE s.kind = item.kind AND s.source_id = item.source_id)`, now, subID, kind)
+	// last_seen_at of a row that goes is when it went (PurgeGoneItems).
+	var gone []int64
+	for _, r := range known {
+		if !r.seen {
+			gone = append(gone, r.id)
+		}
+	}
+	if len(gone) > 0 {
+		list, _ := json.Marshal(gone)
+		r, err := tx.ExecContext(ctx, `UPDATE item SET available = 0, last_seen_at = ? WHERE id IN (SELECT value FROM json_each(?)) AND available = 1`,
+			now, string(list))
 		if err != nil {
 			return res, err
 		}
 		n, _ := r.RowsAffected()
-		res.Removed += int(n)
+		res.Removed = int(n)
+	}
+	for _, kind := range kinds {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM category WHERE subscription_id = ? AND kind = ?`, subID, kind); err != nil {
 			return res, err
 		}
@@ -213,6 +264,9 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 		}
 	}
 	if written > 0 || res.Removed > 0 {
+		if progress != nil {
+			progress(len(items), len(items))
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO item_search(item_search) VALUES ('rebuild')`); err != nil {
 			return res, err
 		}
@@ -224,7 +278,23 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 	// file so it does not stay at catalog size. Best effort, readers may
 	// still hold old snapshots.
 	s.w.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
+	coldCache(ctx, s.w)
 	return res, nil
+}
+
+// coldCache empties the page cache before a large write. The driver's
+// SQLite shares one page cache among all connections
+// (SQLITE_ENABLE_MEMORY_MANAGEMENT): after full-text searches on the
+// readers, the writer kept none of the pages it used and read each row's
+// pages again from disk, for the whole import (modernc.org/sqlite 1.60).
+// After a large write it gives the writer's cache back: the driver takes
+// it from the system outside Go's memory limit, and a TV box kept 50 MB
+// more for as long as the app ran.
+func coldCache(ctx context.Context, db interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}) error {
+	_, err := db.ExecContext(ctx, `PRAGMA shrink_memory`)
+	return err
 }
 
 // carryGroupKeys moves what is kept by group key (favourites, titles

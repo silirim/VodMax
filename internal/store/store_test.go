@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -31,9 +33,9 @@ func openTest(t *testing.T) (*Store, int64) {
 }
 
 // selectAll stands in for the selection that follows an import: new rows
-// start hidden.
+// start hidden and not primary.
 func selectAll(st *Store) {
-	st.w.Exec(`UPDATE item SET visible = 1`)
+	st.w.Exec(`UPDATE item SET visible = 1, primary_variant = 1`)
 }
 
 func movies(n int, prefix string) []Item {
@@ -49,7 +51,7 @@ func TestReplaceKeepsIDsAndMarksRemovals(t *testing.T) {
 	st, sub := openTest(t)
 	ctx := context.Background()
 	items := movies(100, "Film")
-	res, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false)
+	res, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false, nil)
 	if err != nil || res.Added != 100 || res.Total["movie"] != 100 {
 		t.Fatalf("first import: %+v %v", res, err)
 	}
@@ -58,7 +60,7 @@ func TestReplaceKeepsIDsAndMarksRemovals(t *testing.T) {
 
 	// Second import: one title renamed, ten removed.
 	items[0].DisplayTitle, items[0].Title = "Film 00000 rinominato", "Film 00000 rinominato"
-	res, err = st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items[:90], false)
+	res, err = st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items[:90], false, nil)
 	if err != nil || res.Added != 0 || res.Removed != 10 {
 		t.Fatalf("second import: %+v %v", res, err)
 	}
@@ -74,7 +76,7 @@ func TestReplaceKeepsIDsAndMarksRemovals(t *testing.T) {
 	// not written again.
 	var seenBefore int64
 	st.r.QueryRowContext(ctx, `SELECT last_seen_at FROM item WHERE source_id = '50'`).Scan(&seenBefore)
-	res, err = st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false)
+	res, err = st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false, nil)
 	if err != nil || res.Added != 0 || res.Removed != 0 {
 		t.Fatalf("third import: %+v %v", res, err)
 	}
@@ -87,21 +89,85 @@ func TestReplaceKeepsIDsAndMarksRemovals(t *testing.T) {
 	}
 }
 
+// A large import tells how far it is, and gives the same results as the
+// upsert it replaced: ids kept, unchanged rows not written (no search
+// index rebuild), a title that goes and comes back on its row, a title
+// listed twice and changed counted twice, the search on the new names.
+func TestReplaceProgressAndSameResults(t *testing.T) {
+	st, sub := openTest(t)
+	ctx := context.Background()
+	items := movies(12000, "Film")
+	var calls [][2]int
+	progress := func(done, total int) { calls = append(calls, [2]int{done, total}) }
+	res, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false, progress)
+	if err != nil || res.Added != 12000 || res.Removed != 0 {
+		t.Fatalf("first import: %+v %v", res, err)
+	}
+	if want := [][2]int{{0, 12000}, {5000, 12000}, {10000, 12000}, {12000, 12000}}; !slices.Equal(calls, want) {
+		t.Fatalf("progress %v, want %v", calls, want)
+	}
+	selectAll(st)
+	ids, _ := st.ItemIDs(ctx, sub, "movie")
+	var seen int64
+	st.r.QueryRowContext(ctx, `SELECT last_seen_at FROM item WHERE source_id = '7'`).Scan(&seen)
+
+	calls = nil
+	res, err = st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false, progress)
+	if err != nil || res.Added != 0 || res.Removed != 0 || slices.Contains(calls, [2]int{12000, 12000}) {
+		t.Fatalf("same catalog: %+v %v, progress %v", res, err, calls)
+	}
+	var again int64
+	st.r.QueryRowContext(ctx, `SELECT last_seen_at FROM item WHERE source_id = '7'`).Scan(&again)
+	if now, _ := st.ItemIDs(ctx, sub, "movie"); !maps.Equal(now, ids) || again != seen {
+		t.Fatalf("same catalog moved ids or rewrote a row (%d → %d)", seen, again)
+	}
+
+	// One renamed, one gone, one new and listed twice with a change.
+	changed := slices.Clone(items[1:])
+	changed[6].Title, changed[6].DisplayTitle = "Pellicola rara", "Pellicola rara"
+	changed = append(changed, Item{Kind: "movie", SourceID: "nuovo", Title: "Nuovo", DisplayTitle: "Nuovo"},
+		Item{Kind: "movie", SourceID: "nuovo", Title: "Nuovo", DisplayTitle: "Nuovo", Year: 2024})
+	res, err = st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, changed, false, nil)
+	if err != nil || res.Added != 2 || res.Removed != 1 {
+		t.Fatalf("changed catalog: %+v %v", res, err)
+	}
+	selectAll(st)
+	if p, _ := st.Catalog(ctx, Query{Kind: "movie", Text: "rara"}); len(p.Items) != 1 || p.Items[0].ID != ids["7"] {
+		t.Fatalf("renamed title: %+v", p.Items)
+	}
+	if p, _ := st.Catalog(ctx, Query{Kind: "movie", Text: "Film 00007"}); len(p.Items) != 0 {
+		t.Fatalf("old name still found: %+v", p.Items)
+	}
+	var available int
+	st.r.QueryRowContext(ctx, `SELECT available FROM item WHERE id = ?`, ids["0"]).Scan(&available)
+	if available != 0 {
+		t.Fatal("gone title still available")
+	}
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	now, _ := st.ItemIDs(ctx, sub, "movie")
+	st.r.QueryRowContext(ctx, `SELECT available FROM item WHERE id = ?`, ids["0"]).Scan(&available)
+	if now["0"] != ids["0"] || now["7"] != ids["7"] || available != 1 {
+		t.Fatalf("title back on another row (%d → %d) or not available", ids["0"], now["0"])
+	}
+}
+
 func TestSuspiciousDropKeepsPreviousCatalog(t *testing.T) {
 	st, sub := openTest(t)
 	ctx := context.Background()
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(200, "Film"), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(200, "Film"), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	selectAll(st)
-	_, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(50, "Film"), false)
+	_, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(50, "Film"), false, nil)
 	if !errors.Is(err, ErrSuspiciousDrop) {
 		t.Fatalf("expected drop protection, got %v", err)
 	}
 	if counts, _ := st.Counts(ctx, sub); counts["movie"] != 200 {
 		t.Fatalf("previous catalog not kept: %v", counts)
 	}
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(50, "Film"), true); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(50, "Film"), true, nil); err != nil {
 		t.Fatalf("explicit allow_drop refused: %v", err)
 	}
 }
@@ -114,7 +180,7 @@ func TestPaginationAndSearch(t *testing.T) {
 		Item{Kind: "movie", SourceID: "x1", Title: "La città incantata", DisplayTitle: "La città incantata"},
 		Item{Kind: "movie", SourceID: "x2", Title: "Città di Dio", DisplayTitle: "Città di Dio"},
 	)
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	selectAll(st)
@@ -157,12 +223,12 @@ func TestPaginationAndSearch(t *testing.T) {
 func TestReadsDoNotWaitForImport(t *testing.T) {
 	st, sub := openTest(t)
 	ctx := context.Background()
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(1000, "Film"), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(1000, "Film"), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(20000, "Nuovo"), false)
+		_, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(20000, "Nuovo"), false, nil)
 		done <- err
 	}()
 	time.Sleep(50 * time.Millisecond)
@@ -196,7 +262,7 @@ func TestSubscriptionRebuildKeepsCatalog(t *testing.T) {
 	subID, err := st.AddSubscription(ctx, Subscription{Name: "B", Kind: "xtream", VPNID: vpnID, Settings: json.RawMessage(`{}`)},
 		func(int64) []byte { return []byte("sealed") })
 	if err == nil {
-		_, err = st.ReplaceCatalog(ctx, subID, []string{"movie"}, nil, movies(10, "Film"), false)
+		_, err = st.ReplaceCatalog(ctx, subID, []string{"movie"}, nil, movies(10, "Film"), false, nil)
 		selectAll(st)
 	}
 	st.Close()
@@ -341,7 +407,7 @@ func TestImportBackupFromAnOlderVersion(t *testing.T) {
 	if _, err := st.AddProfile(ctx, Profile{Name: "Bimbi", Kind: "kids"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(3, "Film"), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(3, "Film"), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	filmID := func() (id int64) {
@@ -371,7 +437,7 @@ func TestImportBackupFromAnOlderVersion(t *testing.T) {
 		t.Fatalf("recording without its file: %+v %v", r, err)
 	}
 	// The catalog comes back in another order: the old id is another film.
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, append(movies(3, "Altro")[:2], movies(3, "Film")[2]), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, append(movies(3, "Altro")[:2], movies(3, "Film")[2]), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := st.ApplyPendingRestore(ctx); err != nil {
@@ -505,7 +571,7 @@ func TestGroupKeysCarriedOverAfterUpgrade(t *testing.T) {
 			Year: 1980, GroupKey: keys[len(titles)]})
 	}
 	// The database as an older version left it.
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live", "movie"}, nil, items("", "", "1", "1", "rai 1", "|1980"), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live", "movie"}, nil, items("", "", "1", "1", "rai 1", "|1980"), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	id := func(src string) int64 {
@@ -529,7 +595,7 @@ func TestGroupKeysCarriedOverAfterUpgrade(t *testing.T) {
 
 	// The next import computes the new keys.
 	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live", "movie"}, nil,
-		items("первый канал", "الجزيرة", "россия 1", "беларусь 1", "rai 1", "москва слезам не верит|1980"), false); err != nil {
+		items("первый канал", "الجزيرة", "россия 1", "беларусь 1", "rai 1", "москва слезам не верит|1980"), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	favs := map[string]bool{}
@@ -572,14 +638,14 @@ func TestGroupKeysCarriedOverAfterUpgrade(t *testing.T) {
 func TestNewTitlesHiddenUntilSelection(t *testing.T) {
 	st, sub := openTest(t)
 	ctx := context.Background()
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(3, "Film"), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(3, "Film"), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	if page, _ := st.Catalog(ctx, Query{Kind: "movie", NoAdult: true}); len(page.Items) != 0 {
 		t.Fatalf("new titles shown before the selection: %d", len(page.Items))
 	}
 	selectAll(st)
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(4, "Film"), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, movies(4, "Film"), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	if page, _ := st.Catalog(ctx, Query{Kind: "movie", NoAdult: true}); len(page.Items) != 3 {
@@ -601,7 +667,7 @@ func TestCategoriesOfTwoSubscriptions(t *testing.T) {
 	for sub, c := range map[int64][2]string{a: {"Azione", "Heat"}, b: {"Horror", "Saw"}} {
 		cats := []Category{{Kind: "movie", SourceID: "5", Name: c[0]}}
 		items := []Item{{Kind: "movie", SourceID: "1", Title: c[1], DisplayTitle: c[1], CategoryID: "5", GroupKey: c[1]}}
-		if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, cats, items, false); err != nil {
+		if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, cats, items, false, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -625,7 +691,7 @@ func TestPurgeGoneItems(t *testing.T) {
 	st, sub := openTest(t)
 	ctx := context.Background()
 	items := movies(7, "Film")
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	id := func(src string) int64 {
@@ -646,7 +712,7 @@ func TestPurgeGoneItems(t *testing.T) {
 	plain := id("5")
 	st.PutMeta(ctx, fmt.Sprintf("p:%d", plain), "{}")
 	// Only "6" is still offered; everything else went, "0" just now.
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items[6:], true); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, items[6:], true, nil); err != nil {
 		t.Fatal(err)
 	}
 	month := time.Now().Add(-31 * 24 * time.Hour).UnixNano()
@@ -676,7 +742,7 @@ func TestSwappedStreamIDsKeepRecordingChannel(t *testing.T) {
 			{Kind: "live", SourceID: "102", Title: b, DisplayTitle: b, GroupKey: key[b]},
 		}
 	}
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live"}, nil, live("Rai 1", "Rai 2"), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live"}, nil, live("Rai 1", "Rai 2"), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	var id int64
@@ -685,7 +751,7 @@ func TestSwappedStreamIDsKeepRecordingChannel(t *testing.T) {
 	if _, err := st.AddRecording(ctx, Recording{ItemID: id, GroupKey: "rai 1", Channel: "Rai 1", Title: "Film", Start: now + 3600, Stop: now + 7200}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live"}, nil, live("Rai 2", "Rai 1"), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live"}, nil, live("Rai 2", "Rai 1"), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	var key string
@@ -704,7 +770,7 @@ func TestHiddenByIDStaysHiddenWithItsNewKey(t *testing.T) {
 	film := func(key string) []Item {
 		return []Item{{Kind: "movie", SourceID: "1", Title: "Солярис", DisplayTitle: "Солярис", GroupKey: key}}
 	}
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, film(""), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, film(""), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	selectAll(st)
@@ -717,7 +783,7 @@ func TestHiddenByIDStaysHiddenWithItsNewKey(t *testing.T) {
 	if err := st.HideContinue(ctx, 1, id); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, film("солярис"), false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"movie"}, nil, film("солярис"), false, nil); err != nil {
 		t.Fatal(err)
 	}
 	var key string
@@ -741,7 +807,7 @@ func TestOldKeysOfARestoredBackupCarried(t *testing.T) {
 		{Kind: "movie", SourceID: "10", Title: "Москва слезам не верит", DisplayTitle: "Москва слезам не верит", Year: 1980,
 			GroupKey: "москва слезам не верит|1980", LegacyKey: "|1980"},
 	}
-	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live", "movie"}, nil, items, false); err != nil {
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live", "movie"}, nil, items, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	favs := map[string]bool{}

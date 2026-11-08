@@ -45,6 +45,13 @@ func (s *Service) loadSelection(ctx context.Context, subID int64, extra *catalog
 // Variants are grouped across subscriptions, so it always runs on the
 // whole catalog.
 func (s *Service) ApplySelection(ctx context.Context) (catalog.Stats, error) {
+	return s.applySelection(ctx, 0)
+}
+
+// applySelection is ApplySelection returning the statistics of subscription
+// subID (as SubscriptionStats), or of the whole catalog with 0: a sync
+// reads the catalog once instead of twice.
+func (s *Service) applySelection(ctx context.Context, subID int64) (catalog.Stats, error) {
 	s.selMu.Lock()
 	defer s.selMu.Unlock()
 	rules, cats, items, err := s.loadSelection(ctx, 0, nil)
@@ -54,14 +61,19 @@ func (s *Service) ApplySelection(ctx context.Context) (catalog.Stats, error) {
 	before := make([]store.SelectionItem, len(items))
 	copy(before, items)
 	stats := catalog.Select(rules, cats, items)
-	var changed []store.SelectionItem
+	var changed, relabelled []store.SelectionItem
 	for i := range items {
-		a, b := before[i], items[i]
-		if a.Visible != b.Visible || a.Primary != b.Primary || a.VariantCount != b.VariantCount || a.Section != b.Section || a.Adult != b.Adult {
+		switch a, b := before[i], items[i]; {
+		case a.Visible != b.Visible || a.Primary != b.Primary:
 			changed = append(changed, b)
+		case a.VariantCount != b.VariantCount || a.Section != b.Section || a.Adult != b.Adult:
+			relabelled = append(relabelled, b)
 		}
 	}
-	return stats, s.st.WriteSelection(ctx, changed)
+	if subID != 0 {
+		stats = subscriptionStats(items, subID)
+	}
+	return stats, s.st.WriteSelection(ctx, changed, relabelled)
 }
 
 // SubscriptionStats returns the selection statistics of one subscription.
@@ -71,8 +83,12 @@ func (s *Service) SubscriptionStats(ctx context.Context, subID int64, rules *cat
 		return nil, err
 	}
 	catalog.Select(all, cats, items)
-	// Count only this subscription's items, with grouping already decided
-	// across subscriptions.
+	return subscriptionStats(items, subID), nil
+}
+
+// subscriptionStats counts only subID's items, with grouping already
+// decided across subscriptions.
+func subscriptionStats(items []store.SelectionItem, subID int64) catalog.Stats {
 	stats := catalog.Stats{}
 	for _, it := range items {
 		if it.SubscriptionID != subID {
@@ -94,7 +110,7 @@ func (s *Service) SubscriptionStats(ctx context.Context, subID int64, rules *cat
 			}
 		}
 	}
-	return stats, nil
+	return stats
 }
 
 // Rules returns the selection rules of a subscription, with the home
@@ -162,10 +178,7 @@ func (s *Service) SetRules(ctx context.Context, subID int64, r catalog.Rules) (c
 	if err := s.st.SetRules(ctx, subID, raw); err != nil {
 		return nil, err
 	}
-	if _, err := s.ApplySelection(ctx); err != nil {
-		return nil, err
-	}
-	return s.SubscriptionStats(ctx, subID, nil)
+	return s.applySelection(ctx, subID)
 }
 
 // PreviewRules computes the effect of rules without saving them.

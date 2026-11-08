@@ -34,7 +34,7 @@ func TestTuneFollowsTheRecordingWithData(t *testing.T) {
 	s, sub := oneConnectionService(t)
 	ctx := context.Background()
 	if _, err := s.st.ReplaceCatalog(ctx, sub, []string{"live"}, nil,
-		[]store.Item{{Kind: "live", SourceID: "101", Title: "Rai 1", DisplayTitle: "Rai 1", GroupKey: "rai 1"}}, false); err != nil {
+		[]store.Item{{Kind: "live", SourceID: "101", Title: "Rai 1", DisplayTitle: "Rai 1", GroupKey: "rai 1"}}, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	ch, err := s.st.ChannelForGroup(ctx, "rai 1")

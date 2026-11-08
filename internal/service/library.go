@@ -73,7 +73,7 @@ func (s *Service) syncLocal(ctx context.Context, sub store.Subscription, allowDr
 	}
 	// The collection's name is its one category: nothing to classify.
 	cats := []store.Category{{Kind: set.Content, SourceID: library.Category, Name: sub.Name}}
-	imp, err := s.st.ReplaceCatalog(ctx, sub.ID, []string{set.Content}, cats, res.Items, allowDrop)
+	imp, err := s.st.ReplaceCatalog(ctx, sub.ID, []string{set.Content}, cats, res.Items, allowDrop, nil)
 	if err != nil {
 		return SyncResult{}, err
 	}

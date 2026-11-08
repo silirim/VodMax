@@ -17,7 +17,7 @@ import (
 
 // messageCalls are the functions whose first string argument is a message
 // for people: name → index of that argument.
-var messageCalls = map[string]int{"invalid": 0, "Invalid": 0, "T": 1, "tr": 1, "New": 0, "syncPhase": 1}
+var messageCalls = map[string]int{"invalid": 0, "Invalid": 0, "T": 1, "tr": 1, "New": 0, "syncPhase": 1, "syncProgress": 1}
 
 // sourceMessages finds the literal messages passed to messageCalls in the
 // Go files of dirs ("errors.New" only, not other New functions).

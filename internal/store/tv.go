@@ -84,7 +84,11 @@ func (s *Store) ReplaceGuide(ctx context.Context, source string, channels []Guid
 			return err
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	coldCache(ctx, s.w) // a guide of a week fills the writer's cache too
+	return nil
 }
 
 // Programme is a guide entry as returned to clients.

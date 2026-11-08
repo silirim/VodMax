@@ -104,12 +104,21 @@ func (s *Store) SelectionItems(ctx context.Context) ([]SelectionItem, error) {
 }
 
 // WriteSelection stores the computed selection for the given items.
-func (s *Store) WriteSelection(ctx context.Context, items []SelectionItem) error {
+// relabel holds items whose visibility and primary flag stay the same:
+// only their other fields are written, which leaves the three browse
+// indexes alone (most of the cost of a selection over a large catalog).
+func (s *Store) WriteSelection(ctx context.Context, items, relabel []SelectionItem) error {
+	if len(items)+len(relabel) == 0 {
+		return nil // no transaction, and no cache emptied for nothing
+	}
 	tx, err := s.w.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if err := coldCache(ctx, tx); err != nil {
+		return err
+	}
 	stmt, err := tx.PrepareContext(ctx, `UPDATE item SET visible = ?, primary_variant = ?, variant_count = ?, section = ?, adult = ? WHERE id = ?`)
 	if err != nil {
 		return err
@@ -120,7 +129,21 @@ func (s *Store) WriteSelection(ctx context.Context, items []SelectionItem) error
 			return err
 		}
 	}
-	return tx.Commit()
+	labels, err := tx.PrepareContext(ctx, `UPDATE item SET variant_count = ?, section = ?, adult = ? WHERE id = ?`)
+	if err != nil {
+		return err
+	}
+	defer labels.Close()
+	for _, it := range relabel {
+		if _, err := labels.ExecContext(ctx, it.VariantCount, it.Section, it.Adult, it.ID); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	coldCache(ctx, s.w)
+	return nil
 }
 
 // Rules returns the raw JSON selection rules of a subscription.

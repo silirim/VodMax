@@ -545,6 +545,7 @@ type SubscriptionView struct {
 	Syncing     bool           `json:"syncing"`
 	SyncPhase   string         `json:"sync_phase,omitempty"`
 	SyncCount   int            `json:"sync_count,omitempty"`   // entries of the phase read so far
+	SyncTotal   int            `json:"sync_total,omitempty"`   // what SyncCount goes to, when known
 	SyncStarted int64          `json:"sync_started,omitempty"` // Unix seconds
 	SyncSeconds int64          `json:"sync_seconds,omitempty"` // since it started, by the server's clock
 	// A sync left running by a process that ended (Android stopped the
@@ -582,7 +583,7 @@ func (s *Service) subscriptionView(ctx context.Context, sub store.Subscription) 
 	if st := s.syncs[sub.ID]; st != nil {
 		v.Syncing = st.running
 		if st.running {
-			v.SyncPhase, v.SyncCount = T(ctx, st.phase), st.count
+			v.SyncPhase, v.SyncCount, v.SyncTotal = T(ctx, st.phase), st.count, st.total
 			v.SyncStarted, v.SyncSeconds = st.started.Unix(), int64(time.Since(st.started)/time.Second)
 		} else if st.err != nil {
 			v.LastSync = &SyncResult{Error: Localize(LangOf(ctx), st.err)}
@@ -653,6 +654,7 @@ type syncState struct {
 	running  bool
 	phase    string
 	count    int
+	total    int // of count, 0 when unknown
 	started  time.Time
 	result   *SyncResult
 	err      error
@@ -698,9 +700,14 @@ func (s *Service) beginSync(id int64) bool {
 
 // syncPhase tells what a running sync is doing; count is the entries read.
 func (s *Service) syncPhase(id int64, phase string, count int) {
+	s.syncProgress(id, phase, count, 0)
+}
+
+// syncProgress is syncPhase with the total that count goes to.
+func (s *Service) syncProgress(id int64, phase string, count, total int) {
 	s.mu.Lock()
 	if st := s.syncs[id]; st != nil {
-		st.phase, st.count = phase, count
+		st.phase, st.count, st.total = phase, count, total
 	}
 	s.mu.Unlock()
 }
@@ -774,10 +781,7 @@ func (s *Service) runSync(ctx context.Context, id int64, allowDrop bool) (res Sy
 		if err := s.st.SetSyncResult(ctx, id, "ok", "", nil); err != nil {
 			return SyncResult{}, err
 		}
-		if _, err := s.ApplySelection(ctx); err != nil {
-			return SyncResult{}, err
-		}
-		if res.Selection, err = s.SubscriptionStats(ctx, id, nil); err != nil {
+		if res.Selection, err = s.applySelection(ctx, id); err != nil {
 			return SyncResult{}, err
 		}
 		res.Duration = time.Since(started) / time.Millisecond
@@ -797,7 +801,13 @@ func (s *Service) runSync(ctx context.Context, id int64, allowDrop bool) (res Sy
 		return SyncResult{}, &ProviderError{Err: err}
 	}
 	s.syncPhase(id, "Salvo il catalogo", 0)
-	imported, err := s.st.ReplaceCatalog(ctx, id, snap.Kinds, snap.Categories, snap.Items, allowDrop)
+	imported, err := s.st.ReplaceCatalog(ctx, id, snap.Kinds, snap.Categories, snap.Items, allowDrop, func(done, total int) {
+		if done < total {
+			s.syncProgress(id, "Salvo il catalogo", done, total)
+		} else {
+			s.syncPhase(id, "Aggiorno l'indice di ricerca", 0)
+		}
+	})
 	if err != nil {
 		s.st.SetSyncResult(s.life, id, "error", err.Error(), snap.Account)
 		return SyncResult{}, err
@@ -810,10 +820,8 @@ func (s *Service) runSync(ctx context.Context, id int64, allowDrop bool) (res Sy
 		return SyncResult{}, err
 	}
 	s.unmarkRun(ctx, syncRunKey(id)) // the catalog is in; the guide has its own mark
-	if _, err := s.ApplySelection(ctx); err != nil {
-		return SyncResult{}, err
-	}
-	stats, err := s.SubscriptionStats(ctx, id, nil)
+	s.syncPhase(id, "Applico la selezione", 0)
+	stats, err := s.applySelection(ctx, id)
 	if err != nil {
 		return SyncResult{}, err
 	}
