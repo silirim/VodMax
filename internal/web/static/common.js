@@ -97,6 +97,26 @@ window.VodMax = (() => {
     if (/^(text|search|password|number|email|url|tel)$/.test(i.type)) i.setAttribute("enterkeyhint", i.type === "search" ? "search" : "done");
   }, true);
 
+  // webOS opens its keyboard on any text field that gets the focus, also
+  // one only passed on the way with the arrows ("Stasera" between the rows
+  // of Home). A field reached with the arrows is read-only until OK, which
+  // opens the keyboard, or a typed character; touch and click are as ever.
+  function holdKeyboard(f) {
+    const text = f.tagName === "TEXTAREA" || (f.tagName === "INPUT" && /^(text|search|password|number|email|url|tel)$/.test(f.type));
+    if (!text || f.readOnly) return;
+    f.readOnly = true;
+    f.dataset.held = "1";
+  }
+  const release = (f) => { if (f.dataset && f.dataset.held) { f.readOnly = false; delete f.dataset.held; } };
+  document.addEventListener("keydown", (e) => {
+    const f = document.activeElement;
+    if (!f || !f.dataset || !f.dataset.held) return;
+    if (keyOf(e) === "OK") { e.preventDefault(); e.stopImmediatePropagation(); release(f); f.blur(); f.focus(); }
+    else if (e.key.length === 1) release(f);
+  }, true);
+  document.addEventListener("focusout", (e) => release(e.target), true);
+  document.addEventListener("pointerdown", (e) => release(e.target), true);
+
   // A full-screen panel (pairing, profile choice, token): one at a time.
   function overlay(id, ...children) {
     for (const old of document.querySelectorAll(".setup-panel")) old.remove();
@@ -992,5 +1012,5 @@ window.VodMax = (() => {
   // The Android app's native player (window.VodMaxNative), if present.
   const native = window.VodMaxNative || null;
 
-  return { look: window.VodMaxLook, countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, setAmbient, bottomNav, closeSheet, sheetOpen, label, channelArt, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
+  return { look: window.VodMaxLook, holdKeyboard, countryName, proposeCountry, native, newerVersion, appUpdate, updateApp, setAmbient, bottomNav, closeSheet, sheetOpen, label, channelArt, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
 })();

@@ -2135,6 +2135,7 @@
     // Scrolled by the least that shows it whole (scroll-margin keeps the
     // focus ring in view): focus() alone centres a card that is off screen,
     // so quick presses made a row jump back and forth.
+    window.VodMax.holdKeyboard(best);
     best.focus({ preventScroll: true });
     best.scrollIntoView({ block: "nearest", inline: "nearest" });
   }

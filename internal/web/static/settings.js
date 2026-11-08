@@ -1575,7 +1575,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     // From the list of sections into the open one: its first control.
     if (dir === "ArrowRight" && $("side").contains(current)) {
       const first = all.find((e) => $("content").contains(e));
-      if (first) { first.focus(); first.scrollIntoView({ block: "nearest" }); }
+      if (first) { window.VodMax.holdKeyboard(first); first.focus(); first.scrollIntoView({ block: "nearest" }); }
       return;
     }
     // A switch row is as wide as the box: measured at its switch, it sits
@@ -1622,6 +1622,7 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     // Out of the section: its own row in the list, not the nearest one.
     if (!best && dir === "ArrowLeft" && inContent) best = document.querySelector(".item.active");
     if (best && best.offsetParent !== null) {
+      window.VodMax.holdKeyboard(best);
       best.focus();
       best.scrollIntoView({ block: "nearest" });
     }
