@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- CPU and Wi-Fi awake while a copy goes, also with the box in standby. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Movies/VodMax on Android 7-9; from 10 MediaStore needs nothing. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 

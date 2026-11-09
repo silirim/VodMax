@@ -276,6 +276,15 @@ libreria nuova.
   Allo scadere `onTimeout` ferma la copia in modo pulito e chiama
   `stopSelf`. La copia riprende alla prossima apertura dell'app, che
   azzera il conto.
+- **Standby**: il servizio in primo piano tiene vivo il processo, non il
+  processore né il Wi-Fi. Mentre copia tiene un `PARTIAL_WAKE_LOCK`
+  (permesso `WAKE_LOCK`) e, fino ad Android 13, un blocco
+  `WIFI_MODE_FULL_HIGH_PERF` che toglie il Wi-Fi dal risparmio energetico
+  anche a schermo spento. Da Android 14 quel blocco diventa
+  `WIFI_MODE_FULL_LOW_LATENCY`, che vale solo a schermo acceso e con l'app
+  davanti: lì non si chiede. Li lascia quando la coda finisce o va «In
+  pausa». Senza, un box che va in standby a metà copia la fermava fino
+  alla pausa.
 - **FAT32**: un errore di scrittura a 4 GB diventa il messaggio «Oltre 4
   GB».
 
@@ -363,7 +372,7 @@ solo sulle pagine del server.
 - Android:
   - `AndroidManifest.xml`: i permessi `FOREGROUND_SERVICE`,
     `FOREGROUND_SERVICE_DATA_SYNC`, `POST_NOTIFICATIONS`,
-    `ACCESS_NETWORK_STATE`, `WRITE_EXTERNAL_STORAGE` con
+    `ACCESS_NETWORK_STATE`, `WAKE_LOCK`, `WRITE_EXTERNAL_STORAGE` con
     `maxSdkVersion="28"`, il `<service>` di `CopyService` e
     `dataExtractionRules`, con il nuovo `res/xml/data_extraction_rules.xml`;
   - `MainActivity.java`: i metodi del ponte, il risultato della scelta

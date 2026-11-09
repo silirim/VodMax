@@ -125,6 +125,15 @@ public class CopyServiceTest {
     }
 
     @Test
+    public void keepsWifiAwakeWhereAndroidAllows() {
+        int highPerf = 3; // WifiManager.WIFI_MODE_FULL_HIGH_PERF, deprecated from Android 14
+        assertEquals(highPerf, CopyService.wifiLockMode(24));
+        assertEquals(highPerf, CopyService.wifiLockMode(33));
+        assertEquals(0, CopyService.wifiLockMode(34));
+        assertEquals(0, CopyService.wifiLockMode(35));
+    }
+
+    @Test
     public void writesAndReadsTheQueue() {
         CopyService.Copy a = CopyService.fromPage(SERVER, "/stream/save/a=b", "Serie (2019)/S01E01 - 100% + uno.mkv",
             "video/x-matroska", 5_000_000_000L, "\"e%1+\"", "Titolo con spazi\ne a capo · è");

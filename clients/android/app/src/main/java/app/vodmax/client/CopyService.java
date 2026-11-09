@@ -1,5 +1,6 @@
 package app.vodmax.client;
 
+import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -17,12 +18,14 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
+import android.os.PowerManager;
 import android.os.StatFs;
 import android.os.SystemClock;
 import android.os.storage.StorageManager;
@@ -177,6 +180,15 @@ public class CopyService extends Service {
 
     static boolean paused(long lastData, long now) {
         return now - lastData >= PAUSE_MS;
+    }
+
+    /** The Wi-Fi lock a copy holds on this Android, or 0 for none. */
+    @SuppressWarnings("deprecation")
+    static int wifiLockMode(int sdk) {
+        // HIGH_PERF keeps Wi-Fi out of power save with the screen off. From
+        // Android 14 it becomes LOW_LATENCY, which holds only with the screen
+        // on and the app in front, and may lower the throughput: none there.
+        return sdk < 34 ? WifiManager.WIFI_MODE_FULL_HIGH_PERF : 0;
     }
 
     /**
@@ -735,7 +747,36 @@ public class CopyService extends Service {
         if (c != null) new Thread(c::disconnect).start();
     }
 
+    // No timeout: a copy takes hours, and the worker ends, releasing the
+    // locks, about 30 minutes after its last data (paused).
+    @SuppressLint("WakelockTimeout")
     private void work() {
+        // A foreground service keeps the process, not the CPU or Wi-Fi: a
+        // box going to standby mid-copy would stall it until it paused.
+        PowerManager.WakeLock wake = getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "vodmax:copy");
+        WifiManager wm = getApplicationContext().getSystemService(WifiManager.class);
+        int mode = wifiLockMode(Build.VERSION.SDK_INT);
+        WifiManager.WifiLock wifi = wm != null && mode != 0 ? wm.createWifiLock(mode, "vodmax:copy") : null;
+        wake.acquire();
+        try {
+            if (wifi != null) wifi.acquire();
+            copyAll();
+        } finally {
+            if (wifi != null && wifi.isHeld()) wifi.release();
+            wake.release();
+        }
+        main.post(() -> {
+            int id;
+            synchronized (LOCK) {
+                if (worker != null) return; // a copy was queued meanwhile
+                id = lastStart;
+            }
+            stopForeground(STOP_FOREGROUND_REMOVE);
+            stopSelfResult(id); // not if a start is on its way
+        });
+    }
+
+    private void copyAll() {
         Copy last = null;
         while (true) {
             Copy c;
@@ -769,15 +810,6 @@ public class CopyService extends Service {
             current = null;
             last = c;
         }
-        main.post(() -> {
-            int id;
-            synchronized (LOCK) {
-                if (worker != null) return; // a copy was queued meanwhile
-                id = lastStart;
-            }
-            stopForeground(STOP_FOREGROUND_REMOVE);
-            stopSelfResult(id); // not if a start is on its way
-        });
     }
 
     private void copy(Copy c) {
