@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -357,6 +358,20 @@ func TestMyList(t *testing.T) {
 		_, body := e.do(t, "GET", "/api/v1/mylist", nil, true)
 		return string(body)
 	}
+	ids := func(body string) []int64 {
+		t.Helper()
+		var items []struct {
+			ID int64 `json:"id"`
+		}
+		if err := json.Unmarshal([]byte(body), &items); err != nil {
+			t.Fatalf("list: %v %s", err, body)
+		}
+		out := make([]int64, len(items))
+		for i, it := range items {
+			out[i] = it.ID
+		}
+		return out
+	}
 	if l := list(); l != "[]\n" && l != "[]" {
 		t.Fatalf("empty list: %s", l)
 	}
@@ -384,11 +399,11 @@ func TestMyList(t *testing.T) {
 	}
 	// Each profile has its own list.
 	kid := addKids(t, e)
-	if code, body := e.call(t, "GET", "/api/v1/mylist", nil, kid.device, kid.profile); code != 200 || strings.Contains(string(body), `"title":"1408"`) {
+	if code, body := e.call(t, "GET", "/api/v1/mylist", nil, kid.device, kid.profile); code != 200 || len(ids(string(body))) != 0 {
 		t.Fatalf("kids list: %d %s", code, body)
 	}
 	e.do(t, "PUT", "/api/v1/mylist/"+strconv.FormatInt(film, 10), map[string]bool{"on": false}, true)
-	if l := list(); strings.Contains(l, `"title":"1408"`) || !strings.Contains(l, "Twin Peaks") {
+	if l := list(); !slices.Equal(ids(l), []int64{series}) {
 		t.Fatalf("after removing: %s", l)
 	}
 }
