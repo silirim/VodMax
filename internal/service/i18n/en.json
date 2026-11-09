@@ -140,6 +140,7 @@
   "l'assistente non ha risposto in tempo: riprova o scegli un modello più veloce": "the assistant didn't answer in time: try again or choose a faster model",
   "l'indirizzo del provider di accesso deve iniziare con https://": "the address of the sign-in provider must start with https://",
   "l'indirizzo del server non deve contenere nome utente e password: usa i campi appositi": "the server address must not contain a user name and password: use their own fields",
+  "il link contiene *** al posto dei dati di accesso: incolla il link completo del provider": "the link has *** in place of the login details: paste the provider's full link",
   "la cartella %s non esiste": "the folder %s doesn't exist",
   "la cartella %s non esiste o il server non la vede (permessi dell'utente del servizio, cartelle nascoste dal servizio)": "the folder %s doesn't exist or the server can't see it (service user permissions, folders hidden from the service)",
   "la cartella %s non è leggibile dal server": "the server can't read the folder %s",

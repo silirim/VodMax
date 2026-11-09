@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -353,6 +354,9 @@ func (s *Service) AddSubscription(ctx context.Context, in SubscriptionInput) (in
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			return 0, invalid("URL della playlist non valido (atteso http:// o https://)")
 		}
+		if err := noMaskIn(u); err != nil {
+			return 0, err
+		}
 		if _, _, err := cloudLink(u.String()); err != nil {
 			return 0, err
 		}
@@ -472,6 +476,9 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 			u, err := url.Parse(strings.TrimSpace(*p.URL))
 			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 				return invalid("URL della playlist non valido (atteso http:// o https://)")
+			}
+			if err := noMaskIn(u); err != nil {
+				return err
 			}
 			if _, _, err := cloudLink(u.String()); err != nil {
 				return err
@@ -1112,6 +1119,20 @@ func noCredentialsIn(server string) error {
 	}
 	if hidden {
 		return invalid("l'indirizzo del server non deve contenere nome utente e password: usa i campi appositi")
+	}
+	return nil
+}
+
+// noMaskIn refuses a playlist address copied in its hidden form
+// (hideURLSecrets): its *** would go to the provider as the credentials.
+func noMaskIn(u *url.URL) error {
+	pw, _ := u.User.Password()
+	masked := pw == "***"
+	for k, v := range u.Query() {
+		masked = masked || secretParam.MatchString(k) && slices.Contains(v, "***")
+	}
+	if masked {
+		return invalid("il link contiene *** al posto dei dati di accesso: incolla il link completo del provider")
 	}
 	return nil
 }

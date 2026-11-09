@@ -140,6 +140,7 @@
   "l'assistente non ha risposto in tempo: riprova o scegli un modello più veloce": "l'assistant n'a pas répondu à temps : réessayez ou choisissez un modèle plus rapide",
   "l'indirizzo del provider di accesso deve iniziare con https://": "l'adresse du fournisseur d'identité doit commencer par https://",
   "l'indirizzo del server non deve contenere nome utente e password: usa i campi appositi": "l'adresse du serveur ne doit contenir ni nom d'utilisateur ni mot de passe : utilisez les champs prévus",
+  "il link contiene *** al posto dei dati di accesso: incolla il link completo del provider": "le lien contient *** à la place des identifiants : collez le lien complet du fournisseur",
   "la cartella %s non esiste": "le dossier %s n'existe pas",
   "la cartella %s non esiste o il server non la vede (permessi dell'utente del servizio, cartelle nascoste dal servizio)": "le dossier %s n'existe pas ou le serveur ne le voit pas (droits de l'utilisateur du service, dossiers masqués au service)",
   "la cartella %s non è leggibile dal server": "le dossier %s n'est pas lisible par le serveur",

@@ -140,6 +140,7 @@
   "l'assistente non ha risposto in tempo: riprova o scegli un modello più veloce": "der Assistent hat nicht rechtzeitig geantwortet: Versuche es erneut oder wähle ein schnelleres Modell",
   "l'indirizzo del provider di accesso deve iniziare con https://": "die Adresse des Anmeldeanbieters muss mit https:// beginnen",
   "l'indirizzo del server non deve contenere nome utente e password: usa i campi appositi": "die Serveradresse darf keinen Benutzernamen und kein Passwort enthalten: Nutze die dafür vorgesehenen Felder",
+  "il link contiene *** al posto dei dati di accesso: incolla il link completo del provider": "der Link enthält *** statt der Zugangsdaten: Füge den vollständigen Link des Anbieters ein",
   "la cartella %s non esiste": "der Ordner %s existiert nicht",
   "la cartella %s non esiste o il server non la vede (permessi dell'utente del servizio, cartelle nascoste dal servizio)": "der Ordner %s existiert nicht oder der Server sieht ihn nicht (Berechtigungen des Dienstbenutzers, vor dem Dienst verborgene Ordner)",
   "la cartella %s non è leggibile dal server": "der Ordner %s ist für den Server nicht lesbar",

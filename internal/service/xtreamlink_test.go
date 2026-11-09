@@ -142,6 +142,17 @@ func TestM3ULinkBecomesXtream(t *testing.T) {
 		t.Fatalf("plain link saved as %s", sub.Kind)
 	}
 
+	// A link copied masked (hideURLSecrets) is refused: as a playlist its
+	// *** would be sent to the panel as the user and password.
+	for _, masked := range []string{panel.URL + "/p/get.php?username=***&password=***", panel.URL + "/p/get.php?username=mario&password=***"} {
+		if _, err := s.AddSubscription(ctx, SubscriptionInput{Name: "M", Kind: "m3u", VPNID: vpnID, URL: masked}); err == nil || !strings.Contains(err.Error(), "***") {
+			t.Fatalf("add %s: %v", masked, err)
+		}
+		if err := s.UpdateSubscription(ctx, plain, SubscriptionPatch{URL: &masked}); err == nil || !strings.Contains(err.Error(), "***") {
+			t.Fatalf("patch %s: %v", masked, err)
+		}
+	}
+
 	// Saved as M3U by an earlier version: the sync says what to do and
 	// does not change the subscription by itself.
 	legacy := func(name, link string) int64 {
