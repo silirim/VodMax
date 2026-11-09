@@ -21,14 +21,14 @@ func TestUpdateCheck(t *testing.T) {
 			w.Write([]byte(`[
 			 {"tag_name":"v0.3.1","html_url":"https://example.invalid/r/v0.3.1","body":"vecchia","assets":[]},
 			 {"tag_name":"v0.4.0","html_url":"https://example.invalid/r/v0.4.0","body":"Novità","published_at":"2026-11-01T10:00:00Z","assets":[
-			   {"name":"VodMax-0.4.0.apk","browser_download_url":"` + gh.URL + `/dl/VodMax-0.4.0.apk","size":123},
+			   {"name":"VodMax.apk","browser_download_url":"` + gh.URL + `/dl/VodMax.apk","size":123},
 			   {"name":"vodmax-server_0.4.0_linux_amd64.tar.gz","browser_download_url":"` + gh.URL + `/dl/s-amd64","size":45},
 			   {"name":"vodmax-server_0.4.0_linux_arm64.tar.gz","browser_download_url":"` + gh.URL + `/dl/s-arm64","size":46},
 			   {"name":"SHA256SUMS","browser_download_url":"` + gh.URL + `/dl/SHA256SUMS","size":300}]},
 			 {"tag_name":"v0.5.0","draft":true,"assets":[]},
 			 {"tag_name":"v0.5.0-beta.1","prerelease":true,"html_url":"https://example.invalid/r/beta","body":"Beta","assets":[]}]`))
 		case "/dl/SHA256SUMS":
-			w.Write([]byte(strings.Repeat("a", 64) + "  VodMax-0.4.0.apk\n" + strings.Repeat("b", 64) + "  vodmax-server_0.4.0_linux_amd64.tar.gz\n" +
+			w.Write([]byte(strings.Repeat("a", 64) + "  VodMax.apk\n" + strings.Repeat("b", 64) + "  vodmax-server_0.4.0_linux_amd64.tar.gz\n" +
 				strings.Repeat("c", 64) + "  vodmax-server_0.4.0_linux_arm64.tar.gz\n"))
 		default:
 			http.NotFound(w, r)
@@ -51,7 +51,7 @@ func TestUpdateCheck(t *testing.T) {
 		t.Fatalf("check: %d %s", code, body)
 	}
 	if !info.Available || info.Latest != "v0.4.0" || info.Notes != "Novità" || !info.Enabled ||
-		info.APK == nil || info.APK.SHA256 != strings.Repeat("a", 64) || !strings.HasSuffix(info.APK.URL, "/dl/VodMax-0.4.0.apk") {
+		info.APK == nil || info.APK.SHA256 != strings.Repeat("a", 64) || !strings.HasSuffix(info.APK.URL, "/dl/VodMax.apk") {
 		t.Fatalf("update: %s", body)
 	}
 	// The result is kept: devices read it without asking GitHub.

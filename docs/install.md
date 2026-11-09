@@ -15,7 +15,7 @@ Packages are in the [releases](https://github.com/silirim/VodMax/releases):
 | `vodmax-server_<v>_linux_amd64.tar.gz` | Server on a PC, mini PC, virtual machine or container (x86-64) |
 | `vodmax-server_<v>_linux_arm64.tar.gz` | Server on Raspberry Pi 4/5 or an ARM NAS (64-bit) |
 | `vodmax-server_<v>_linux_armv7.tar.gz` | Server on 32-bit ARM boards |
-| `VodMax-<v>.apk` | Android phones and tablets, Android TV, Google TV, Fire TV |
+| `VodMax.apk` | Android phones and tablets, Android TV, Google TV, Fire TV |
 | `app.vodmax.client_<v>_all.ipk` | LG TVs with webOS |
 | `SHA256SUMS` | Checksums: `sha256sum -c --ignore-missing SHA256SUMS` (only the files you downloaded) |
 
@@ -240,7 +240,9 @@ be reachable over `https://`.
 
 ### Android phone, tablet, Android TV, Google TV
 
-1. Download `VodMax-<v>.apk` on the device (or copy it with a USB stick).
+1. Download `VodMax.apk` on the device (or copy it with a USB stick).
+   From 0.6.17 on, <https://github.com/silirim/VodMax/releases/latest/download/VodMax.apk>
+   always gives the latest version (betas excluded).
 2. Allow installing apps from that source when Android asks
    (*Install unknown apps*).
 3. Open VodMax, enter the server address (`http://192.168.1.10:8095`), then
@@ -261,7 +263,9 @@ from outside the store.
    *Developer options*; there enable *Apps from unknown sources* (or allow
    the Downloader app).
 2. Install **Downloader** from the Amazon Appstore and open in it the link
-   of `VodMax-<v>.apk` from the release page.
+   of `VodMax.apk` from the release page. From 0.6.17 on you can type this
+   fixed link instead, which always gives the latest version (betas excluded):
+   `https://github.com/silirim/VodMax/releases/latest/download/VodMax.apk`
 3. Open VodMax: enter the server address, or choose *Use this device on its own*.
 
 The Fire TV remote has no channel and colour buttons: use Up/Down and OK

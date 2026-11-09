@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds the release packages into dist/<version>/:
 #   vodmax-server_<v>_linux_{amd64,arm64,armv7}.tar.gz  server + systemd unit
-#   VodMax-<v>.apk                                      Android (with the built-in server)
+#   VodMax.apk                                          Android (with the built-in server)
 #   app.vodmax.client_<v>_all.ipk                        LG webOS
 #   SHA256SUMS
 # Needs Go; for the APK the Android SDK and NDK (clients/android/local.properties)
@@ -10,6 +10,8 @@
 # It stops when the apps' versions do not match, when the APK or the IPK
 # cannot be built, or when the APK is not signed with the release key.
 # DEBUG=1 turns these into warnings, for a local test build.
+# The APK name has no version, so releases/latest/download/VodMax.apk is
+# always the latest stable one (links and Fire TV Downloader codes).
 set -e
 v=${1:?versione, es. 0.2.0}
 cd "$(dirname "$0")/.."
@@ -45,16 +47,16 @@ if [ -n "${JAVA_HOME:-}" ]; then
   # else with the debug key, for local tests only.
   if [ -f "${VODMAX_SIGNING:-$HOME/.config/vodmax-release/keystore.properties}" ]; then
     (cd clients/android && ./gradlew --no-daemon -q assembleRelease)
-    cp clients/android/app/build/outputs/apk/release/app-release.apk "$out/VodMax-$v.apk"
+    cp clients/android/app/build/outputs/apk/release/app-release.apk "$out/VodMax.apk"
   else
     fail "nessuna chiave di rilascio: l'APK sarebbe firmato con la chiave di debug"
     (cd clients/android && ./gradlew --no-daemon -q assembleDebug)
-    cp clients/android/app/build/outputs/apk/debug/app-debug.apk "$out/VodMax-$v.apk"
+    cp clients/android/app/build/outputs/apk/debug/app-debug.apk "$out/VodMax.apk"
   fi
   # Installed apps take an update only with the key they were signed with.
   sdk=${ANDROID_HOME:-$(sed -n 's/^sdk.dir=//p' clients/android/local.properties)}
   signer=$(ls -d "$sdk"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -n 1)
-  certs=$("${signer:-apksigner}" verify --print-certs "$out/VodMax-$v.apk") || fail "firma dell'APK non verificata"
+  certs=$("${signer:-apksigner}" verify --print-certs "$out/VodMax.apk") || fail "firma dell'APK non verificata"
   case $certs in *"CN=Android Debug"*) fail "APK firmato con la chiave di debug" ;; esac
 else
   fail "JAVA_HOME non impostato: niente APK"

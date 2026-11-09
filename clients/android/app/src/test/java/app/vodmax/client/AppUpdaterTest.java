@@ -12,6 +12,8 @@ public class AppUpdaterTest {
     public void acceptsReleaseApks() {
         assertTrue(AppUpdater.releaseApk(BASE + "v0.6.6/VodMax-0.6.6.apk"));
         assertTrue(AppUpdater.releaseApk(BASE + "v0.7.0-beta.1/VodMax-0.7.0-beta.1.apk"));
+        // From 0.6.17 the APK has no version in its name.
+        assertTrue(AppUpdater.releaseApk(BASE + "v0.6.17/VodMax.apk"));
     }
 
     // Each of these passed the old prefix check; the connection resolves

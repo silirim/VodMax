@@ -15,7 +15,7 @@ I pacchetti sono nelle [release](https://github.com/silirim/VodMax/releases):
 | `vodmax-server_<v>_linux_amd64.tar.gz` | Server su PC, mini PC, macchina virtuale o container (x86-64) |
 | `vodmax-server_<v>_linux_arm64.tar.gz` | Server su Raspberry Pi 4/5 o NAS ARM (64 bit) |
 | `vodmax-server_<v>_linux_armv7.tar.gz` | Server su schede ARM a 32 bit |
-| `VodMax-<v>.apk` | Telefoni e tablet Android, Android TV, Google TV, Fire TV |
+| `VodMax.apk` | Telefoni e tablet Android, Android TV, Google TV, Fire TV |
 | `app.vodmax.client_<v>_all.ipk` | TV LG con webOS |
 | `SHA256SUMS` | Checksum: `sha256sum -c --ignore-missing SHA256SUMS` (solo i file scaricati) |
 
@@ -242,8 +242,9 @@ Il provider deve essere raggiungibile in `https://`.
 
 ### Telefono e tablet Android, Android TV, Google TV
 
-1. Scarica `VodMax-<v>.apk` sul dispositivo (o copialo con una chiavetta
-   USB).
+1. Scarica `VodMax.apk` sul dispositivo (o copialo con una chiavetta
+   USB). Dalla 0.6.17 <https://github.com/silirim/VodMax/releases/latest/download/VodMax.apk>
+   dà sempre l'ultima versione (beta escluse).
 2. Quando Android lo chiede, permetti l'installazione da quella fonte
    (*Installa app sconosciute*).
 3. Apri VodMax, scrivi l'indirizzo del server (`http://192.168.1.10:8095`),
@@ -263,7 +264,9 @@ Fire TV Cube, TV Fire TV). **Non** funziona sulla Fire TV Stick 4K Select
    del dispositivo per far comparire *Opzioni sviluppatore*; lì attiva *App
    di origine sconosciuta* (o permettilo all'app Downloader).
 2. Installa **Downloader** dall'Amazon Appstore e aprici il link di
-   `VodMax-<v>.apk` dalla pagina della release.
+   `VodMax.apk` dalla pagina della release. Dalla 0.6.17 puoi scrivere
+   invece questo link fisso, che dà sempre l'ultima versione (beta escluse):
+   `https://github.com/silirim/VodMax/releases/latest/download/VodMax.apk`
 3. Apri VodMax: scrivi l'indirizzo del server, oppure scegli *Usa questo
    dispositivo da solo*.
 

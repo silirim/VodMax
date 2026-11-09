@@ -139,8 +139,11 @@ docker run -d --name vodmax --restart unless-stopped -p 8095:8095 -v vodmax-data
 [compose file](packaging/docker-compose.yml) is ready). The admin token to
 sign in the first time: `docker exec vodmax cat /var/lib/vodmax/admin.token`.
 
-**Android / Android TV / Fire TV** — install `VodMax-<version>.apk`, then enter
+**Android / Android TV / Fire TV** — install `VodMax.apk`, then enter
 the server address or choose *Use this device on its own* (standalone).
+From 0.6.17 on, <https://github.com/silirim/VodMax/releases/latest/download/VodMax.apk>
+always downloads the latest version (betas excluded): handy on a Fire TV,
+in the Downloader app.
 
 **LG webOS** — install `app.vodmax.client_<version>_all.ipk` with the
 [webOS CLI](https://webostv.developer.lge.com/develop/tools/cli-introduction)
