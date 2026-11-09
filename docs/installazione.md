@@ -176,9 +176,11 @@ una versione nuova.
    cambia quando vuoi in **Impostazioni → VPN**.
 4. **Impostazioni → Abbonamenti**: aggiungi una playlist M3U (il suo
    indirizzo) o un account Xtream Codes (server, utente, password), scegli
-   la VPN (o *Nessuna VPN*), poi *Sincronizza ora*. Nel campo Server va bene
-   anche il link completo del provider (`…/get.php?username=…&password=…`):
-   utente e password si prendono da lì. Catalogo e guida si aggiornano ogni notte,
+   la VPN (o *Nessuna VPN*) e premi *Aggiungi*: il catalogo si scarica
+   subito e il riquadro dell'abbonamento mostra la fase e il tempo. Nel campo
+   Server va bene anche il link completo del provider
+   (`…/get.php?username=…&password=…`): utente e password si prendono da lì.
+   Catalogo e guida si aggiornano ogni notte,
    la guida anche ogni poche ore (Impostazioni → Sistema).
 5. **Impostazioni → Selezione** e **Categorie**: il tuo paese è quello
    scelto tra le bandiere al primo avvio (se ne può scegliere un altro per

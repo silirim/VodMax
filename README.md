@@ -161,7 +161,8 @@ Build from source: [docs/sviluppo.md](docs/sviluppo.md) and
 2. **Settings → Subscriptions**: the first time it asks how VodMax reaches
    your provider: through a WireGuard VPN (paste its `.conf`), through a VPN
    you already run on the router or the device, or without a VPN. Then add
-   an M3U or Xtream Codes playlist and *Sync now*.
+   an M3U or Xtream Codes playlist: the catalog starts downloading at once
+   and its box shows the phase and the time.
 3. **Settings → Collections**: add a folder of movies or series.
 4. **Settings → Devices**: pair TVs and phones with the code they show.
 

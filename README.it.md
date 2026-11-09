@@ -158,7 +158,8 @@ Dai sorgenti: [docs/sviluppo.md](docs/sviluppo.md) e `scripts/release.sh`.
 2. **Impostazioni → Abbonamenti**: la prima volta chiede come VodMax
    raggiunge il provider: con una VPN WireGuard (incolli il `.conf`), con
    una VPN che usi già sul router o sul dispositivo, oppure senza VPN. Poi
-   aggiungi una playlist M3U o Xtream Codes e *Sincronizza ora*.
+   aggiungi una playlist M3U o Xtream Codes: il catalogo si scarica subito
+   e il suo riquadro mostra la fase e il tempo.
 3. **Impostazioni → Raccolte**: aggiungi una cartella di film o di serie.
 4. **Impostazioni → Dispositivi**: abbina TV e telefoni con il codice che
    mostrano.
