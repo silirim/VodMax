@@ -1309,16 +1309,19 @@
     }
     box.append(el("ol", { className: "downloads copies" }, ...list.map((c) => {
       const going = !c.finished;
+      // Only a done copy keeps its file: on any other row the app deletes
+      // the piece (no orphan .part on a stick), so it is Annulla, confirmed.
+      const kept = c.state === "done";
       const row = el("li", {}, el("div", { className: "dl-main" }, el("strong", {}, c.title || c.name),
         el("span", { className: "state " + c.state }, (copyState[c.state] || c.state) + (going && c.size ? " · " + (c.percent || 0) + "% · " + gb(c.done || 0) + " / " + gb(c.size) : "")),
         c.name ? el("small", { className: "empty" }, c.name) : null,
         going ? el("span", { className: "bar" }, el("div", { style: "width:" + Math.min(100, c.percent || 0) + "%" })) : null));
-      const b = el("button", { className: "focusable small" + (going ? " danger" : "") });
-      window.VodMax.label(b, going ? "x" : "check", going ? t("Annulla") : t("Togli"));
+      const b = el("button", { className: "focusable small" + (kept ? "" : " danger") });
+      window.VodMax.label(b, kept ? "check" : "x", kept ? t("Togli") : t("Annulla"));
       b.onclick = () => {
-        if (going && !confirm(t("Annullare la copia di “{title}”? Il pezzo già copiato si cancella.", { title: c.title || c.name }))) return;
+        if (!kept && !confirm(t("Annullare la copia di “{title}”? Il pezzo già copiato si cancella.", { title: c.title || c.name }))) return;
         copier.cancelCopy(String(c.id));
-        if (!going) flash(t("Riga tolta: il file copiato resta"));
+        if (kept) flash(t("Riga tolta: il file copiato resta"));
         redrawCopies();
       };
       row.append(el("div", { className: "dl-buttons" }, b));

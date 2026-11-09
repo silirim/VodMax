@@ -68,7 +68,8 @@ public class CopyService extends Service {
     static final String MOVIES = "movies", APP = "app";
 
     // States, as the page reads them in copies(). The waiting ones and
-    // "paused" are not finished: the page offers Annulla, else Togli.
+    // "paused" are not finished. The page offers Togli only on DONE, whose
+    // file stays, and Annulla on the others, whose piece is deleted.
     static final String QUEUED = "queued", COPYING = "copying", WIFI = "wifi", NETWORK = "network",
         FOLDER = "folder", PAUSED = "paused", DONE = "done";
     static final String UNREACHABLE = "unreachable", EXPIRED = "expired", CHANGED = "changed", FAT32 = "fat32",
@@ -329,7 +330,7 @@ public class CopyService extends Service {
         return "";
     }
 
-    /** Annulla (a copy not finished: its piece is deleted) or Togli. */
+    /** Annulla (any copy but DONE: its piece is deleted) or Togli (DONE: the file stays). */
     static void cancel(Context ctx, String id) {
         Context app = ctx.getApplicationContext();
         Copy gone = null;

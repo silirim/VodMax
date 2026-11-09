@@ -588,7 +588,7 @@ public class MainActivity extends Activity {
             }
         }
 
-        /** Annulla a copy not finished (its piece is deleted), or Togli a finished one. */
+        /** Annulla a copy not done (its piece is deleted), or Togli a done one. */
         @JavascriptInterface
         public void cancelCopy(String id) {
             CopyService.cancel(MainActivity.this, id);

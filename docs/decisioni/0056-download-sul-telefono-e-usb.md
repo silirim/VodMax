@@ -118,11 +118,13 @@ documentazione di Amazon. Va confermato con le prove a mano.
   - la cartella in uso e **Scegli cartella**;
   - **Copia anche su rete mobile**, spento all'inizio (vedi Regole);
   - le copie in coda, in corso e finite, con la percentuale e lo stato;
-  - **Annulla** su una copia non finita: ferma la copia e cancella il
-    pezzo copiato;
-  - **Togli** su una copia finita o non riuscita: toglie solo la riga. Il
-    file copiato resta; sul telefono si elimina con l'app File, su Fire TV
-    con un PC o un gestore file di terzi.
+  - **Annulla** su una copia non finita o non riuscita, dopo una
+    conferma: ferma la copia e cancella il pezzo copiato, che altrimenti
+    resterebbe sulla chiavetta come `….part`. Per riprendere una copia
+    non riuscita si tocca di nuovo il pulsante (vedi Ripresa);
+  - **Togli** su una copia finita: toglie solo la riga. Il file copiato
+    resta; sul telefono si elimina con l'app File, su Fire TV con un PC o
+    un gestore file di terzi.
 - Tutto si usa con il telecomando.
 - Se Android chiude l'app a metà, la copia riprende quando si riapre
   VodMax.
