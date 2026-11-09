@@ -236,6 +236,20 @@ button.small, .lang-picker button { min-height: 2.2em; padding: 0.4em 1em; font-
 button.small:disabled { cursor: wait; }
 .button.danger:focus, button.small.danger:focus { color: #7a0d0d; }
 
+/* Volume in the players (common.js volume): the mute button and a slider
+   drawn like the seek bar, filled up to --level (WebKit has no fill part). */
+.volume { display: inline-flex; align-items: center; gap: var(--s2); }
+.volume .button { padding-left: 0.8em; padding-right: 0.8em; }
+.volume input { width: 6em; height: 1.6em; margin: 0; background: none; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.volume input:focus { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: var(--r-pill); }
+.volume input::-webkit-slider-runnable-track { height: 6px; border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--accent) var(--level, 100%), rgba(255, 255, 255, 0.22) var(--level, 100%)); }
+.volume input::-webkit-slider-thumb { -webkit-appearance: none; width: 0.9rem; height: 0.9rem; margin-top: calc(3px - 0.45rem);
+  background: #fff; border: 0; border-radius: 50%; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5); }
+.volume input::-moz-range-track { height: 6px; background: rgba(255, 255, 255, 0.22); border-radius: var(--r-pill); }
+.volume input::-moz-range-progress { height: 6px; background: var(--accent); border-radius: var(--r-pill); }
+.volume input::-moz-range-thumb { width: 0.9rem; height: 0.9rem; background: #fff; border: 0; border-radius: 50%; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5); }
+
 /* ":focus-visible" is left out of these rules on purpose: browsers before
    Chromium 86 (old Android WebViews) drop a whole rule they cannot read. */
 

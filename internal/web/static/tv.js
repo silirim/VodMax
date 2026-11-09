@@ -581,6 +581,7 @@
   // Full screen where the browser allows it (phones, PCs); the TV app
   // already fills the screen.
   $("ctl-full").hidden = !(document.fullscreenEnabled && document.documentElement.requestFullscreen) || /Web0S|webOS/.test(navigator.userAgent);
+  window.VodMax.volume($("video"), $("ctl-volume"), showControls);
   document.addEventListener("fullscreenchange", () => {
     const full = Boolean(document.fullscreenElement);
     const text = full ? t("Esci dallo schermo intero") : t("Schermo intero");
@@ -823,7 +824,7 @@
     const bar = $("controls");
     let passOn = false;
     if (!bar.hidden && bar.contains(document.activeElement)) {
-      const buttons = [...bar.querySelectorAll("button")].filter((b) => b.offsetParent);
+      const buttons = [...bar.querySelectorAll("button, input")].filter((b) => b.offsetParent);
       const i = buttons.indexOf(document.activeElement);
       if (key === "ArrowLeft" || key === "ArrowRight") {
         const next = buttons[Math.min(buttons.length - 1, Math.max(0, i + (key === "ArrowRight" ? 1 : -1)))];

@@ -871,5 +871,8 @@
   "Scegli il file della playlist": "Scegli il file della playlist",
   "Il file è più grande di 64 MB: usa un indirizzo o un link": "Il file è più grande di 64 MB: usa un indirizzo o un link",
   "File caricato: leggo il catalogo": "File caricato: leggo il catalogo",
-  "Invio del file non riuscito": "Invio del file non riuscito"
+  "Invio del file non riuscito": "Invio del file non riuscito",
+  "Volume": "Volume",
+  "Disattiva audio": "Disattiva audio",
+  "Riattiva audio": "Riattiva audio"
 }

@@ -2464,6 +2464,7 @@
   // page already fills the screen. A phone turns to landscape.
   const canFullscreen = Boolean(document.fullscreenEnabled && $("player").requestFullscreen) && !/Web0S|webOS/.test(navigator.userAgent);
   $("player-full").hidden = !canFullscreen;
+  window.VodMax.volume(video, $("player-volume"), showBar);
   function toggleFullscreen() {
     if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
     $("player").requestFullscreen({ navigationUI: "hide" }).then(() => {

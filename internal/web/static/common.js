@@ -934,6 +934,49 @@ window.VodMax = (() => {
     };
   }
 
+  // ---- Volume: a mute button and a 0-100 slider (both in box) ----
+  // One level per device in localStorage, so live TV and films start at
+  // the last one chosen. On the slider Up and Down change it; Left and
+  // Right still move along the bar. The Android app shows none: the
+  // device's own volume keys work there.
+  function volume(video, box, onUse) {
+    if (native) { box.hidden = true; return; }
+    const button = box.querySelector("button"), slider = box.querySelector("input");
+    const saved = store.get("volume", null) || {};
+    // The level is never 0: the slider at 0 mutes, unmuting goes back to it.
+    let level = Math.min(100, Math.max(5, Number(saved.level) || 100)), muted = saved.muted === true;
+    const show = () => {
+      video.volume = level / 100;
+      video.muted = muted;
+      slider.value = muted ? 0 : level;
+      slider.style.setProperty("--level", slider.value + "%");
+      const text = muted ? t("Riattiva audio") : t("Disattiva audio");
+      button.replaceChildren(VodMaxIcons.icon(muted ? "volume-x" : level < 50 ? "volume-1" : "volume-2"));
+      button.title = text;
+      button.setAttribute("aria-label", text);
+    };
+    const use = () => { show(); store.set("volume", { level, muted }); if (onUse) onUse(); };
+    const set = (v) => { v = Math.min(100, Math.max(0, v)); muted = v === 0; if (v) level = v; use(); };
+    slider.setAttribute("aria-label", t("Volume"));
+    slider.addEventListener("input", () => set(Number(slider.value)));
+    slider.addEventListener("keydown", (e) => {
+      const key = keyOf(e);
+      // A faded bar: the key only brings it back (the page's handler).
+      if ((key !== "ArrowUp" && key !== "ArrowDown") || box.closest(".idle,[hidden]")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      set(Number(slider.value) + (key === "ArrowUp" ? 5 : -5));
+    });
+    button.addEventListener("click", () => { muted = !muted; use(); });
+    // iPhones and iPads leave the level to their own buttons (read-only there).
+    const probe = document.createElement("video");
+    probe.volume = 0.5;
+    slider.hidden = probe.volume !== 0.5;
+    // Left out of a layout (the TV page on phones): a saved mute could not be undone there.
+    if (getComputedStyle(box).display === "none") { level = 100; muted = false; }
+    show();
+  }
+
   // ---- Server problems (VPN down, failed sync, expiring account) ----
   // A small notice in a corner, on every page, linking to the settings.
   let statusWatched = false;
@@ -1017,5 +1060,5 @@ window.VodMax = (() => {
   const copier = native && ["copyTarget", "copy", "copies", "chooseFolder", "cancelCopy"].every((m) => typeof native[m] === "function") ? native : null;
   const copyTarget = () => (copier ? String(copier.copyTarget() || "") : "");
 
-  return { look: window.VodMaxLook, holdKeyboard, countryName, proposeCountry, native, copier, copyTarget, newerVersion, appUpdate, updateApp, setAmbient, bottomNav, closeSheet, sheetOpen, label, channelArt, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, watchStatus };
+  return { look: window.VodMaxLook, holdKeyboard, countryName, proposeCountry, native, copier, copyTarget, newerVersion, appUpdate, updateApp, setAmbient, bottomNav, closeSheet, sheetOpen, label, channelArt, store, viewer, token, authHeaders, withToken, askToken, showProfiles, me, api, keyOf, clock, hhmm, tsPlayer, hlsPlayer, volume, watchStatus };
 })();

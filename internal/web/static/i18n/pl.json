@@ -871,5 +871,8 @@
   "Scegli il file della playlist": "Wybierz plik playlisty",
   "Il file è più grande di 64 MB: usa un indirizzo o un link": "Plik jest większy niż 64 MB: użyj adresu lub linku",
   "File caricato: leggo il catalogo": "Plik przesłany: odczytywanie katalogu",
-  "Invio del file non riuscito": "Nie udało się wysłać pliku"
+  "Invio del file non riuscito": "Nie udało się wysłać pliku",
+  "Volume": "Głośność",
+  "Disattiva audio": "Wycisz",
+  "Riattiva audio": "Wyłącz wyciszenie"
 }
