@@ -871,6 +871,7 @@
   "Fino a 64 MB. Il file resta sul server e non si aggiorna da solo: per una versione nuova, Modifica → “Sostituisci il file”.": "Up to 64 MB. The file stays on the server and does not update by itself: for a new version, Edit → “Replace the file”.",
   "Scegli il file della playlist": "Choose the playlist file",
   "Il file è più grande di 64 MB: usa un indirizzo o un link": "The file is larger than 64 MB: use an address or a link",
+  "Scrivi il nome dell'abbonamento (al massimo 80 caratteri)": "Enter the subscription name (80 characters at most)",
   "File caricato: leggo il catalogo": "File uploaded: reading the catalog",
   "Invio del file non riuscito": "Sending the file failed",
   "Volume": "Volume",

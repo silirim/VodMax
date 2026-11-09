@@ -474,6 +474,7 @@ func (a *api) addPlaylistFile(w http.ResponseWriter, r *http.Request) {
 	vpnID, _ := strconv.ParseInt(q.Get("vpn_id"), 10, 64)
 	id, err := a.svc.AddPlaylistFile(r.Context(), q.Get("name"), vpnID, q.Get("file"), r.Body)
 	if err != nil {
+		drainUpload(r)
 		a.fail(w, r, err)
 		return
 	}
@@ -485,15 +486,25 @@ func (a *api) addPlaylistFile(w http.ResponseWriter, r *http.Request) {
 func (a *api) replacePlaylistFile(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
+		drainUpload(r)
 		a.fail(w, r, err)
 		return
 	}
 	view, err := a.svc.ReplacePlaylistFile(r.Context(), id, r.URL.Query().Get("file"), r.Body)
 	if err != nil {
+		drainUpload(r)
 		a.fail(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, view)
+}
+
+// drainUpload reads the rest of a refused upload, up to the largest file
+// accepted. Refused before its body is read (no name, a sync running),
+// past 256 KB unread net/http closes the connection while the browser is
+// still sending: the page sees a failed upload, not the reason.
+func drainUpload(r *http.Request) {
+	io.Copy(io.Discard, io.LimitReader(r.Body, service.PlaylistMaxSize+1))
 }
 
 func (a *api) syncSubscription(w http.ResponseWriter, r *http.Request) {

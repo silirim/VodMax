@@ -3,6 +3,7 @@ package api
 import (
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -70,4 +71,30 @@ func TestPlaylistFileUpload(t *testing.T) {
 		t.Fatalf("restore: %d %s", code, body)
 	}
 	waitLive(n, "1")
+}
+
+// An upload refused before its body is read (no name, no such
+// subscription) is still read to the end: left unread past 256 KB,
+// net/http closes the connection while the browser is still sending, and
+// the page shows a failed upload instead of the reason.
+func TestPlaylistFileRefusedEarly(t *testing.T) {
+	e := setup(t, true)
+	big := strings.Repeat("#EXTINF:-1,Canale\nhttp://panel.example/u/p/1.ts\n", 1<<15) // over 1 MB
+	for _, c := range []struct {
+		method, path, msg string
+		code              int
+	}{
+		{"POST", "/api/v1/subscriptions/file?name=&vpn_id=1&file=lista.m3u", "nome dell'abbonamento obbligatorio", 400},
+		{"PUT", "/api/v1/subscriptions/99/file?file=lista.m3u", "", 404},
+	} {
+		body := strings.NewReader(big)
+		req := httptest.NewRequest(c.method, c.path, body)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("X-VodMax-Lang", "it")
+		rec := httptest.NewRecorder()
+		e.srv.Config.Handler.ServeHTTP(rec, req)
+		if rec.Code != c.code || !strings.Contains(rec.Body.String(), c.msg) || body.Len() != 0 {
+			t.Errorf("%s %s: %d %s, %d bytes unread", c.method, c.path, rec.Code, rec.Body, body.Len())
+		}
+	}
 }

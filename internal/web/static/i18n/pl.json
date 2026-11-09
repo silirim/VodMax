@@ -871,6 +871,7 @@
   "Fino a 64 MB. Il file resta sul server e non si aggiorna da solo: per una versione nuova, Modifica → “Sostituisci il file”.": "Do 64 MB. Plik zostaje na serwerze i nie aktualizuje się sam: aby wgrać nową wersję, Edytuj → „Zastąp plik”.",
   "Scegli il file della playlist": "Wybierz plik playlisty",
   "Il file è più grande di 64 MB: usa un indirizzo o un link": "Plik jest większy niż 64 MB: użyj adresu lub linku",
+  "Scrivi il nome dell'abbonamento (al massimo 80 caratteri)": "Wpisz nazwę subskrypcji (najwyżej 80 znaków)",
   "File caricato: leggo il catalogo": "Plik przesłany: odczytywanie katalogu",
   "Invio del file non riuscito": "Nie udało się wysłać pliku",
   "Volume": "Głośność",

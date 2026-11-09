@@ -39,9 +39,11 @@ func fromFile(sub store.Subscription) bool {
 	return sub.Kind == "m3u" && set.File != ""
 }
 
-// playlistMaxSize bounds an uploaded file, as a backup to restore; a
-// variable for tests.
-var playlistMaxSize int64 = 64 << 20
+// PlaylistMaxSize bounds an uploaded file, as a backup to restore.
+const PlaylistMaxSize = 64 << 20
+
+// playlistMaxSize is PlaylistMaxSize, a variable for tests.
+var playlistMaxSize int64 = PlaylistMaxSize
 
 // readPlaylistFile checks an uploaded file as a downloaded playlist is
 // checked, without reading past the limit, and returns it gzipped.

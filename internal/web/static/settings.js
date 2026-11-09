@@ -585,6 +585,10 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       const chosen = fromFile ? file.files[0] : null;
       if (fromFile && !chosen && !hasFile) { flash(t("Scegli il file della playlist")); return; }
       if (chosen && chosen.size > 64 * 1024 * 1024) { flash(t("Il file è più grande di 64 MB: usa un indirizzo o un link")); return; }
+      // Checked here, not after sending megabytes the server would refuse
+      // (and, on edit, after the file had already replaced the old one).
+      const trimmed = name.value.trim();
+      if (chosen && (!trimmed || [...trimmed].length > 80)) { flash(t("Scrivi il nome dell'abbonamento (al massimo 80 caratteri)")); name.focus(); return; }
       save.disabled = true;
       try {
         let id = existing && existing.id;
