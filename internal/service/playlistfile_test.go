@@ -281,7 +281,7 @@ func fileService(t *testing.T) (*Service, int64) {
 func TestPlaylistFile(t *testing.T) {
 	ctx := context.Background()
 	s, vpnID := fileService(t)
-	list := playlistOf(10)
+	list := playlistOf(120) // past dropMinimum, so that replacing it meets the drop check
 	id, err := s.AddPlaylistFile(ctx, "Da file", vpnID, "lista.m3u8", strings.NewReader(list))
 	if err != nil {
 		t.Fatal(err)
@@ -296,7 +296,7 @@ func TestPlaylistFile(t *testing.T) {
 		t.Fatalf("file stored in clear or missing: %v", err)
 	}
 	res, err := s.Sync(ctx, id, false)
-	if err != nil || res.Total["live"] != 10 {
+	if err != nil || res.Total["live"] != 120 {
 		t.Fatalf("sync: %+v %v", res, err)
 	}
 
@@ -321,14 +321,14 @@ func TestPlaylistFile(t *testing.T) {
 	}
 
 	// Replacing it with a much shorter list is a choice: no drop check.
-	if _, err := s.ReplacePlaylistFile(ctx, id, "nuova.m3u", strings.NewReader(playlistOf(2))); err != nil {
+	if _, err := s.ReplacePlaylistFile(ctx, id, "nuova.m3u", strings.NewReader(playlistOf(10))); err != nil {
 		t.Fatal(err)
 	}
 	v := waitView(t, s, func(v SubscriptionView) bool {
-		return v.ID == id && !v.Syncing && v.Counts["live"] == 2 || v.LastSync != nil && v.LastSync.Error != ""
+		return v.ID == id && !v.Syncing && (v.Counts["live"] == 10 || v.LastSync != nil && v.LastSync.Error != "")
 	})
-	if v.LastSync != nil && v.LastSync.Error != "" {
-		t.Fatalf("replace: %s", v.LastSync.Error)
+	if v.LastSync == nil || v.LastSync.Error != "" || v.Counts["live"] != 10 {
+		t.Fatalf("replace: %+v %v", v.LastSync, v.Counts)
 	}
 
 	// A sync that starts while the file arrives would keep the old catalog.
