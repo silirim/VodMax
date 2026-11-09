@@ -21,6 +21,10 @@ func TestXtreamLink(t *testing.T) {
 		{"https://panel.example/get.php?username=mario&password=p%40ss", "https://panel.example", "mario", "p@ss"},
 		{" http://panel.example:2095/x/y/get.php?type=m3u&username=u&password=p ", "http://panel.example:2095/x/y", "u", "p"},
 		{"http://ospite:chiave@panel.example/get.php?username=u&password=p", "http://panel.example", "u", "p"},
+		{"http://panel.example:8080/player_api.php?username=mario&password=segreta", "http://panel.example:8080", "mario", "segreta"},
+		{"https://panel.example/x/player_api.php?username=u&password=p&action=get_live_streams", "https://panel.example/x", "u", "p"},
+		{"http://panel.example/player_api.php?username=mario", "", "", ""},
+		{"http://panel.example/player_api.php/x?username=u&password=p", "", "", ""},
 		// Plain playlists stay M3U.
 		{"http://panel.example/get.php?username=mario&type=m3u_plus", "", "", ""},
 		{"http://panel.example/get.php?username=mario&password=", "", "", ""},
@@ -175,4 +179,76 @@ func TestM3ULinkBecomesXtream(t *testing.T) {
 	if sub, _ := s.st.Subscription(ctx, working); sub.Kind != "m3u" {
 		t.Fatalf("working playlist renamed: saved as %s", sub.Kind)
 	}
+}
+
+func TestXtreamServerLink(t *testing.T) {
+	ctx := context.Background()
+	s, vpnID := linkService(t)
+	panel := fakePanel(t, "/p")
+
+	// The full link as the server: split, and it wins over the fields.
+	link := panel.URL + "/p/player_api.php?username=mario&password=segreta"
+	id, err := s.AddSubscription(ctx, SubscriptionInput{Name: "A", Kind: "xtream", VPNID: vpnID, Server: link, Username: "altro", Password: "vecchia"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkXtream(t, s, id, panel.URL+"/p")
+
+	// Edited with a get.php link, the password field left empty.
+	old, err := s.AddSubscription(ctx, SubscriptionInput{Name: "B", Kind: "xtream", VPNID: vpnID, Server: panel.URL + "/vecchio", Username: "luigi", Password: "vecchia"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server, user, empty := panel.URL+"/p/get.php?username=mario&password=segreta&type=m3u_plus", "luigi", ""
+	if err := s.UpdateSubscription(ctx, old, SubscriptionPatch{Server: &server, Username: &user, Password: &empty}); err != nil {
+		t.Fatal(err)
+	}
+	checkXtream(t, s, old, panel.URL+"/p")
+
+	// A link without the password is still refused.
+	half := panel.URL + "/p/get.php?username=mario"
+	if _, err := s.AddSubscription(ctx, SubscriptionInput{Name: "C", Kind: "xtream", VPNID: vpnID, Server: half, Username: "mario", Password: "segreta"}); err == nil {
+		t.Fatal("add: link without password accepted")
+	}
+	if err := s.UpdateSubscription(ctx, old, SubscriptionPatch{Server: &half}); err == nil {
+		t.Fatal("edit: link without password accepted")
+	}
+
+	// What the settings page sees has no password.
+	subs, err := s.Subscriptions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shown, _ := json.Marshal(subs)
+	if strings.Contains(string(shown), "segreta") || strings.Contains(string(shown), "password") {
+		t.Fatalf("view: %s", shown)
+	}
+
+	// A full link saved as the server by an earlier version comes back
+	// masked from the form: its secrets are kept, not replaced by ***.
+	settings, _ := json.Marshal(xtreamSettings{Server: panel.URL + "/p/player_api.php?username=mario&password=segreta", Username: "mario"})
+	sec, _ := json.Marshal(subscriptionSecret{Password: "segreta"})
+	legacy, err := s.st.AddSubscription(ctx, store.Subscription{Name: "D", Kind: "xtream", VPNID: vpnID, Settings: settings},
+		func(id int64) []byte { return s.box.Seal(sec, subOwner(id)) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	sub, err := s.st.Subscription(ctx, legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := s.subscriptionView(ctx, sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var masked xtreamSettings
+	json.Unmarshal(view.Settings, &masked)
+	if !strings.Contains(masked.Server, "password=***") {
+		t.Fatalf("legacy view: %s", masked.Server)
+	}
+	name := "D2"
+	if err := s.UpdateSubscription(ctx, legacy, SubscriptionPatch{Name: &name, Server: &masked.Server, Username: &masked.Username, Password: &empty}); err != nil {
+		t.Fatal(err)
+	}
+	checkXtream(t, s, legacy, panel.URL+"/p")
 }

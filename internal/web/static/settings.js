@@ -530,7 +530,23 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     const portal = input({ value: set.server || "", placeholder: "http://portale:porta/c/" });
     const mac = input({ autocomplete: "off", spellcheck: false, placeholder: existing ? t("lascia vuoto per non cambiarlo") : "00:1A:79:XX:XX:XX" });
     if (existing) { kind.value = existing.kind; kind.disabled = true; vpn.value = existing.vpn_id; }
-    const xtreamRows = [...field("Server", server), ...field(t("Utente"), user), ...field("Password", pass)];
+    // The provider's full link fills user and password, as the server would.
+    const splitLink = () => {
+      let u;
+      try { u = new URL(server.value.trim()); } catch { return; }
+      const m = /^(.*)\/(get|player_api)\.php$/.exec(u.pathname);
+      const login = u.searchParams.get("username"), key = u.searchParams.get("password");
+      // *** is a saved link shown masked: the server puts its secrets back.
+      if (!/^https?:$/.test(u.protocol) || !m || !login || !key || login === "***" || key === "***") return;
+      server.value = u.origin + m[1];
+      user.value = login;
+      pass.value = key;
+    };
+    server.addEventListener("paste", () => setTimeout(splitLink));
+    server.addEventListener("change", splitLink);
+    const xtreamRows = [...field("Server", server),
+      el("p", { className: "note full" }, t("Va bene anche il link completo del provider (…/get.php?username=…&password=…): utente e password si compilano da soli.")),
+      ...field(t("Utente"), user), ...field("Password", pass)];
     // An M3U playlist from an address (a cloud share link too) or from a
     // file (0057). No file where there is no file picker: the LG app, and
     // TVs whose Android app finds none.

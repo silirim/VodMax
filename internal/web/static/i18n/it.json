@@ -866,6 +866,7 @@
   "File (.m3u, .m3u8)": "File (.m3u, .m3u8)",
   "Playlist da": "Playlist da",
   "Va bene anche il link di condivisione di un file di Google Drive o Dropbox, condiviso con “chiunque abbia il link”: non serve accedere a nessun account.": "Va bene anche il link di condivisione di un file di Google Drive o Dropbox, condiviso con “chiunque abbia il link”: non serve accedere a nessun account.",
+  "Va bene anche il link completo del provider (…/get.php?username=…&password=…): utente e password si compilano da soli.": "Va bene anche il link completo del provider (…/get.php?username=…&password=…): utente e password si compilano da soli.",
   "Sostituisci il file": "Sostituisci il file",
   "Fino a 64 MB. Il file resta sul server e non si aggiorna da solo: per una versione nuova, Modifica → “Sostituisci il file”.": "Fino a 64 MB. Il file resta sul server e non si aggiorna da solo: per una versione nuova, Modifica → “Sostituisci il file”.",
   "Scegli il file della playlist": "Scegli il file della playlist",

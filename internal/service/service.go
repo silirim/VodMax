@@ -329,6 +329,13 @@ func (s *Service) AddSubscription(ctx context.Context, in SubscriptionInput) (in
 			in.Kind, in.Server, in.Username, in.Password, in.URL = "xtream", server, user, pass, ""
 		}
 	}
+	// The provider's full link pasted as the server: its user and password
+	// win over the fields, since the link was the last thing given.
+	if in.Kind == "xtream" {
+		if server, user, pass, ok := xtreamLink(in.Server); ok {
+			in.Server, in.Username, in.Password = server, user, pass
+		}
+	}
 	var settings any
 	var sec subscriptionSecret
 	switch in.Kind {
@@ -435,13 +442,17 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 		var set xtreamSettings
 		json.Unmarshal(sub.Settings, &set)
 		if p.Server != nil {
-			set.Server = strings.TrimSpace(*p.Server)
+			// An older full link comes back masked: split it with its real secrets, not ***.
+			set.Server = keepURLSecrets(strings.TrimSpace(*p.Server), set.Server)
 		}
 		if p.Username != nil {
 			set.Username = *p.Username
 		}
 		if p.Password != nil && *p.Password != "" {
 			sec.Password = *p.Password
+		}
+		if server, user, pass, ok := xtreamLink(set.Server); ok && p.Server != nil {
+			set.Server, set.Username, sec.Password = server, user, pass // a full link, as on add
 		}
 		if p.Server != nil {
 			if err := noCredentialsIn(set.Server); err != nil {
@@ -1029,15 +1040,19 @@ func (s *Service) BrowseCategories(ctx context.Context, kind string) ([]store.Br
 }
 
 // xtreamLink reads an Xtream Codes playlist link
-// (http://host:port/get.php?username=…&password=…): the same panel answers
-// player_api.php with those credentials, and gives films, series, the guide
-// and the account state that a plain M3U lacks.
+// (http://host:port/get.php?username=…&password=…) or API link
+// (…/player_api.php?…): the same panel answers player_api.php with those
+// credentials, and gives films, series, the guide and the account state
+// that a plain M3U lacks.
 func xtreamLink(raw string) (server, username, password string, ok bool) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return "", "", "", false
 	}
 	prefix, found := strings.CutSuffix(u.Path, "/get.php")
+	if !found {
+		prefix, found = strings.CutSuffix(u.Path, "/player_api.php")
+	}
 	q := u.Query()
 	username, password = q.Get("username"), q.Get("password")
 	if !found || username == "" || password == "" {

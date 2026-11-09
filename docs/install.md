@@ -171,7 +171,8 @@ is out.
    home address. You can change it later in **Settings → VPN**.
 4. **Settings → Subscriptions**: add an M3U playlist (its URL) or an Xtream
    Codes account (server, user, password), choose the VPN (or *No VPN*),
-   then *Sync now*.
+   then *Sync now*. The provider's full link (`…/get.php?username=…&password=…`)
+   works in the Server field too: user and password are taken from it.
    The catalog and the guide are refreshed every night and the guide every
    few hours (Settings → System).
 5. **Settings → Selection** and **Categories**: your country is the one you
