@@ -11,9 +11,10 @@ import (
 
 // Catch-up: channels whose provider keeps an archive (tv_archive) can be
 // watched from a past moment, within their archive days. The archive is
-// played like a film (remux to fragmented MP4, seekable by asking the
-// archive from another minute). Times in archive URLs are in the
-// provider server's time zone, read at login and kept in memory.
+// played like a film (remux to fragmented MP4, or MPEG-TS at playing speed
+// for mpegts.js in the browser; seekable by asking the archive from
+// another minute). Times in archive URLs are in the provider server's
+// time zone, read at login and kept in memory.
 
 type catchupInfo struct {
 	client   *xtream.Client

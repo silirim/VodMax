@@ -42,6 +42,10 @@ vodmax-server -version
   Senza, VodMax funziona, ma niente pausa della diretta, niente
   registrazioni, e i file MKV/AVI non partono nel browser (l'app Android li
   riproduce comunque).
+  Le repliche dall'archivio della playlist vanno meglio nel browser e sulle
+  TV LG con ffmpeg 6.1 o più recente (Debian 13, Ubuntu 24.04, l'immagine
+  Docker): con uno più vecchio (Debian 12 ha la 5.1) arrivano in MP4, che
+  alcune TV LG non riproducono.
 - **Comskip** (facoltativo): segna la pubblicità nelle registrazioni, per
   "salta la pubblicità". Non è nei pacchetti di Debian né
   nell'immagine Docker: compilalo dai sorgenti e metti `comskip` in

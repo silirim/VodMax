@@ -91,4 +91,17 @@ piattaforme.
   la variante del canale che ha l'archivio. Riprodotto come un film
   (remux in MP4, salti chiedendo l'archivio dal minuto giusto): circa
   3 s per partire. La guida conserva 7 giorni di programmi passati.
+- Catch-up nel browser da 0.6.16: il player della TV LG G4 non reggeva
+  l'MP4 a frammenti (buffer fermo a ~10 s, poi blocco o MediaError 3, a
+  volte audio senza video). Con FFmpeg 6.1 o più recente la sessione ha
+  `ts: true` e il browser chiede `?ts=1`: il server manda MPEG-TS (video
+  copiato, audio AAC) a velocità di riproduzione, con `-readrate 1` e una
+  scorta iniziale (`-readrate_initial_burst`) pari ai secondi saltati più
+  30, e il browser lo riproduce con mpegts.js come le registrazioni. Il
+  ritmo serve perché mpegts.js smette per sempre di caricare a buffer
+  pieno e il flusso non si può richiedere da un byte: per lo stesso motivo
+  la ripresa da una pausa con più di 60 s già caricati davanti, o un salto
+  a più di 60 s dalla fine di quanto caricato, riapre il flusso da lì. Con
+  un FFmpeg più vecchio (Debian 12 ha la 5.1) e nell'app Android resta
+  l'MP4.
 - "Dall'inizio" in TV: dentro il buffer se c'è, altrimenti archivio.

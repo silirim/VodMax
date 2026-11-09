@@ -42,6 +42,10 @@ vodmax-server -version
   Without it VodMax works, but there is no pause of live TV, no recordings
   and MKV/AVI files do not play in the browser (the Android app plays them
   anyway).
+  Replays from the playlist's archive play best in the browser and on LG
+  TVs with ffmpeg 6.1 or later (Debian 13, Ubuntu 24.04, the Docker image):
+  with an older one (Debian 12 has 5.1) they arrive as MP4, which some LG
+  TVs do not play.
 - **Comskip** (optional): marks the ads in recordings, for "skip ad". It is
   not in Debian's packages nor in the Docker image: build it from
   its sources and put `comskip` in `/usr/local/bin`. Without it everything
