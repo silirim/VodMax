@@ -47,7 +47,11 @@ inatteso (500) arriva solo a un profilo amministratore, gli altri leggono
 un messaggio generico e il dettaglio resta nel log del server. Una
 richiesta di visione superata da una più recente dello stesso player
 (stesso `viewer`: zapping veloce) risponde 410 e non segna il canale come
-guasto; il client la ignora.
+guasto; il client la ignora. Se invece un altro dispositivo prende il
+controllo della connessione mentre la visione parte (analisi del file,
+avvio della conversione, apertura di un canale), risponde come una
+connessione occupata: 409, o 423 se ora la tengono solo registrazioni; e
+anche lì il canale non è guasto.
 
 | Metodo e percorso | Scopo |
 |---|---|

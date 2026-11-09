@@ -342,5 +342,10 @@ func (s *Service) openLiveItem(ctx context.Context, it store.PlaybackItem, viewe
 	if replacedBy(streamCtx) {
 		return nil, ErrReplaced
 	}
+	// Taken over while it opened: busy, not a broken channel, and not the
+	// provider error it caused (that one names the provider's address).
+	if busy := context.Cause(streamCtx); errors.As(busy, new(ConnectionBusy)) {
+		return nil, busy
+	}
 	return nil, err
 }

@@ -1,6 +1,14 @@
 package api
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -48,4 +56,84 @@ func TestCatchupSessions(t *testing.T) {
 			t.Errorf("%s: %d %s", c.name, code, body)
 		}
 	}
+}
+
+// A replay or a channel still starting when another device takes the
+// connection answers 409 ("take control?") like a busy connection: not a
+// failure in the log, and not the provider's address in the answer.
+func TestTakenOverWhileStarting(t *testing.T) {
+	e, p := tvSetup(t)
+	var rai, cielo int64
+	for _, c := range channels(t, e, "?section=tv") {
+		switch c.Name {
+		case "Rai 1":
+			rai = c.ID
+		case "Cielo":
+			cielo = c.ID
+		}
+	}
+	now := time.Now()
+	code, body := e.do(t, "POST", "/api/v1/catchup/"+strconv.FormatInt(rai, 10)+"/session",
+		map[string]any{"viewer": "salotto-tv-01", "start": now.Add(-2 * time.Hour).Unix(), "stop": now.Add(-time.Hour).Unix()}, true)
+	var sess struct{ ID, URL string }
+	if code != 200 || json.Unmarshal(body, &sess) != nil {
+		t.Fatalf("catch-up: %d %s", code, body)
+	}
+	// An ffmpeg still reading the archive: nothing written yet.
+	dir := t.TempDir()
+	ff, started := filepath.Join(dir, "ffmpeg"), filepath.Join(dir, "started")
+	if err := os.WriteFile(ff, []byte("#!/bin/sh\ntouch "+started+"\nexec sleep 10\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	e.svc.SetFFmpeg(ff, "")
+	p.mu.Lock()
+	p.holds = map[string]bool{"101.ts": true}
+	p.mu.Unlock()
+
+	var logged bytes.Buffer
+	a := &api{svc: e.svc, log: slog.New(slog.NewTextHandler(&logged, nil))}
+	open := func(h http.HandlerFunc, path, name, value string) <-chan *httptest.ResponseRecorder {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		r := httptest.NewRequestWithContext(ctx, "GET", path, nil)
+		r.SetPathValue(name, value)
+		done := make(chan *httptest.ResponseRecorder, 1)
+		go func() {
+			defer cancel()
+			w := httptest.NewRecorder()
+			h(w, r)
+			done <- w
+		}()
+		return done
+	}
+	waitFor := func(what string, ok func() bool) {
+		t.Helper()
+		for deadline := time.Now().Add(5 * time.Second); !ok(); time.Sleep(20 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatal("waiting for", what)
+			}
+		}
+	}
+	takeOver := func(what string, done <-chan *httptest.ResponseRecorder) {
+		t.Helper()
+		resp, err := openStream(t, e, ticket(t, e, cielo, "camera-tablet-02")+"?force=1")
+		if err != nil || resp.StatusCode != 200 {
+			t.Fatalf("take over: %v %v", err, resp)
+		}
+		readSome(t, resp)
+		resp.Body.Close()
+		w := <-done
+		if w.Code != 409 || strings.Contains(w.Body.String(), p.Listener.Addr().String()) || strings.Contains(logged.String(), "level=ERROR") {
+			t.Fatalf("%s: %d %s, log %q", what, w.Code, w.Body.String(), logged.String())
+		}
+	}
+
+	done := open(a.vodRemux, sess.URL+"?ts=1&t=0", "session", sess.ID)
+	waitFor("ffmpeg", func() bool { _, err := os.Stat(started); return err == nil })
+	takeOver("catch-up", done)
+
+	// The channel: the provider has not answered yet.
+	link := ticket(t, e, rai, "salotto-tv-01")
+	done = open(a.liveStream, link+"?force=1", "ticket", strings.TrimPrefix(link, "/stream/live/"))
+	waitFor("the provider", func() bool { p.mu.Lock(); defer p.mu.Unlock(); return p.hits["101.ts"] > 0 })
+	takeOver("channel", done)
 }

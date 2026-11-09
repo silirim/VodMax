@@ -134,23 +134,25 @@ func (s *Service) acquireConn(ctx context.Context, subID int64, viewer string, f
 			}
 		}
 		if victim < 0 {
-			onlyRecordings := true
-			for _, other := range kept {
-				onlyRecordings = onlyRecordings && other.recording
-			}
 			m.mu.Unlock()
 			cancel(nil)
-			return nil, nil, ConnectionBusy{Max: max, Recording: onlyRecordings}
+			return nil, nil, ConnectionBusy{Max: max, Recording: onlyRecordings(kept)}
 		}
 		stop = append(stop, kept[victim])
 		kept = append(kept[:victim], kept[victim+1:]...)
 	}
 	m.bySub[subID] = append(kept, c)
+	// What the stream taken over would hear if it asked again with force:
+	// with only recordings left, nobody can take the connection back.
+	takenOver := ConnectionBusy{Max: max, Recording: onlyRecordings(m.bySub[subID])}
 	m.mu.Unlock()
 
 	// Wait for replaced streams to release their provider connection.
 	for _, old := range stop {
-		var cause error // nil: taken over by someone else
+		// Taken over by someone else: one still starting answers like a
+		// busy connection ("take control?", or held by a recording) rather
+		// than failing.
+		var cause error = takenOver
 		if old.viewer == viewer {
 			cause = ErrReplaced
 		}
@@ -174,6 +176,17 @@ func (s *Service) acquireConn(ctx context.Context, subID int64, viewer string, f
 		c.finish()
 	}
 	return streamCtx, release, nil
+}
+
+// onlyRecordings tells whether recordings, which nobody can take over,
+// hold all these connections.
+func onlyRecordings(list []*conn) bool {
+	for _, c := range list {
+		if !c.recording {
+			return false
+		}
+	}
+	return true
 }
 
 // upstream opens a provider URL through the subscription's VPN, retrying

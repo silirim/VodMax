@@ -704,6 +704,11 @@ func (s *Service) probe(ctx context.Context, sess *vodSession, force bool) (*pro
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
+		// Taken over by another device during the analysis: the connection
+		// is busy now, the file is not broken.
+		if busy := context.Cause(streamCtx); errors.As(busy, new(ConnectionBusy)) {
+			return nil, busy
+		}
 		return nil, fmt.Errorf("analisi del file non riuscita: %s", firstLine(stderr.String(), err))
 	}
 	return parseProbe(out)
@@ -857,7 +862,8 @@ func (s *Service) startRemux(ctx context.Context, input, out []string, t Transco
 	br := bufio.NewReaderSize(body, 64<<10)
 	if _, err := br.Peek(8); err != nil {
 		body.Close()
-		// Replaced by a newer request or abandoned: not a failed conversion.
+		// Replaced by a newer request, taken over by another device or
+		// abandoned: not a failed conversion.
 		if ctx.Err() != nil {
 			return nil, context.Cause(ctx)
 		}

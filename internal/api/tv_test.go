@@ -29,6 +29,7 @@ type tvProvider struct {
 	broken   map[string]bool // live streams ("101.ts") the provider does not serve
 	stalls   map[string]bool // live streams that stop sending after a few packets, connection open
 	kicks    map[string]bool // live streams closed after a few packets, as when another client takes the connection
+	holds    map[string]bool // live streams that never answer: the request waits until it is cancelled
 	hits     map[string]int  // live requests per stream, served or not
 	extra    string          // more live streams, JSON objects
 	// Detail pages: detailsDown answers 503, badSeries a page that is not
@@ -97,6 +98,11 @@ func newTVProvider() *tvProvider {
 			if p.broken[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]] {
 				p.mu.Unlock()
 				http.Error(w, "stream not found", http.StatusNotFound)
+				return
+			}
+			if p.holds[r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]] {
+				p.mu.Unlock()
+				<-r.Context().Done()
 				return
 			}
 			if p.active >= 1 {

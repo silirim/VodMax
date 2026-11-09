@@ -51,3 +51,53 @@ func TestBackgroundGivesWay(t *testing.T) {
 	}
 	watch()
 }
+
+// A stream taken over while it starts hears what it would hear asking
+// again with force: "take control?" while a viewer holds a connection,
+// the recording message when only recordings are left, since nobody can
+// take one back from them.
+func TestTakenOverHearsBusy(t *testing.T) {
+	ctx := context.Background()
+	hold := func(s *Service, sub int64, viewer string, force, recording bool) context.Context {
+		t.Helper()
+		c, release, err := s.acquire(ctx, sub, viewer, force, recording)
+		if err != nil {
+			t.Fatalf("%s: %v", viewer, err)
+		}
+		go func() { <-c.Done(); release() }()
+		t.Cleanup(release)
+		return c
+	}
+	heard := func(c context.Context) ConnectionBusy {
+		t.Helper()
+		var busy ConnectionBusy
+		if !errors.As(context.Cause(c), &busy) {
+			t.Fatalf("taken over: %v, want busy", context.Cause(c))
+		}
+		return busy
+	}
+
+	s, sub := oneConnectionService(t)
+	film := hold(s, sub, "film-viewer-1", false, false)
+	tv := hold(s, sub, "tv-viewer-02", true, false)
+	if heard(film).Recording {
+		t.Error("taken by a viewer: the recording message")
+	}
+	hold(s, sub, "recording:1", true, true)
+	if !heard(tv).Recording {
+		t.Error("taken by a recording: \"take control?\" that cannot work")
+	}
+	if _, _, err := s.acquire(ctx, sub, "tv-viewer-02", true, false); !errors.Is(err, ConnectionBusy{Max: 1, Recording: true}) {
+		t.Errorf("asking again with force: %v", err)
+	}
+
+	// Two connections: the recording takes one, a viewer keeps the other.
+	s, sub = oneConnectionService(t)
+	s.st.SetSyncResult(ctx, sub, "ok", "", json.RawMessage(`{"max_connections":2}`))
+	film = hold(s, sub, "film-viewer-1", false, false)
+	hold(s, sub, "tv-viewer-02", false, false)
+	hold(s, sub, "recording:1", true, true)
+	if heard(film).Recording {
+		t.Error("a viewer still holds a connection: the recording message")
+	}
+}

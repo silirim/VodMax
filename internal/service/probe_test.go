@@ -1,6 +1,13 @@
 package service
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
 
 func TestParseProbeTracks(t *testing.T) {
 	out := []byte(`{"format":{"duration":"6012.4"},"streams":[
@@ -29,5 +36,39 @@ func TestParseProbeTracks(t *testing.T) {
 	p.Audio[1].Language = "fre"
 	if p.preferredAudio() != 0 {
 		t.Fatal("without Italian the file's default track is preferred")
+	}
+}
+
+// A film taken over by another device during the analysis hears that the
+// connection is busy ("take control?"), not that the file is broken.
+func TestProbeTakenOver(t *testing.T) {
+	s, sub := oneConnectionService(t)
+	dir := t.TempDir()
+	ffprobe, started := filepath.Join(dir, "ffprobe"), filepath.Join(dir, "started")
+	if err := os.WriteFile(ffprobe, []byte("#!/bin/sh\ntouch "+started+"\nexec sleep 10\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	s.SetFFmpeg("", ffprobe)
+	sess := &vodSession{id: "sesscccc", viewer: "film-viewer-1", subID: sub, mode: "remux", internal: "probecccc", expires: time.Now().Add(time.Hour)}
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.probe(context.Background(), sess, false)
+		done <- err
+	}()
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		if _, err := os.Stat(started); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("ffprobe never started")
+		}
+	}
+	_, release, err := s.acquire(context.Background(), sub, "tv-viewer-02", true, false)
+	if err != nil {
+		t.Fatalf("take control refused: %v", err)
+	}
+	defer release()
+	if err := <-done; !errors.As(err, new(ConnectionBusy)) {
+		t.Fatalf("analysis ended with %v, want busy", err)
 	}
 }
