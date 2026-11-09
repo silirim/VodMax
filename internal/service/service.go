@@ -792,10 +792,12 @@ func (s *Service) runSync(ctx context.Context, id int64, allowDrop bool) (res Sy
 			s.st.SetSyncResult(s.life, id, "error", err.Error(), nil)
 			return SyncResult{}, err
 		}
-		if err := s.st.SetSyncResult(ctx, id, "ok", "", nil); err != nil {
+		// Done only once the selection shows the new rows, as below.
+		if res.Selection, err = s.applySelection(ctx, id); err != nil {
+			s.st.SetSyncResult(s.life, id, "error", err.Error(), nil)
 			return SyncResult{}, err
 		}
-		if res.Selection, err = s.applySelection(ctx, id); err != nil {
+		if err := s.st.SetSyncResult(ctx, id, "ok", "", nil); err != nil {
 			return SyncResult{}, err
 		}
 		res.Duration = time.Since(started) / time.Millisecond
@@ -830,16 +832,27 @@ func (s *Service) runSync(ctx context.Context, id int64, allowDrop bool) (res Sy
 	if err := s.st.ApplyPendingRestore(ctx); err != nil {
 		return SyncResult{}, err
 	}
-	if err := s.st.SetSyncResult(ctx, id, "ok", "", snap.Account); err != nil {
-		return SyncResult{}, err
-	}
-	s.unmarkRun(ctx, syncRunKey(id)) // the catalog is in; the guide has its own mark
+	// The selection is the step that needs the most memory: the fetched
+	// catalog is not kept through it.
+	skipped, account := snap.Skipped, snap.Account
+	snap = nil
+	// New rows stay hidden until the selection shows them, so the sync is
+	// done, and its mark goes, only after it: a process stopped during the
+	// selection leaves the sync interrupted and the old synced_at, and
+	// maintenance does it again.
 	s.syncPhase(id, "Applico la selezione", 0)
 	stats, err := s.applySelection(ctx, id)
 	if err != nil {
+		// Saved so that maintenance waits syncRetry instead of starting
+		// it again at every tick.
+		s.st.SetSyncResult(s.life, id, "error", err.Error(), account)
 		return SyncResult{}, err
 	}
-	result := SyncResult{ImportResult: imported, Skipped: snap.Skipped, Selection: stats}
+	if err := s.st.SetSyncResult(ctx, id, "ok", "", account); err != nil {
+		return SyncResult{}, err
+	}
+	s.unmarkRun(ctx, syncRunKey(id)) // the catalog is shown; the guide has its own mark
+	result := SyncResult{ImportResult: imported, Skipped: skipped, Selection: stats}
 	// The catalog is in and shown from here on; the guide follows, and its
 	// failure does not invalidate the catalog.
 	if sub, err := s.st.Subscription(ctx, id); err == nil && sub.Kind == "xtream" {

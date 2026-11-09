@@ -265,7 +265,9 @@ func (s *Service) runScheduled(ctx context.Context, log *slog.Logger, now time.T
 		if !interruptedDue(run, now) {
 			continue // nor its guide, which may be what stopped the process
 		}
-		if catalogDue(sc, sub.SyncedAt, sub.SyncStatus, now) {
+		// An interrupted sync keeps the synced_at of the one before, which
+		// for a sync started during the day is past today's nightly hour.
+		if run.Attempts > 0 && sc.CatalogHour >= 0 || catalogDue(sc, sub.SyncedAt, sub.SyncStatus, now) {
 			res, err := s.Sync(ctx, sub.ID, false)
 			if err != nil {
 				log.Warn("sincronizzazione programmata fallita", "abbonamento", sub.ID, "err", err)

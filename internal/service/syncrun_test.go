@@ -2,11 +2,14 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -185,5 +188,148 @@ func TestInterruptedSync(t *testing.T) {
 	s.endLife()
 	if v = waitView(t, s, func(v SubscriptionView) bool { return !v.Syncing }); !v.SyncInterrupted || v.SyncStatus != "ok" {
 		t.Fatalf("after the stop: %+v", v)
+	}
+}
+
+// New titles stay hidden until the selection that follows the import: a
+// process stopped during it leaves the sync interrupted, not done, and
+// maintenance does it again after the pause, also for a sync started
+// during the day. A selection that fails on its own is saved as a failed
+// sync, retried after syncRetry.
+func TestSyncInterruptedInSelection(t *testing.T) {
+	ctx := context.Background()
+	s, vpnID := linkService(t)
+	// The nightly hour is never close: only the interruption makes the
+	// sync due.
+	nightly := Schedule{CatalogHour: (time.Now().Hour() + 12) % 24, GuideHours: 6}
+	if err := s.SetSchedule(ctx, nightly); err != nil {
+		t.Fatal(err)
+	}
+	var catalogHits atomic.Int32
+	var second atomic.Bool
+	panel := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/player_api.php" {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.URL.Query().Get("action") {
+		case "":
+			w.Write([]byte(`{"user_info":{"auth":1,"status":"Active","exp_date":"1893456000","max_connections":"1","active_cons":"0"}}`))
+		case "get_live_streams":
+			catalogHits.Add(1)
+			if second.Load() {
+				w.Write([]byte(`[{"num":1,"name":"Canale Uno","stream_id":101,"category_id":"1"},{"num":2,"name":"Canale Due","stream_id":102,"category_id":"1"}]`))
+				return
+			}
+			w.Write([]byte(`[{"num":1,"name":"Canale Uno","stream_id":101,"category_id":"1"}]`))
+		default:
+			w.Write([]byte(`[]`))
+		}
+	}))
+	t.Cleanup(panel.Close)
+	id, err := s.AddSubscription(ctx, SubscriptionInput{Name: "A", Kind: "xtream", VPNID: vpnID, Server: panel.URL, Username: "mario", Password: "segreta"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A sync stopped during the selection, and the restart: a new process
+	// on the same database.
+	stopInSelection := func() {
+		t.Helper()
+		sel := &s.selMu // the selection waits until the process has stopped
+		sel.Lock()
+		var once sync.Once
+		unlock := func() { once.Do(sel.Unlock) }
+		t.Cleanup(unlock)
+		if _, err := s.StartSync(ctx, id, false); err != nil {
+			t.Fatal(err)
+		}
+		waitView(t, s, func(v SubscriptionView) bool { return v.SyncPhase == "Applico la selezione" })
+		s.endLife()
+		unlock()
+		waitView(t, s, func(v SubscriptionView) bool { return !v.Syncing })
+		s = New(s.st, s.box, nil)
+	}
+	stopInSelection()
+	v := waitView(t, s, func(SubscriptionView) bool { return true })
+	if !v.SyncInterrupted || v.SyncedAt != nil || v.Counts["live"] != 0 {
+		t.Fatalf("after the stop: %+v", v)
+	}
+	if st, err := s.Status(ctx); err != nil || !slices.ContainsFunc(st.Problems, func(p Problem) bool {
+		return p.Area == "subscription" && strings.Contains(p.Text, "si è interrotta")
+	}) {
+		t.Fatalf("status: %+v %v", st.Problems, err)
+	}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	s.runScheduled(ctx, log, time.Now().Add(31*time.Minute))
+	if catalogHits.Load() != 2 {
+		t.Fatalf("catalog read %d times", catalogHits.Load())
+	}
+	v = waitView(t, s, func(SubscriptionView) bool { return true })
+	if v.SyncInterrupted || v.SyncedAt == nil || v.SyncStatus != "ok" || v.Counts["live"] != 1 {
+		t.Fatalf("after the retry: %+v", v)
+	}
+
+	// A later sync, started by hand during the day: its old synced_at is
+	// past the nightly hour, and the new channel waits for the retry.
+	synced := *v.SyncedAt
+	second.Store(true)
+	stopInSelection()
+	if v = waitView(t, s, func(SubscriptionView) bool { return true }); !v.SyncInterrupted || v.SyncedAt == nil || !v.SyncedAt.Equal(synced) || v.Counts["live"] != 1 {
+		t.Fatalf("after the second stop: %+v", v)
+	}
+	// With the automatic sync off only the person starts it.
+	if err := s.SetSchedule(ctx, Schedule{CatalogHour: -1, GuideHours: 6}); err != nil {
+		t.Fatal(err)
+	}
+	s.runScheduled(ctx, log, time.Now().Add(31*time.Minute))
+	if catalogHits.Load() != 3 {
+		t.Fatalf("catalog read %d times with the automatic sync off", catalogHits.Load())
+	}
+	if err := s.SetSchedule(ctx, nightly); err != nil {
+		t.Fatal(err)
+	}
+	s.runScheduled(ctx, log, time.Now().Add(31*time.Minute))
+	if catalogHits.Load() != 4 {
+		t.Fatalf("catalog read %d times", catalogHits.Load())
+	}
+	if v = waitView(t, s, func(SubscriptionView) bool { return true }); v.SyncInterrupted || v.SyncStatus != "ok" || v.Counts["live"] != 2 {
+		t.Fatalf("after the second retry: %+v", v)
+	}
+
+	if err := s.st.SetRules(ctx, id, json.RawMessage(`{"home":5}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Sync(ctx, id, false); err == nil {
+		t.Fatal("sync with unreadable rules")
+	}
+	var run syncRun
+	s.st.Setting(ctx, syncRunKey(id), &run)
+	if v = waitView(t, s, func(SubscriptionView) bool { return true }); v.SyncStatus != "error" || v.SyncError == "" || run.Attempts != 0 {
+		t.Fatalf("after a failed selection: %+v, mark %+v", v, run)
+	}
+}
+
+// A collection, too, is done only once the selection shows its titles: a
+// selection that fails leaves it failed, not synced.
+func TestLocalSyncFailedSelection(t *testing.T) {
+	ctx := context.Background()
+	s, _ := linkService(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Film di casa.mkv"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	id, err := s.AddSubscription(ctx, SubscriptionInput{Name: "Casa", Kind: "local", Path: dir, Content: "movie"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.st.SetRules(ctx, id, json.RawMessage(`{"home":5}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Sync(ctx, id, false); err == nil {
+		t.Fatal("sync with unreadable rules")
+	}
+	if v := waitView(t, s, func(SubscriptionView) bool { return true }); v.SyncStatus != "error" || v.SyncError == "" {
+		t.Fatalf("after a failed selection: %+v", v)
 	}
 }
