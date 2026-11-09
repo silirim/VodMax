@@ -1540,9 +1540,17 @@
       play(media, id, title, startAt, "remux", tracks);
       return;
     }
-    // Taken over: the video too, or the other device, reopening in the
-    // moment the analysis let the connection go, would get it back.
-    load(startAt || 0, forced);
+    // A catch-up goes through mpegts.js (MSE): webOS stalls on the
+    // server's fragmented MP4 in a plain video element. sess.ts: the
+    // server's ffmpeg can send it at playing speed.
+    if (media === "catchup" && sess.ts && window.mpegts && mpegts.isSupported()) {
+      state.play.reopen = true;
+      openTS(startAt || 0);
+    } else {
+      // Taken over: the video too, or the other device, reopening in the
+      // moment the analysis let the connection go, would get it back.
+      load(startAt || 0, forced);
+    }
     saveTimer = setInterval(saveProgress, 15000);
   }
 
@@ -1771,7 +1779,10 @@
   function toggle() {
     const p = state.play;
     if (!p) return;
-    if (p.ts) p.ts.toggle(); else if (video.paused) video.play(); else video.pause();
+    // A catch-up keeps coming while paused: past a minute held ahead the
+    // browser's buffer may fill, where mpegts.js stops loading for good.
+    if (p.ts && !p.recording && p.ts.paused && p.ts.behind() > 60) openTS(position());
+    else if (p.ts) p.ts.toggle(); else if (video.paused) video.play(); else video.pause();
     updateToggle();
     showBar();
   }
@@ -1857,6 +1868,9 @@
   video.addEventListener("error", async () => {
     const p = state.play;
     if (!p || p.recording) { if (p && p.recording) flash(t("Registrazione non riproducibile in questo browser")); return; }
+    // mpegts.js reports its own errors (catchupError); a probe here would
+    // open a second stream and replace the one playing.
+    if (p.ts) { flash(t("Riproduzione non riuscita")); return; }
     // Find out why: a busy connection answers 409, one held by a recording 423.
     const status = await fetch(p.sess.url + (p.sess.mode === "remux" ? "?t=0" : ""), { headers: { Range: "bytes=0-0" } })
       .then((r) => { r.body && r.body.cancel(); return r.status; }).catch(() => 0);
@@ -1883,7 +1897,7 @@
   video.addEventListener("ended", () => {
     const p = state.play;
     if (p && p.sess.next && !p.nextCancelled) { playNext(false); return; }
-    if (p && p.media === "catchup" && goOnCatchup(p)) return;
+    if (p && p.media === "catchup" && goOnCatchup(p, position(), p.reopen ? openTS : load)) return;
     saveProgress();
     stopPlayback(true);
   });
@@ -2053,6 +2067,9 @@
     const saved = save ? saveProgress() : Promise.resolve();
     // An archive opened from the TV or the guide: closing goes back there.
     if (save && state.play && state.play.media === "catchup" && state.catchupBack) {
+      // Until the page goes, mpegts.js would play its buffer again.
+      if (state.play.ts) state.play.ts.destroy();
+      video.pause();
       location.href = state.catchupBack;
       return;
     }
@@ -2198,14 +2215,37 @@
     }).catch(fail);
   }
 
-  // Opens a TS recording at a second (or "live" while it is recorded).
+  // A catch-up through mpegts.js: the stream's own answer says why it
+  // failed (the video element's error handler would probe it again).
+  function catchupError(type, detail, info) {
+    const p = state.play;
+    if (!p) return;
+    const code = info && info.code;
+    if (code === 410) return; // replaced by a newer request of this player
+    if (code === 423) {
+      flash(t("Tutte le connessioni dell'abbonamento sono occupate da una registrazione in corso"));
+      stopPlayback(true);
+      return;
+    }
+    if (code === 409) {
+      if (confirm(t("La connessione dell'abbonamento è in uso su un altro dispositivo. Prendere il controllo?"))) openTS(position(), true);
+      else stopPlayback(true);
+      return;
+    }
+    diag("ts-error", { type, detail, code, msg: info && info.msg });
+    flash(t("Riproduzione non riuscita"));
+  }
+
+  // Opens a TS recording at a second (or "live" while it is recorded), or
+  // a catch-up converted to MPEG-TS by the server.
   // The video's clock starts again at 0: position() adds the offset.
-  function openTS(from) {
+  function openTS(from, force) {
     const p = state.play;
     if (!p || !p.reopen) return;
     if (p.ts) p.ts.destroy();
     p.offset = from === "live" ? Math.max(0, duration() - 4) : Math.max(0, from);
-    p.ts = window.VodMax.tsPlayer(video, p.sess.url + "?t=" + (from === "live" ? "live" : Math.floor(p.offset)), { live: true, onError: recordingError });
+    const url = p.sess.url + (p.recording ? "?t=" : "?ts=1&t=") + (from === "live" ? "live" : Math.floor(p.offset)) + (force ? "&force=" + Date.now() : "");
+    p.ts = window.VodMax.tsPlayer(video, url, { live: true, onError: p.recording ? recordingError : catchupError });
     showBar();
   }
 
@@ -2217,7 +2257,9 @@
     if (p.growing && target >= d - 8) { openTS("live"); return; }
     target = Math.max(0, d > 5 ? Math.min(target, d - 5) : target);
     const b = video.buffered, at = target - p.offset;
-    for (let i = 0; i < b.length; i++) {
+    // A catch-up far back in the buffer: reopened, as in toggle.
+    const tooMuch = !p.recording && b.length && b.end(b.length - 1) - at > 60;
+    for (let i = 0; i < b.length && !tooMuch; i++) {
       if (at >= b.start(i) && at <= b.end(i) - 1) { p.ts.seek(target - position()); showBar(); return; }
     }
     openTS(target);

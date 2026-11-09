@@ -31,7 +31,7 @@ func TestVODRefusesPlaylists(t *testing.T) {
 	ran := false
 	if _, err := exec.LookPath(s.ffmpegBin()); err == nil {
 		ran = true
-		if st, err := s.OpenRemux(context.Background(), sess.id, 0, false, -1, -1); err == nil {
+		if st, err := s.OpenRemux(context.Background(), sess.id, 0, false, -1, -1, false); err == nil {
 			st.Close()
 			t.Error("ffmpeg converted a playlist")
 		}

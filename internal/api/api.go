@@ -1191,7 +1191,7 @@ func (a *api) vodRemux(w http.ResponseWriter, r *http.Request) {
 	if v, err := strconv.Atoi(q.Get("sub")); err == nil {
 		sub = v
 	}
-	stream, err := a.svc.OpenRemux(r.Context(), r.PathValue("session"), max(t, 0), q.Get("force") != "", audio, sub)
+	stream, err := a.svc.OpenRemux(r.Context(), r.PathValue("session"), max(t, 0), q.Get("force") != "", audio, sub, q.Get("ts") != "")
 	if err != nil {
 		a.fail(w, r, err)
 		return

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -255,6 +256,9 @@ type PlaybackSession struct {
 	// SubtitlesURL returns the WebVTT of the chosen subtitles, written
 	// while the remux runs (?sub=N on the remux URL).
 	SubtitlesURL string `json:"subtitles_url,omitempty"`
+	// TS: the remux URL also sends MPEG-TS at playing speed (?ts=1), as
+	// the browser plays a catch-up; it needs FFmpeg 6.1 or later.
+	TS bool `json:"ts,omitempty"`
 	// Episodes: the one after, and where opening and credits are.
 	Next    *NextEpisode         `json:"next,omitempty"`
 	Markers *store.SeriesMarkers `json:"markers,omitempty"`
@@ -707,10 +711,11 @@ func firstLine(s string, err error) string {
 }
 
 // OpenRemux starts ffmpeg at position (seconds) and returns fragmented
-// MP4. H.264 video and AAC audio are copied; other audio is converted to
-// AAC stereo, other video to H.264 (slow on small machines).
+// MP4, or MPEG-TS when ts is set (for mpegts.js in the browser). H.264
+// video and AAC audio are copied; other audio is converted to AAC stereo,
+// other video to H.264 (slow on small machines).
 // audio and sub choose tracks by index (-1: first audio, no subtitles).
-func (s *Service) OpenRemux(ctx context.Context, sessionID string, position float64, force bool, audio, sub int) (*Stream, error) {
+func (s *Service) OpenRemux(ctx context.Context, sessionID string, position float64, force bool, audio, sub int, ts bool) (*Stream, error) {
 	sess, err := s.session(sessionID)
 	if err != nil {
 		return nil, err
@@ -758,6 +763,12 @@ func (s *Service) OpenRemux(ctx context.Context, sessionID string, position floa
 	if len(p.Audio) > 0 {
 		audioCodec = p.Audio[audio].Codec
 	}
+	if ts {
+		// mpegts.js stops loading for good once the browser's buffer is
+		// full, and this stream cannot be asked again by range: it is sent
+		// at playing speed, after the seconds skipped plus a margin.
+		args = append(args, "-readrate", "1", "-readrate_initial_burst", strconv.Itoa(int(math.Ceil(skip))+30))
+	}
 	input := append(args, "-i", "http://"+addr+"/internal/"+sess.internal)
 	if skip > 0 {
 		input = append(input, "-ss", strconv.FormatFloat(skip, 'f', 1, 64))
@@ -769,7 +780,12 @@ func (s *Service) OpenRemux(ctx context.Context, sessionID string, position floa
 	} else {
 		out = append(out, "-c:a", "aac", "-ac", "2", "-b:a", "192k")
 	}
-	out = append(out, "-f", "mp4", "-movflags", "frag_keyframe+empty_moov+default_base_moof", "pipe:1")
+	contentType := "video/mp4"
+	if ts {
+		out, contentType = append(out, "-f", "mpegts", "pipe:1"), "video/mp2t"
+	} else {
+		out = append(out, "-f", "mp4", "-movflags", "frag_keyframe+empty_moov+default_base_moof", "pipe:1")
+	}
 	// Text subtitles go to a second output, read by the player as it grows.
 	subFile := ""
 	if sub >= 0 && sub < len(p.Subtitles) && p.Subtitles[sub].Supported {
@@ -794,7 +810,7 @@ func (s *Service) OpenRemux(ctx context.Context, sessionID string, position floa
 		release()
 		return nil, err
 	}
-	return &Stream{ReadCloser: &releasingBody{ReadCloser: body, release: release}, ContentType: "video/mp4",
+	return &Stream{ReadCloser: &releasingBody{ReadCloser: body, release: release}, ContentType: contentType,
 		Title: sess.title}, nil
 }
 
@@ -802,7 +818,7 @@ func (s *Service) OpenRemux(ctx context.Context, sessionID string, position floa
 // with the processor.
 func (s *Service) remux(ctx context.Context, input, out []string, t TranscodeSettings, copyVideo bool, subFile string) (io.ReadCloser, error) {
 	body, err := s.startRemux(ctx, input, out, t, copyVideo)
-	if err != nil && t.Accel != "" && !copyVideo {
+	if err != nil && t.Accel != "" && !copyVideo && ctx.Err() == nil {
 		slog.Warn("conversione con la scheda grafica non riuscita: uso il processore", "accel", t.Accel, "err", err)
 		if subFile != "" {
 			os.Remove(subFile)
@@ -835,6 +851,10 @@ func (s *Service) startRemux(ctx context.Context, input, out []string, t Transco
 	br := bufio.NewReaderSize(body, 64<<10)
 	if _, err := br.Peek(8); err != nil {
 		body.Close()
+		// Replaced by a newer request or abandoned: not a failed conversion.
+		if ctx.Err() != nil {
+			return nil, context.Cause(ctx)
+		}
 		return nil, fmt.Errorf("conversione non riuscita: %s", firstLine(stderr.String(), err))
 	}
 	return readCloser{br, body}, nil
@@ -878,6 +898,15 @@ func (s *Service) ffmpegBin() string {
 		return s.vod.ffmpeg
 	}
 	return "ffmpeg"
+}
+
+// pacedRemux says whether ffmpeg has -readrate_initial_burst (FFmpeg 6.1
+// and later; Debian 12 has 5.1), which the MPEG-TS remux needs.
+func (s *Service) pacedRemux(ctx context.Context) bool {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	out, _ := exec.CommandContext(ctx, s.ffmpegBin(), "-hide_banner", "-h", "long").Output()
+	return bytes.Contains(out, []byte("-readrate_initial_burst"))
 }
 
 func (s *Service) ffprobeBin() string {
