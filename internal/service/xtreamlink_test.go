@@ -26,6 +26,9 @@ func TestXtreamLink(t *testing.T) {
 		{"https://panel.example/x/player_api.php?username=u&password=p&action=get_live_streams", "https://panel.example/x", "u", "p"},
 		{"http://panel.example/player_api.php?username=mario", "", "", ""},
 		{"http://panel.example/player_api.php/x?username=u&password=p", "", "", ""},
+		// A saved link shown masked has no credentials in it.
+		{"http://panel.example/player_api.php?password=***&username=***", "", "", ""},
+		{"http://panel.example/get.php?username=mario&password=***", "", "", ""},
 		// Plain playlists stay M3U.
 		{"http://panel.example/get.php?username=mario&type=m3u_plus", "", "", ""},
 		{"http://panel.example/get.php?username=mario&password=", "", "", ""},
@@ -259,30 +262,48 @@ func TestXtreamServerLink(t *testing.T) {
 	}
 
 	// A full link saved as the server by an earlier version comes back
-	// masked from the form: its secrets are kept, not replaced by ***.
-	settings, _ := json.Marshal(xtreamSettings{Server: panel.URL + "/p/player_api.php?username=mario&password=segreta", Username: "mario"})
-	sec, _ := json.Marshal(subscriptionSecret{Password: "segreta"})
-	legacy, err := s.st.AddSubscription(ctx, store.Subscription{Name: "D", Kind: "xtream", VPNID: vpnID, Settings: settings},
-		func(id int64) []byte { return s.box.Seal(sec, subOwner(id)) })
-	if err != nil {
-		t.Fatal(err)
+	// masked from the form. Its password was never used (the field's
+	// was): saved again, only its address is kept, with the stored
+	// password or the one typed now, never the link's or ***.
+	legacy := func(name, stored string) (int64, xtreamSettings) {
+		t.Helper()
+		settings, _ := json.Marshal(xtreamSettings{Server: panel.URL + "/p/player_api.php?username=mario&password=vecchia", Username: "mario"})
+		sec, _ := json.Marshal(subscriptionSecret{Password: stored})
+		id, err := s.st.AddSubscription(ctx, store.Subscription{Name: name, Kind: "xtream", VPNID: vpnID, Settings: settings},
+			func(id int64) []byte { return s.box.Seal(sec, subOwner(id)) })
+		if err != nil {
+			t.Fatal(err)
+		}
+		sub, err := s.st.Subscription(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view, err := s.subscriptionView(ctx, sub)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var masked xtreamSettings
+		json.Unmarshal(view.Settings, &masked)
+		if !strings.Contains(masked.Server, "password=***") {
+			t.Fatalf("legacy view: %s", masked.Server)
+		}
+		return id, masked
 	}
-	sub, err := s.st.Subscription(ctx, legacy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	view, err := s.subscriptionView(ctx, sub)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var masked xtreamSettings
-	json.Unmarshal(view.Settings, &masked)
-	if !strings.Contains(masked.Server, "password=***") {
-		t.Fatalf("legacy view: %s", masked.Server)
-	}
+	renamed, masked := legacy("D", "segreta")
 	name := "D2"
-	if err := s.UpdateSubscription(ctx, legacy, SubscriptionPatch{Name: &name, Server: &masked.Server, Username: &masked.Username, Password: &empty}); err != nil {
+	if err := s.UpdateSubscription(ctx, renamed, SubscriptionPatch{Name: &name, Server: &masked.Server, Username: &masked.Username, Password: &empty}); err != nil {
 		t.Fatal(err)
 	}
-	checkXtream(t, s, legacy, panel.URL+"/p")
+	checkXtream(t, s, renamed, panel.URL+"/p")
+	changed, masked := legacy("E", "vecchia")
+	typed := "segreta"
+	if err := s.UpdateSubscription(ctx, changed, SubscriptionPatch{Server: &masked.Server, Username: &masked.Username, Password: &typed}); err != nil {
+		t.Fatal(err)
+	}
+	checkXtream(t, s, changed, panel.URL+"/p")
+
+	// Pasted when adding, the masked link gives no user and password.
+	if _, err := s.AddSubscription(ctx, SubscriptionInput{Name: "F", Kind: "xtream", VPNID: vpnID, Server: masked.Server, Username: "mario", Password: "segreta"}); err == nil {
+		t.Fatal("add: masked link accepted")
+	}
 }

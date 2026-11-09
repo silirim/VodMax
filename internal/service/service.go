@@ -441,20 +441,24 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 	case "xtream":
 		var set xtreamSettings
 		json.Unmarshal(sub.Settings, &set)
-		if p.Server != nil {
-			// An older full link comes back masked: split it with its real secrets, not ***.
-			set.Server = keepURLSecrets(strings.TrimSpace(*p.Server), set.Server)
-		}
 		if p.Username != nil {
 			set.Username = *p.Username
 		}
 		if p.Password != nil && *p.Password != "" {
 			sec.Password = *p.Password
 		}
-		if server, user, pass, ok := xtreamLink(set.Server); ok && p.Server != nil {
-			set.Server, set.Username, sec.Password = server, user, pass // a full link, as on add
-		}
 		if p.Server != nil {
+			typed := strings.TrimSpace(*p.Server)
+			// A full link saved by an earlier version comes back masked: its
+			// real secrets are put back only to find the address in it.
+			set.Server = keepURLSecrets(typed, set.Server)
+			if server, user, pass, ok := xtreamLink(typed); ok {
+				set.Server, set.Username, sec.Password = server, user, pass // a full link typed now wins, as on add
+			} else if server, _, _, ok := xtreamLink(set.Server); ok {
+				// Its credentials were never used (xtream.New drops the
+				// query): the fields and the stored password stay.
+				set.Server = server
+			}
 			if err := noCredentialsIn(set.Server); err != nil {
 				return err
 			}
@@ -1076,7 +1080,8 @@ func xtreamLink(raw string) (server, username, password string, ok bool) {
 	}
 	q := u.Query()
 	username, password = q.Get("username"), q.Get("password")
-	if !found || username == "" || password == "" {
+	// *** is a saved link shown masked (hideURLSecrets), not a credential.
+	if !found || username == "" || password == "" || username == "***" || password == "***" {
 		return "", "", "", false
 	}
 	return (&url.URL{Scheme: u.Scheme, Host: u.Host, Path: prefix}).String(), username, password, true
