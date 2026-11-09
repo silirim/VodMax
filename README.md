@@ -53,9 +53,9 @@ decoder with the remote.
 | ⏸️ **Timeshift & catch-up** | Pause and rewind live TV, start the programme from the beginning, replay from the playlist's archive |
 | ⏺️ **Recordings (DVR)** | Record what is on, from the guide or by rule ("every match", "the news", live only), with disk and connection checks; "skip ad" with Comskip (optional, installed separately: not in the Docker image) |
 | 🎬 **Movies & series** | Posters, plots and cast, continue watching, my list, next episode, skip intro, audio and subtitle languages, MKV/AVI/HEVC converted on the fly (also with the graphics card: VAAPI, Quick Sync, NVENC) |
-| ⬇️ **Downloads** | Copy movies, episodes, seasons or whole series to the server's disk, to watch them without the playlist; one at a time, only on a free connection (whoever watches comes first), optionally at night |
+| ⬇️ **Downloads** | Copy movies, episodes, seasons or whole series to the server's disk, to watch them without the playlist; one at a time, only on a free connection (whoever watches comes first), optionally at night. From there the Android app copies them, and finished recordings, to the phone, an SD card or a USB stick, to watch offline |
 | 📁 **Local collections** | Folders of movies or series named like Jellyfin/Kodi/Plex libraries, `.nfo` files and artwork next to the videos |
-| 📡 **Sources** | Xtream Codes, M3U playlists and Stalker portals (MAC) |
+| 📡 **Sources** | Xtream Codes, M3U playlists (an address, a file, or a Google Drive or Dropbox share link) and Stalker portals (MAC) |
 | 🧹 **Catalog selection** | Choose your country and keep only the countries, years and categories you want — recognised in any spelling (“UK \| Sport”, “\|DE\| Filme”, “Live France”) — with a live preview |
 | 👪 **Profiles** | Per-person progress and favourites, kids profiles, devices paired with a short code or signed in with your home account (OpenID Connect: Authelia, Authentik, Keycloak…) |
 | ✨ **Assistant** | Optional: built in (VodMax downloads and runs the model at home), Claude and other online services with an API key, or your own server. Write a recording rule as a sentence, record "just once" ("tonight's film on Rai 1", "Feyenoord Inter"), ask what to watch tonight |

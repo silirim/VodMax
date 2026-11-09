@@ -52,9 +52,9 @@ telecomando.
 | ⏸️ **Pausa e archivio** | Pausa e riavvolgimento della diretta, programma dall'inizio, archivio della playlist |
 | ⏺️ **Registrazioni** | Il programma in onda, dalla guida o per regola ("ogni partita", "il telegiornale", solo dirette), con controllo di disco e connessioni; "salta la pubblicità" con Comskip (facoltativo, da installare a parte: non è nell'immagine Docker) |
 | 🎬 **Film e serie** | Locandine, trama e cast, continua a guardare, episodio successivo, la mia lista, salta la sigla, lingua dell'audio e sottotitoli, MKV/AVI/HEVC convertiti al volo (anche con la scheda grafica: VAAPI, Quick Sync, NVENC) |
-| ⬇️ **Download** | Film, episodi, stagioni o serie intere copiati sul disco del server, da guardare senza la playlist; uno alla volta e solo con una connessione libera (chi guarda ha la precedenza), anche solo di notte |
+| ⬇️ **Download** | Film, episodi, stagioni o serie intere copiati sul disco del server, da guardare senza la playlist; uno alla volta e solo con una connessione libera (chi guarda ha la precedenza), anche solo di notte. Da lì l'app Android li copia, con le registrazioni finite, sul telefono, su una scheda SD o su una chiavetta USB, da guardare senza rete |
 | 📁 **Raccolte locali** | Cartelle di film o serie con i nomi di Jellyfin/Kodi/Plex, file `.nfo` e immagini accanto ai video |
-| 📡 **Sorgenti** | Xtream Codes, playlist M3U e portali Stalker (MAC) |
+| 📡 **Sorgenti** | Xtream Codes, playlist M3U (un indirizzo, un file o un link di condivisione di Google Drive o Dropbox) e portali Stalker (MAC) |
 | 🧹 **Selezione del catalogo** | Scegli il tuo paese e tieni solo i paesi, gli anni e le categorie che vuoi, riconosciuti in ogni grafia («UK \| Sport», «\|DE\| Filme», «Live Francia»), con anteprima |
 | 👪 **Profili** | Avanzamenti e preferiti per persona, profili bambini, dispositivi abbinati con un codice o con l'account di casa (OpenID Connect: Authelia, Authentik, Keycloak…) |
 | ✨ **Assistente** | Facoltativo: integrato (VodMax scarica e fa girare il modello in casa), Claude e altri servizi online con una chiave API, oppure un tuo server. Scrivi una regola di registrazione con una frase, registra "solo questa volta" ("il film di stasera su Rai 1", "Feyenoord Inter"), chiedi cosa guardare stasera |
