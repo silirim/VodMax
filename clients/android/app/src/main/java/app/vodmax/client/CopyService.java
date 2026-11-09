@@ -178,9 +178,13 @@ public class CopyService extends Service {
         return now - lastData >= PAUSE_MS;
     }
 
-    /** A write failing past 4 GB: a FAT32 stick. */
+    /**
+     * A write failing as it crosses 4 GB: a FAT32 stick. A file past 4 GB is
+     * on another file system, so a later failure is a stick pulled out or a
+     * full disk, and must not end the copy for good.
+     */
     static boolean fat32(long pos, int n) {
-        return pos + n > FAT32_MAX;
+        return pos <= FAT32_MAX && pos + n > FAT32_MAX;
     }
 
     // ---- The queue file (JVM tests): a line per copy, fields escaped ----

@@ -116,6 +116,12 @@ public class CopyServiceTest {
     public void knowsTheFat32Limit() {
         assertFalse(CopyService.fat32(0xFFFFFFFFL - 10, 10));
         assertTrue(CopyService.fat32(0xFFFFFFFFL - 10, 11));
+        assertTrue(CopyService.fat32(0xFFFFFFFFL, 1));
+        // Already past 4 GB: not a FAT32 stick, so a stick pulled out or a
+        // full disk, which must not end the copy for good.
+        assertFalse(CopyService.fat32(0xFFFFFFFFL + 1, 1));
+        assertFalse(CopyService.fat32(5_000_000_000L, 10));
+        assertFalse(CopyService.fat32(6_000_000_000L, 256 * 1024));
     }
 
     @Test
