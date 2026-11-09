@@ -233,11 +233,17 @@ type vodState struct {
 	once     sync.Once
 	ffmpeg   string
 	ffprobe  string
+	// pacedRemux's answer for the ffmpeg in pacedBin ("" until known).
+	pacedBin string
+	paced    bool
 }
 
 // SetFFmpeg sets the ffmpeg and ffprobe executables (default: from PATH).
 func (s *Service) SetFFmpeg(ffmpeg, ffprobe string) {
 	s.vod.ffmpeg, s.vod.ffprobe = ffmpeg, ffprobe
+	s.vod.mu.Lock()
+	s.vod.pacedBin = ""
+	s.vod.mu.Unlock()
 }
 
 // PlaybackSession is what a client needs to play.
@@ -901,12 +907,29 @@ func (s *Service) ffmpegBin() string {
 }
 
 // pacedRemux says whether ffmpeg has -readrate_initial_burst (FFmpeg 6.1
-// and later; Debian 12 has 5.1), which the MPEG-TS remux needs.
-func (s *Service) pacedRemux(ctx context.Context) bool {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+// and later; Debian 12 has 5.1), which the MPEG-TS remux needs. ffmpeg
+// does not change while the server runs, so the answer is kept until
+// SetFFmpeg; a probe that did not finish (timeout, no ffmpeg) is not, or
+// one slow moment would send the browser to MP4 for good.
+func (s *Service) pacedRemux() bool {
+	bin := s.ffmpegBin()
+	s.vod.mu.Lock()
+	known, paced := s.vod.pacedBin == bin, s.vod.paced
+	s.vod.mu.Unlock()
+	if known {
+		return paced
+	}
+	// Not the request's context: a viewer who leaves must not decide.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	out, _ := exec.CommandContext(ctx, s.ffmpegBin(), "-hide_banner", "-h", "long").Output()
-	return bytes.Contains(out, []byte("-readrate_initial_burst"))
+	out, err := exec.CommandContext(ctx, bin, "-hide_banner", "-h", "long").Output()
+	paced = bytes.Contains(out, []byte("-readrate_initial_burst"))
+	if err == nil {
+		s.vod.mu.Lock()
+		s.vod.pacedBin, s.vod.paced = bin, paced
+		s.vod.mu.Unlock()
+	}
+	return paced
 }
 
 func (s *Service) ffprobeBin() string {

@@ -137,12 +137,37 @@ func TestPacedRemux(t *testing.T) {
 			t.Fatal(err)
 		}
 		s.SetFFmpeg(ff, "")
-		if got := s.pacedRemux(context.Background()); got != c.want {
+		if got := s.pacedRemux(); got != c.want {
 			t.Errorf("%q: got %v", c.help, got)
 		}
 	}
 	s.SetFFmpeg(filepath.Join(t.TempDir(), "none"), "")
-	if s.pacedRemux(context.Background()) {
+	if s.pacedRemux() {
 		t.Error("no ffmpeg: paced")
+	}
+}
+
+// ffmpeg does not change while the server runs: its answer is kept until
+// SetFFmpeg, but a probe that failed is asked again.
+func TestPacedRemuxKept(t *testing.T) {
+	s := &Service{}
+	ff := filepath.Join(t.TempDir(), "ffmpeg")
+	s.SetFFmpeg(ff, "")
+	if s.pacedRemux() {
+		t.Fatal("no ffmpeg: paced")
+	}
+	if err := os.WriteFile(ff, []byte("#!/bin/sh\nprintf '%s\\n' '-readrate_initial_burst seconds'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if !s.pacedRemux() {
+		t.Fatal("the failed probe was kept")
+	}
+	os.Remove(ff)
+	if !s.pacedRemux() {
+		t.Fatal("ffmpeg asked again")
+	}
+	s.SetFFmpeg(ff, "")
+	if s.pacedRemux() {
+		t.Fatal("answer kept after SetFFmpeg")
 	}
 }

@@ -112,5 +112,5 @@ func (s *Service) NewCatchupSession(ctx context.Context, channelID int64, start,
 		probe: &probeResult{Duration: end.Sub(start).Seconds(), VideoCodec: "h264", Audio: []Track{}, Subtitles: []Track{}}}
 	s.addVODSession(sess)
 	return PlaybackSession{ID: sess.id, Mode: "remux", Title: title, Duration: int(end.Sub(start).Seconds()),
-		URL: "/stream/vod/" + sess.id + "/remux", Audio: []Track{}, Subtitles: []Track{}, TS: s.pacedRemux(ctx)}, nil
+		URL: "/stream/vod/" + sess.id + "/remux", Audio: []Track{}, Subtitles: []Track{}, TS: s.pacedRemux()}, nil
 }
