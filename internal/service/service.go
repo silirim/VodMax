@@ -477,10 +477,11 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 			dropFile = true // an address takes the place of a file
 		}
 		// Saving converts an Xtream Codes link, new or stored, as adding does;
-		// a stored one only while its playlist fails, since the item ids and
-		// category choices of a working subscription change with the kind.
+		// a stored one only when it never synced or its panel refused the
+		// playlist, since the item ids and category choices change with the
+		// kind: a VPN down or a 503 passes and must not convert it.
 		typed := p.URL != nil && *p.URL != ""
-		if server, user, pass, ok := xtreamLink(sec.URL); ok && (typed || sub.SyncStatus != "ok") {
+		if server, user, pass, ok := xtreamLink(sec.URL); ok && (typed || sub.SyncedAt == nil || strings.HasPrefix(sub.SyncError, m3uRefused)) {
 			kind = new(string)
 			*kind = "xtream"
 			settings, _ = json.Marshal(xtreamSettings{Server: server, Username: user})
@@ -957,9 +958,11 @@ func (s *Service) fetch(ctx context.Context, id int64) (*catalog.Snapshot, error
 			if drive != "" {
 				return nil, cloudError(drive, confirmed)
 			}
-			if _, _, _, ok := xtreamLink(sec.URL); ok {
-				// Some panels refuse get.php (HTTP 884) but answer player_api.php;
-				// the subscription is converted only when the person saves it.
+			if _, _, _, ok := xtreamLink(sec.URL); ok && resp.StatusCode > 599 {
+				// Some panels refuse get.php with a status no web server uses
+				// (884) but answer player_api.php; the subscription is converted
+				// only when the person saves it (m3uRefused). A 401, 403 or 5xx
+				// is not that refusal, and saving keeps the playlist.
 				return nil, fmt.Errorf("il provider non dà la playlist M3U (risposta HTTP %d): modifica l'abbonamento e salvalo, VodMax userà Xtream Codes con i dati del link", resp.StatusCode)
 			}
 			return nil, fmt.Errorf("playlist: risposta HTTP %d", resp.StatusCode)
@@ -1051,6 +1054,11 @@ func (s *Service) BrowseCategories(ctx context.Context, kind string) ([]store.Br
 	}
 	return s.st.BrowseCategories(ctx, kind, viewerOf(ctx).Kids)
 }
+
+// m3uRefused starts the error of fetch for a playlist link whose panel
+// refuses get.php. Sync errors are saved untranslated, so a saved one that
+// starts with it tells UpdateSubscription to convert the link.
+const m3uRefused = "il provider non dà la playlist M3U ("
 
 // xtreamLink reads an Xtream Codes playlist link
 // (http://host:port/get.php?username=…&password=…) or API link

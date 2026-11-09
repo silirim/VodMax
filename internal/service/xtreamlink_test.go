@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -140,12 +141,17 @@ func TestM3ULinkBecomesXtream(t *testing.T) {
 
 	// Saved as M3U by an earlier version: the sync says what to do and
 	// does not change the subscription by itself.
-	sec, _ := json.Marshal(subscriptionSecret{URL: link})
-	old, err := s.st.AddSubscription(ctx, store.Subscription{Name: "B", Kind: "m3u", VPNID: vpnID, Settings: json.RawMessage(`{"host":"127.0.0.1"}`)},
-		func(id int64) []byte { return s.box.Seal(sec, subOwner(id)) })
-	if err != nil {
-		t.Fatal(err)
+	legacy := func(name, link string) int64 {
+		t.Helper()
+		sec, _ := json.Marshal(subscriptionSecret{URL: link})
+		id, err := s.st.AddSubscription(ctx, store.Subscription{Name: name, Kind: "m3u", VPNID: vpnID, Settings: json.RawMessage(`{"host":"127.0.0.1"}`)},
+			func(id int64) []byte { return s.box.Seal(sec, subOwner(id)) })
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
 	}
+	old := legacy("B", link)
 	if _, err := s.Sync(ctx, old, false); err == nil || !strings.Contains(err.Error(), "risposta HTTP 884") || !strings.Contains(err.Error(), "Xtream Codes") {
 		t.Fatalf("sync of get.php refused: %v", err)
 	}
@@ -164,11 +170,7 @@ func TestM3ULinkBecomesXtream(t *testing.T) {
 	checkXtream(t, s, old, panel.URL+"/p")
 
 	// A get.php playlist that works keeps its kind when only renamed.
-	working, err := s.st.AddSubscription(ctx, store.Subscription{Name: "C", Kind: "m3u", VPNID: vpnID, Settings: json.RawMessage(`{"host":"127.0.0.1"}`)},
-		func(id int64) []byte { return s.box.Seal(sec, subOwner(id)) })
-	if err != nil {
-		t.Fatal(err)
-	}
+	working := legacy("C", link)
 	if err := s.st.SetSyncResult(ctx, working, "ok", "", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -179,6 +181,38 @@ func TestM3ULinkBecomesXtream(t *testing.T) {
 	if sub, _ := s.st.Subscription(ctx, working); sub.Kind != "m3u" {
 		t.Fatalf("working playlist renamed: saved as %s", sub.Kind)
 	}
+
+	// Nor does one whose last sync failed for another reason: the VPN
+	// down, or a panel answering 503, whose error does not say to save.
+	down := legacy("D", link)
+	if err := s.st.SetSyncResult(ctx, down, "error", "VPN: tunnel giù", nil); err != nil {
+		t.Fatal(err)
+	}
+	unavailable := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(unavailable.Close)
+	busy := legacy("E", unavailable.URL+"/p/get.php?username=mario&password=segreta")
+	if _, err := s.Sync(ctx, busy, false); err == nil || !strings.Contains(err.Error(), "risposta HTTP 503") || strings.Contains(err.Error(), "Xtream Codes") {
+		t.Fatalf("sync of get.php answering 503: %v", err)
+	}
+	for _, id := range []int64{down, busy} {
+		name = fmt.Sprintf("rinominato %d", id)
+		if err := s.UpdateSubscription(ctx, id, SubscriptionPatch{Name: &name}); err != nil {
+			t.Fatal(err)
+		}
+		if sub, _ := s.st.Subscription(ctx, id); sub.Kind != "m3u" {
+			t.Fatalf("after %q: saved as %s", sub.SyncError, sub.Kind)
+		}
+	}
+
+	// One that never synced is converted.
+	never := legacy("F", link)
+	name = "F2"
+	if err := s.UpdateSubscription(ctx, never, SubscriptionPatch{Name: &name}); err != nil {
+		t.Fatal(err)
+	}
+	checkXtream(t, s, never, panel.URL+"/p")
 }
 
 func TestXtreamServerLink(t *testing.T) {
