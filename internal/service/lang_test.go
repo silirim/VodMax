@@ -9,6 +9,7 @@ func TestTranslateText(t *testing.T) {
 		"3 in programma": "3 scheduled",
 		"2 in programma (1 nuove), 3 repliche saltate":                "2 scheduled (1 new), 3 reruns skipped",
 		"il provider ha smesso di mandare dati":                       "the provider stopped sending data",
+		"guida: risposta HTTP 462":                                    "guide: HTTP answer 462",
 		"registrazione parziale: interrotta da un riavvio del server": "partial recording: interrupted by a server restart",
 		"un testo che nessuno conosce":                                "un testo che nessuno conosce",
 	}

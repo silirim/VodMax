@@ -465,7 +465,7 @@ func (s *Service) Status(ctx context.Context) (SystemStatus, error) {
 		for _, g := range sources {
 			if g.Enabled && g.Status == "error" {
 				out.Problems = append(out.Problems, Problem{Level: "warning", Area: "guide",
-					Text: T(ctx, "Guida esterna “%s” non aggiornata: %s", g.Name, g.Error)})
+					Text: T(ctx, "Guida esterna “%s” non aggiornata: %s", g.Name, TranslateText(LangOf(ctx), g.Error))})
 			}
 		}
 	}
@@ -497,7 +497,7 @@ func (s *Service) Status(ctx context.Context) (SystemStatus, error) {
 		}
 		if e := guideErr[sub.ID]; e != "" {
 			out.Problems = append(out.Problems, Problem{Level: "warning", Area: "guide",
-				Text: T(ctx, "Guida di “%s” non aggiornata: %s", sub.Name, e)})
+				Text: T(ctx, "Guida di “%s” non aggiornata: %s", sub.Name, TranslateText(LangOf(ctx), e))})
 		}
 	}
 	return out, nil

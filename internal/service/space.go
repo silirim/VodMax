@@ -75,12 +75,10 @@ func (s *Service) Space(ctx context.Context) (Space, error) {
 	return sp, nil
 }
 
+// recordingsDir is "" without a recorder (the Android app's own server).
 func (s *Service) recordingsDir() string {
 	s.rec.mu.Lock()
 	defer s.rec.mu.Unlock()
-	if s.rec.dir == "" {
-		return "."
-	}
 	return s.rec.dir
 }
 
