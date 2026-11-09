@@ -216,6 +216,21 @@ func TestM3ULinkBecomesXtream(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkXtream(t, s, never, panel.URL+"/p")
+
+	// Unless it has category choices: a restored backup saves it without
+	// a sync and puts its overrides back, keyed by the M3U group names.
+	restored := legacy("G", link)
+	off := false
+	if err := s.st.SetCategoryOverride(ctx, restored, "live", "Notizie", store.CategoryOverride{Enabled: &off}); err != nil {
+		t.Fatal(err)
+	}
+	name = "G2"
+	if err := s.UpdateSubscription(ctx, restored, SubscriptionPatch{Name: &name}); err != nil {
+		t.Fatal(err)
+	}
+	if sub, _ := s.st.Subscription(ctx, restored); sub.Kind != "m3u" || sub.SyncedAt != nil {
+		t.Fatalf("restored playlist renamed: saved as %s, synced %v", sub.Kind, sub.SyncedAt)
+	}
 }
 
 func TestXtreamServerLink(t *testing.T) {

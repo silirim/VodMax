@@ -208,6 +208,14 @@ func (s *Store) SetCategoryOverride(ctx context.Context, subID int64, kind, sour
 	return err
 }
 
+// HasCategoryOverrides tells whether a subscription has category choices,
+// even before a sync brings its categories (after a restore).
+func (s *Store) HasCategoryOverrides(ctx context.Context, subID int64) (bool, error) {
+	var found bool
+	err := s.r.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM category_override WHERE subscription_id = ?)`, subID).Scan(&found)
+	return found, err
+}
+
 // SetItemHidden hides or shows a single item regardless of the rules.
 func (s *Store) SetItemHidden(ctx context.Context, itemID int64, hidden bool) error {
 	var err error

@@ -485,11 +485,23 @@ func (s *Service) UpdateSubscription(ctx context.Context, id int64, p Subscripti
 		// playlist, since the item ids and category choices change with the
 		// kind: a VPN down or a 503 passes and must not convert it.
 		typed := p.URL != nil && *p.URL != ""
-		if server, user, pass, ok := xtreamLink(sec.URL); ok && (typed || sub.SyncedAt == nil || strings.HasPrefix(sub.SyncError, m3uRefused)) {
-			kind = new(string)
-			*kind = "xtream"
-			settings, _ = json.Marshal(xtreamSettings{Server: server, Username: user})
-			sec = subscriptionSecret{Password: pass}
+		if server, user, pass, ok := xtreamLink(sec.URL); ok {
+			convert := typed || strings.HasPrefix(sub.SyncError, m3uRefused)
+			if !convert && sub.SyncedAt == nil {
+				// A restored backup brings back the category choices before
+				// the first sync: then there is something to lose.
+				chosen, err := s.st.HasCategoryOverrides(ctx, id)
+				if err != nil {
+					return err
+				}
+				convert = !chosen
+			}
+			if convert {
+				kind = new(string)
+				*kind = "xtream"
+				settings, _ = json.Marshal(xtreamSettings{Server: server, Username: user})
+				sec = subscriptionSecret{Password: pass}
+			}
 		}
 	case "stalker":
 		var set xtreamSettings
