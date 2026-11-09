@@ -226,6 +226,7 @@ public class MainActivity extends Activity {
         // Two reopenings at once (the local server's exit and a page error)
         // must not leave the first WebView running off screen.
         dropWeb();
+        signingIn = proxyLogin = false; // the new WebView starts with the bridge
         web = new WebView(this);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
@@ -275,14 +276,24 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
+                String url = u.toString();
+                // The server sends http to https (Cloudflare, a proxy): from
+                // now on the address is the https one, else its pages would
+                // look like another site's login and the app would lose its
+                // bridge (and Back would go to the first screen).
+                String secure = request.isForMainFrame() && request.isRedirect() ? upgrade(server, url) : null;
+                if (secure != null) {
+                    server = secure;
+                    if (!prefs().getBoolean(KEY_LOCAL, false)) prefs().edit().putString(KEY_SERVER, server).apply();
+                }
                 // The home login goes to the account's site and comes back
                 // with a code: the whole round trip stays in the app.
-                if (u.toString().startsWith(server + "/auth/sso/")) {
+                if (url.startsWith(server + "/auth/sso/")) {
                     signingIn = true;
                     web.removeJavascriptInterface("VodMaxNative"); // not for the account's site
                 }
-                if (u.toString().startsWith(server + "/") || u.toString().equals(server)) {
-                    if (!u.getPath().startsWith("/auth/sso/")) endSignIn();
+                if (url.startsWith(server + "/") || url.equals(server)) {
+                    if (serverPage(server, url)) endSignIn();
                     return false;
                 }
                 // A login in front of the server (Cloudflare Access, Authelia…)
@@ -306,6 +317,16 @@ public class MainActivity extends Activity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 updatePip(false, 0, 0);
+                // Back on the server after a login the check above did not
+                // see: WebView does not report a form's POST (Cloudflare
+                // Access sends the code that way) nor where it redirects.
+                // The page started without the bridge: loaded again with it.
+                if (view == web && signingIn && serverPage(server, url)) {
+                    endSignIn();
+                    // Not a page carrying a one-time code in its #fragment
+                    // (the home login's): reloading could lose it.
+                    if (!url.contains("#")) view.post(view::reload);
+                }
             }
 
             @Override
@@ -729,6 +750,20 @@ public class MainActivity extends Activity {
         page("window.VodMaxNativePip && window.VodMaxNativePip(" + on + ")");
     }
 
+    /** A page of the server, not its home sign-in (which goes on to the account's site). */
+    static boolean serverPage(String server, String url) {
+        if (server == null || url == null) return false;
+        boolean ours = url.equals(server) || url.startsWith(server + "/") || url.startsWith(server + "?") || url.startsWith(server + "#");
+        return ours && !url.startsWith(server + "/auth/sso/");
+    }
+
+    /** The https form of an http server address when url is on it; else null. */
+    static String upgrade(String server, String url) {
+        if (server == null || url == null || !server.startsWith("http://")) return null;
+        String secure = "https://" + server.substring("http://".length());
+        return url.equals(secure) || url.startsWith(secure + "/") ? secure : null;
+    }
+
     private void endSignIn() {
         if (!signingIn) return;
         signingIn = false;
@@ -817,7 +852,7 @@ public class MainActivity extends Activity {
             // to the first screen, where another address can be given.
             boolean proxy = proxyLogin;
             endSignIn();
-            if (proxy) showSetup(null);
+            if (proxy && !serverPage(server, web.getUrl())) showSetup(null);
             else web.loadUrl(server + "/");
             return true;
         }
