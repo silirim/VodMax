@@ -918,24 +918,25 @@
       if (state.listIndex >= LISTS.length) { state.listIndex = 0; store.set("list", 0); }
     }
     try { await refreshChannels(); } catch (e) { if (!e.handled) flash(e.message); return; }
-    if (state.channels.length === 0) { flash(t("Nessun canale: sincronizza un abbonamento")); return; }
     // From the guide: /tv.html?channel=ID.
     const asked = Number(new URLSearchParams(location.search).get("channel"));
     const last = asked || store.get("last", null);
     let channel = state.channels.find((c) => c.id === last);
-    if (!channel && last) {
-      // A sport or radio channel: zap in its own list from now on.
+    if (!channel && (last || !state.channels.length)) {
+      // A sport or radio channel, or an empty list (every channel in Sport,
+      // none left in TV): zap in the channel's own list from now on.
       const all = await load({ section: "" }).catch(() => []);
-      const found = all.find((c) => c.id === last);
+      const found = all.find((c) => c.id === last) || (state.channels.length ? null : all[0]);
       const i = found ? LISTS.findIndex((l) => l.section === found.section) : -1;
       if (i >= 0) {
         state.listIndex = i;
         store.set("list", i);
         if (state.favoritesOnly && !found.favorite) { state.favoritesOnly = false; store.set("favoritesOnly", false); }
         await refreshChannels();
-        channel = state.channels.find((c) => c.id === last);
+        channel = state.channels.find((c) => c.id === found.id);
       }
     }
+    if (state.channels.length === 0) { flash(t("Nessun canale: sincronizza un abbonamento")); return; }
     tune(channel || state.channels[0]);
   }
 
