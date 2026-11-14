@@ -621,8 +621,15 @@ const vodFormats = "mov,matroska,mpegts,avi,flv,mpeg,asf,ogg"
 type probeResult struct {
 	Duration   float64
 	VideoCodec string
+	PixFmt     string // of that video: "yuv420p10le" is 10-bit
 	Audio      []Track
 	Subtitles  []Track
+}
+
+// copyVideo tells whether the video can go to the player as it is: 8-bit
+// 4:2:0 H.264. Other H.264 (10-bit, 4:2:2) plays as sound only on TVs.
+func (p *probeResult) copyVideo() bool {
+	return p.VideoCodec == "h264" && (p.PixFmt == "" || p.PixFmt == "yuv420p" || p.PixFmt == "yuvj420p")
 }
 
 // textSubtitles can be converted to WebVTT; image subtitles (PGS, DVD,
@@ -639,6 +646,7 @@ func parseProbe(out []byte) (*probeResult, error) {
 			Type        string            `json:"codec_type"`
 			Codec       string            `json:"codec_name"`
 			Channels    int               `json:"channels"`
+			PixFmt      string            `json:"pix_fmt"`
 			Tags        map[string]string `json:"tags"`
 			Disposition map[string]int    `json:"disposition"`
 		} `json:"streams"`
@@ -657,7 +665,7 @@ func parseProbe(out []byte) (*probeResult, error) {
 		switch st.Type {
 		case "video":
 			if p.VideoCodec == "" && st.Disposition["attached_pic"] == 0 {
-				p.VideoCodec = st.Codec
+				p.VideoCodec, p.PixFmt = st.Codec, st.PixFmt
 			}
 		case "audio":
 			t.Index, t.Supported = len(p.Audio), true
@@ -785,7 +793,7 @@ func (s *Service) OpenRemux(ctx context.Context, sessionID string, position floa
 		input = append(input, "-ss", strconv.FormatFloat(skip, 'f', 1, 64))
 	}
 	var out []string
-	out = append(out, "-map", "0:v:0", "-map", "0:a:"+strconv.Itoa(audio)+"?", "-sn", "-dn")
+	out = append(out, "-map", "0:V:0", "-map", "0:a:"+strconv.Itoa(audio)+"?", "-sn", "-dn")
 	if audioCodec == "aac" {
 		out = append(out, "-c:a", "copy")
 	} else {
@@ -813,10 +821,10 @@ func (s *Service) OpenRemux(ctx context.Context, sessionID string, position floa
 	// H.264 is copied; other video is converted, by the graphics card if
 	// chosen, else (or when the card does not start) by the processor.
 	var t TranscodeSettings
-	if p.VideoCodec != "h264" {
+	if !p.copyVideo() {
 		t, _ = s.TranscodeSettings(ctx)
 	}
-	body, err := s.remux(streamCtx, input, out, t, p.VideoCodec == "h264", subFile)
+	body, err := s.remux(streamCtx, input, out, t, p.copyVideo(), subFile)
 	if err != nil {
 		release()
 		return nil, err

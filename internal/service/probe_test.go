@@ -39,6 +39,24 @@ func TestParseProbeTracks(t *testing.T) {
 	}
 }
 
+// A cover picture before the film is skipped (ffmpeg maps "0:V:0", not the
+// picture); 10-bit H.264 is converted, as TVs play it as sound only.
+func TestParseProbeVideo(t *testing.T) {
+	p, err := parseProbe([]byte(`{"streams":[
+		{"codec_type":"video","codec_name":"mjpeg","pix_fmt":"yuvj444p","disposition":{"attached_pic":1}},
+		{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p"}]}`))
+	if err != nil || p.VideoCodec != "h264" || !p.copyVideo() {
+		t.Fatalf("cover first: %+v %v", p, err)
+	}
+	p, err = parseProbe([]byte(`{"streams":[{"codec_type":"video","codec_name":"h264","pix_fmt":"yuv420p10le"}]}`))
+	if err != nil || p.copyVideo() {
+		t.Fatalf("10-bit H.264 copied: %+v %v", p, err)
+	}
+	if p, _ := parseProbe([]byte(`{"streams":[{"codec_type":"video","codec_name":"hevc","pix_fmt":"yuv420p"}]}`)); p.copyVideo() {
+		t.Fatal("HEVC copied")
+	}
+}
+
 // A film taken over by another device during the analysis hears that the
 // connection is busy ("take control?"), not that the file is broken.
 func TestProbeTakenOver(t *testing.T) {
