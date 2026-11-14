@@ -65,11 +65,12 @@ func ParseDetails(raw json.RawMessage) Details {
 		Trailer: youTubeID(str("youtube_trailer", "trailer")), Poster: str("movie_image", "cover_big", "cover"), TMDB: str("tmdb_id", "tmdb"),
 	}
 	d.Rating, _ = strconv.ParseFloat(str("rating"), 64)
-	if n, err := strconv.Atoi(str("duration_secs", "episode_run_time")); err == nil {
-		if _, minutes := m["episode_run_time"]; minutes && m["duration_secs"] == nil {
-			n *= 60
-		}
+	// duration_secs is in seconds, episode_run_time (series) in minutes;
+	// panels fill the one they lack with "" or 0.
+	if n, err := strconv.Atoi(str("duration_secs")); err == nil && n > 0 {
 		d.DurationSecs = n
+	} else if n, err := strconv.Atoi(str("episode_run_time")); err == nil && n > 0 {
+		d.DurationSecs = n * 60
 	}
 	switch v := m["backdrop_path"].(type) {
 	case string:
