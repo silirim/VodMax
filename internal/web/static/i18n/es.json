@@ -886,5 +886,10 @@
   "Vista dei canali TV": "Vista de los canales de TV",
   "Vista dei film": "Vista de las películas",
   "Vista delle serie": "Vista de las series",
-  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Libre: una sola lista. Carpetas: las categorías del proveedor, en su orden. También se elige en la página."
+  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Libre: una sola lista. Carpetas: las categorías del proveedor, en su orden. También se elige en la página.",
+  "Rosso nasconde": "Rojo oculta",
+  "Nascondere «{name}»? Lo rimetti da Impostazioni › Categorie.": "¿Ocultar «{name}»? Puedes recuperarlo en Ajustes › Categorías.",
+  "Nascosto: {name}": "Oculto: {name}",
+  "Di nuovo visibile: {name}": "Visible de nuevo: {name}",
+  "Nascosti uno per uno ({n})": "Ocultos uno a uno ({n})"
 }

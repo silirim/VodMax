@@ -886,5 +886,10 @@
   "Vista dei canali TV": "Vista dei canali TV",
   "Vista dei film": "Vista dei film",
   "Vista delle serie": "Vista delle serie",
-  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina."
+  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.",
+  "Rosso nasconde": "Rosso nasconde",
+  "Nascondere «{name}»? Lo rimetti da Impostazioni › Categorie.": "Nascondere «{name}»? Lo rimetti da Impostazioni › Categorie.",
+  "Nascosto: {name}": "Nascosto: {name}",
+  "Di nuovo visibile: {name}": "Di nuovo visibile: {name}",
+  "Nascosti uno per uno ({n})": "Nascosti uno per uno ({n})"
 }

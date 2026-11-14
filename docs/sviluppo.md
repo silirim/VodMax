@@ -74,7 +74,8 @@ anche lì il canale non è guasto.
 | `GET /api/v1/subscriptions/{id}/selection` | Conteggi: offerti, visibili, schede, per sezione |
 | `GET /api/v1/subscriptions/{id}/categories?kind=` | Categorie con classificazione, correzioni e motivo dell'esclusione |
 | `PUT /api/v1/subscriptions/{id}/categories/{kind}/{categoria}` | Correzione manuale: `enabled`, `section`, `country`, `adult` (`null` = automatico) |
-| `PUT /api/v1/items/{id}/hidden` | Nasconde o ripristina un singolo titolo o canale |
+| `PUT /api/v1/items/{id}/hidden` | Nasconde o ripristina un titolo o canale, con tutte le sue versioni (stesso `group_key`) |
+| `GET /api/v1/subscriptions/{id}/hidden?kind=` | Titoli o canali nascosti a mano, uno per scheda (`id`, `name`), per nome |
 | `GET /api/v1/items/{id}/variants` | Le versioni dello stesso titolo, migliore per prima |
 | `GET /api/v1/items/{id}/details` | Scheda di un film o una serie: trama, cast con foto (`people`), logo del titolo, sfondo, trailer, fonti |
 | `GET /api/v1/items/{id}/similar` | "Titoli simili": fino a 12 titoli dello stesso tipo del catalogo con più categorie in comune (poi voto e novità), stesse schede del catalogo; mai il titolo stesso o le sue versioni |

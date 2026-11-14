@@ -883,6 +883,18 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     };
     const included = cats.filter((c) => c.effective.enabled).length;
     main.append(kinds, el("p", { className: "note" }, t("{n} categorie incluse su {total}", { n: included, total: cats.length })), table);
+    // Hidden one by one (Red in the TV channel list): each can come back.
+    const hidden = await api("GET", "/api/v1/subscriptions/" + sub.id + "/hidden?kind=" + state.kind).catch(() => []);
+    if (!hidden.length) return;
+    const list = el("table", { className: "cats" }, ...hidden.map((h) => {
+      const row = el("tr", {}, el("td", { className: "name" }, h.name));
+      row.append(el("td", {}, button(t("Mostra"), async () => {
+        try { await api("PUT", "/api/v1/items/" + h.id + "/hidden", { hidden: false }); row.remove(); flash(t("Di nuovo visibile: {name}", { name: h.name })); }
+        catch (e) { flash(e.message); }
+      })));
+      return row;
+    }));
+    main.append(el("h3", {}, t("Nascosti uno per uno ({n})", { n: hidden.length })), list);
   }
 
   // ---- System: problems and schedule ----

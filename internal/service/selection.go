@@ -238,7 +238,12 @@ func (s *Service) SetCategoryOverride(ctx context.Context, subID int64, kind, so
 	return err
 }
 
-// SetItemHidden hides or restores a single title or channel.
+// HiddenItems lists the channels or titles of a subscription hidden by hand.
+func (s *Service) HiddenItems(ctx context.Context, subID int64, kind string) ([]store.HiddenItem, error) {
+	return s.st.HiddenItems(ctx, subID, kind)
+}
+
+// SetItemHidden hides or restores a title or channel, all its versions.
 func (s *Service) SetItemHidden(ctx context.Context, itemID int64, hidden bool) error {
 	if err := s.st.SetItemHidden(ctx, itemID, hidden); err != nil {
 		return err

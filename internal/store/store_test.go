@@ -930,3 +930,47 @@ func TestOldKeysOfARestoredBackupCarried(t *testing.T) {
 		t.Fatalf("favourites %v, rule channel %q", favs, rule.Spec.Channel)
 	}
 }
+
+// Hiding a channel hides all its versions, so no other one takes its
+// place; the list of hidden ones has it once, and showing it brings all back.
+func TestHideWholeChannel(t *testing.T) {
+	st, sub := openTest(t)
+	ctx := context.Background()
+	if _, err := st.ReplaceCatalog(ctx, sub, []string{"live"}, nil, []Item{
+		{Kind: "live", SourceID: "1", Title: "Rai 1 HD", DisplayTitle: "Rai 1", GroupKey: "rai1"},
+		{Kind: "live", SourceID: "2", Title: "Rai 1 FHD", DisplayTitle: "Rai 1", GroupKey: "rai1"},
+		{Kind: "live", SourceID: "3", Title: "Altro", DisplayTitle: "Altro"},
+		{Kind: "live", SourceID: "4", Title: "Senza", DisplayTitle: "Senza"},
+	}, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	id := func(src string) int64 {
+		var id int64
+		st.r.QueryRowContext(ctx, `SELECT id FROM item WHERE source_id = ?`, src).Scan(&id)
+		return id
+	}
+	hidden := func() int {
+		var n int
+		st.r.QueryRowContext(ctx, `SELECT count(*) FROM item_override WHERE hidden = 1`).Scan(&n)
+		return n
+	}
+	if err := st.SetItemHidden(ctx, id("2"), true); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetItemHidden(ctx, id("4"), true); err != nil {
+		t.Fatal(err)
+	}
+	if n := hidden(); n != 3 {
+		t.Fatalf("%d versions hidden, want 3", n)
+	}
+	list, err := st.HiddenItems(ctx, sub, "live")
+	if err != nil || len(list) != 2 || list[0].Name != "Rai 1" || list[0].ID != id("1") || list[1].Name != "Senza" {
+		t.Fatalf("hidden list %+v %v", list, err)
+	}
+	if err := st.SetItemHidden(ctx, id("1"), false); err != nil {
+		t.Fatal(err)
+	}
+	if n := hidden(); n != 1 {
+		t.Fatalf("%d versions still hidden, want 1", n)
+	}
+}

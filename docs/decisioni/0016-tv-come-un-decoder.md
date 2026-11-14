@@ -51,7 +51,7 @@ con l'uso di un decoder Sky:
 | Su / Giù | Mostra nel banner cosa c'è sugli altri canali **senza cambiare**; OK sintonizza, Indietro annulla |
 | OK | Lista dei canali con ora e a seguire; ◀ ▶ tra Tutti, Preferiti, Sport, Radio |
 | Giallo (F) | Aggiunge o toglie dai preferiti |
-| Rosso (P) | Cambio canale solo tra i preferiti |
+| Rosso (P) | Cambio canale solo tra i preferiti; nell'elenco dei canali, per l'amministratore: nasconde il canale con tutte le sue versioni (si rimette da Impostazioni › Categorie) |
 | Numeri | Vai al canale |
 | Info (I) | Banner |
 
