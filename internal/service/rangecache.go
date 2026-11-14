@@ -285,6 +285,11 @@ func (c *rangeCache) fetch() {
 		}
 		c.mu.Lock()
 		c.running = false
+		// A reader that came while this fetcher was leaving found it still
+		// running and started none: start one for it now.
+		if c.err == nil && len(c.readers) > 0 {
+			c.startFetcher()
+		}
 		c.mu.Unlock()
 	}()
 	buf := make([]byte, c.chunk)
