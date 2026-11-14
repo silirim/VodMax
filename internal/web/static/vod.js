@@ -1648,11 +1648,13 @@
       return;
     }
     // A catch-up goes through mpegts.js (MSE): webOS stalls on the
-    // server's fragmented MP4 in a plain video element. sess.ts: the
+    // server's fragmented MP4 in a plain video element (sound, no
+    // picture), so on webOS a converted film does too. sess.ts: the
     // server's ffmpeg can send it at playing speed.
-    if (media === "catchup" && sess.ts && window.mpegts && mpegts.isSupported()) {
+    const viaTS = media === "catchup" || (sess.mode === "remux" && /Web0S|webOS/.test(navigator.userAgent));
+    if (viaTS && sess.ts && window.mpegts && mpegts.isSupported()) {
       state.play.reopen = true;
-      openTS(startAt || 0);
+      openTS(startAt || 0, forced);
     } else {
       // Taken over: the video too, or the other device, reopening in the
       // moment the analysis let the connection go, would get it back.
@@ -1800,7 +1802,7 @@
     }
     p.audio = audio;
     p.sub = sub;
-    load(at);
+    if (p.reopen) openTS(at); else load(at);
   }
 
   // Subtitles: the remux writes WebVTT as it goes; new cues are added to
@@ -2351,8 +2353,10 @@
     if (!p || !p.reopen) return;
     if (p.ts) p.ts.destroy();
     p.offset = from === "live" ? Math.max(0, duration() - 4) : Math.max(0, from);
-    const url = p.sess.url + (p.recording ? "?t=" : "?ts=1&t=") + (from === "live" ? "live" : Math.floor(p.offset)) + (force ? "&force=" + Date.now() : "");
+    const url = p.sess.url + (p.recording ? "?t=" : "?ts=1&audio=" + (p.audio || 0) + "&sub=" + (p.sub == null ? -1 : p.sub) + "&t=")
+      + (from === "live" ? "live" : Math.floor(p.offset)) + (force ? "&force=" + Date.now() : "");
     p.ts = window.VodMax.tsPlayer(video, url, { live: true, onError: p.recording ? recordingError : catchupError });
+    if (!p.recording) startSubtitles();
     showBar();
   }
 

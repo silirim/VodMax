@@ -395,6 +395,7 @@ func (s *Service) NewPlaybackSession(ctx context.Context, media string, id int64
 	}
 	if mode == "remux" {
 		out.URL += "/remux"
+		out.TS = s.pacedRemux() // for TVs that stall on the fragmented MP4
 	}
 	if p, err := s.st.GetProgress(ctx, viewerOf(ctx).ProfileID, media, id); err == nil && p != nil && !p.Completed && p.Position > 30 {
 		out.Resume = p
