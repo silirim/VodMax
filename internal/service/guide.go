@@ -82,10 +82,28 @@ func (s *Service) recordingConflict(ctx context.Context, subID int64, group stri
 	if err != nil {
 		return "", err
 	}
-	var busy []string
+	var others []store.Recording
 	for i, r := range list {
 		if subs[i] == subID && r.GroupKey != group {
-			busy = append(busy, T(ctx, "“%s” su %s", r.Title, r.Channel))
+			others = append(others, r)
+		}
+	}
+	// Only recordings running at the same moment share the connections:
+	// find the moment within [start, stop) when most of them run (one of
+	// their starts, or start itself).
+	var busy []string
+	for _, t := range append([]int64{start}, startsOf(others)...) {
+		if t < start || t >= stop {
+			continue
+		}
+		var at []string
+		for _, r := range others {
+			if r.Start <= t && r.Stop > t {
+				at = append(at, T(ctx, "“%s” su %s", r.Title, r.Channel))
+			}
+		}
+		if len(at) > len(busy) {
+			busy = at
 		}
 	}
 	if len(busy) < max {
@@ -95,4 +113,12 @@ func (s *Service) recordingConflict(ctx context.Context, subID int64, group stri
 		return T(ctx, "l'abbonamento ha %d connessione e a quell'ora registra già %s", max, strings.Join(busy, ", ")), nil
 	}
 	return T(ctx, "l'abbonamento ha %d connessioni e a quell'ora registra già %s", max, strings.Join(busy, ", ")), nil
+}
+
+func startsOf(list []store.Recording) []int64 {
+	out := make([]int64, len(list))
+	for i, r := range list {
+		out[i] = r.Start
+	}
+	return out
 }
