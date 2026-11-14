@@ -886,5 +886,10 @@
   "Vista dei canali TV": "Widok kanałów TV",
   "Vista dei film": "Widok filmów",
   "Vista delle serie": "Widok seriali",
-  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Swobodny: jedna lista. Foldery: kategorie dostawcy, w jego kolejności. Można też wybrać na stronie."
+  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Swobodny: jedna lista. Foldery: kategorie dostawcy, w jego kolejności. Można też wybrać na stronie.",
+  "Rosso nasconde": "Czerwony ukrywa",
+  "Nascondere «{name}»? Lo rimetti da Impostazioni › Categorie.": "Ukryć «{name}»? Przywrócisz go w Ustawienia › Kategorie.",
+  "Nascosto: {name}": "Ukryto: {name}",
+  "Di nuovo visibile: {name}": "Znów widoczny: {name}",
+  "Nascosti uno per uno ({n})": "Ukryte pojedynczo ({n})"
 }

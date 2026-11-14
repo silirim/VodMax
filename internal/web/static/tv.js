@@ -5,7 +5,8 @@
 // OK              channel list; Left/Right switch list (Cartelle: folder,
 //                 Up from the first channel then OK: all the folders)
 // Yellow / F      add or remove favourite
-// Red / P         zap through favourites only
+// Red / P         zap through favourites only; in the list (admin): hide
+//                 the channel, back from Settings › Categorie
 // digits          go to channel number
 // Info / I        show the banner and the on-screen controls
 // Space, ◀ ▶      pause, 10 s back, 30 s forward (within the buffer)
@@ -116,8 +117,17 @@
     state.listIndex = state.favoritesOnly ? -1 : i > 0 ? i : 1;
     state.folders = true;
     if (saved) saveList(); // a gone folder becomes Tutti; favoritesOnly follows
-    $("list").querySelector(".hint").textContent = t("OK guarda · ◀ ▶ cambia cartella · Su dal primo canale: tutte le cartelle · Giallo preferito · Blu registra · Indietro chiude");
+    listHint();
   }
+
+  // The admin also reads that Red hides a channel.
+  let admin = false;
+  function listHint() {
+    $("list").querySelector(".hint").textContent = (state.folders
+      ? t("OK guarda · ◀ ▶ cambia cartella · Su dal primo canale: tutte le cartelle · Giallo preferito · Blu registra · Indietro chiude")
+      : t("OK guarda · ◀ ▶ cambia elenco · Giallo preferito · Blu registra · Indietro chiude")) + (admin ? " · " + t("Rosso nasconde") : "");
+  }
+  window.VodMax.me().then((who) => { admin = Boolean(who && who.admin); listHint(); }).catch(() => {});
 
   // Cartelle, leaving Preferiti: a folder that holds the channel. Channels
   // handed over by the guide have no folders: the full list's copy.
@@ -613,6 +623,12 @@
     everyChannel = null;
     if (state.folders) LISTS[favIndex()].count += channel.favorite ? 1 : -1;
     await refreshChannels();
+    await reloadList();
+  }
+
+  // The open list again from the server, the selection on the same channel
+  // (or where it was, when that one is gone).
+  async function reloadList() {
     if (state.overlay) {
       const keep = state.overlay.channels[state.overlay.selected];
       state.overlay.all = await load(LISTS[state.overlay.listIndex]);
@@ -622,6 +638,20 @@
       state.overlay.selected = Math.max(0, Math.min(i < 0 ? state.overlay.selected : i, state.overlay.channels.length - 1));
       renderList();
     }
+  }
+
+  // Hidden with all its versions, as from the Categorie page (admin only).
+  function hideChannel(channel) {
+    if (!channel || !admin) return;
+    confirmDialog(t("Nascondere «{name}»? Lo rimetti da Impostazioni › Categorie.", { name: channel.name }), async () => {
+      try {
+        await api("PUT", "/api/v1/items/" + channel.id + "/hidden", { hidden: true });
+      } catch (e) { flash(e.message); return; }
+      flash(t("Nascosto: {name}", { name: channel.name }));
+      everyChannel = null;
+      await refreshChannels();
+      await reloadList();
+    });
   }
 
   async function toggleFavoritesOnly() {
@@ -1020,6 +1050,7 @@
         case "ArrowRight": openList((o.listIndex + 1) % LISTS.length); break;
         case "OK": if (state.folders && o.selected < 0) pickFolder(); else pickFromList(); break;
         case "Yellow": toggleFavorite(o.channels[o.selected]); break;
+        case "Red": hideChannel(o.channels[o.selected]); break;
         case "Blue": record(o.channels[o.selected]); break;
         case "Back": closeList(); break;
         default: handled = false;

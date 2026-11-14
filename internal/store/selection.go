@@ -216,15 +216,48 @@ func (s *Store) HasCategoryOverrides(ctx context.Context, subID int64) (bool, er
 	return found, err
 }
 
-// SetItemHidden hides or shows a single item regardless of the rules.
+// SetItemHidden hides or shows an item with all its versions (the same
+// channel or title in other qualities or subscriptions): hiding one alone
+// would leave the card on screen with the next version.
 func (s *Store) SetItemHidden(ctx context.Context, itemID int64, hidden bool) error {
+	const group = `SELECT v.id FROM item i JOIN item v ON v.kind = i.kind
+		AND (v.id = i.id OR (i.group_key != '' AND v.group_key = i.group_key)) WHERE i.id = ?`
 	var err error
 	if hidden {
-		_, err = s.w.ExecContext(ctx, `INSERT OR REPLACE INTO item_override VALUES (?, 1)`, itemID)
+		_, err = s.w.ExecContext(ctx, `INSERT OR REPLACE INTO item_override (item_id, hidden) SELECT id, 1 FROM (`+group+`)`, itemID)
 	} else {
-		_, err = s.w.ExecContext(ctx, `DELETE FROM item_override WHERE item_id = ?`, itemID)
+		_, err = s.w.ExecContext(ctx, `DELETE FROM item_override WHERE item_id IN (`+group+`)`, itemID)
 	}
 	return err
+}
+
+// HiddenItem is a channel or title hidden by hand.
+type HiddenItem struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// HiddenItems lists what was hidden by hand in a subscription, one row
+// per channel or title (not per version), by name.
+func (s *Store) HiddenItems(ctx context.Context, subID int64, kind string) ([]HiddenItem, error) {
+	rows, err := s.r.QueryContext(ctx, `
+		SELECT min(i.id), i.display_title FROM item_override o JOIN item i ON i.id = o.item_id
+		WHERE o.hidden = 1 AND i.subscription_id = ? AND i.kind = ? AND i.available = 1
+		GROUP BY CASE WHEN i.group_key = '' THEN 'id:' || i.id ELSE i.group_key END
+		ORDER BY i.display_title COLLATE NOCASE`, subID, kind)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []HiddenItem{}
+	for rows.Next() {
+		var h HiddenItem
+		if err := rows.Scan(&h.ID, &h.Name); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
 }
 
 // Variants lists the available versions of the same title or channel as

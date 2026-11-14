@@ -886,5 +886,10 @@
   "Vista dei canali TV": "Ansicht der TV-Sender",
   "Vista dei film": "Ansicht der Filme",
   "Vista delle serie": "Ansicht der Serien",
-  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Frei: eine einzige Liste. Ordner: die Kategorien des Anbieters, in seiner Reihenfolge. Auch auf der Seite wählbar."
+  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Frei: eine einzige Liste. Ordner: die Kategorien des Anbieters, in seiner Reihenfolge. Auch auf der Seite wählbar.",
+  "Rosso nasconde": "Rot blendet aus",
+  "Nascondere «{name}»? Lo rimetti da Impostazioni › Categorie.": "«{name}» ausblenden? Zurückholen kannst du ihn unter Einstellungen › Kategorien.",
+  "Nascosto: {name}": "Ausgeblendet: {name}",
+  "Di nuovo visibile: {name}": "Wieder sichtbar: {name}",
+  "Nascosti uno per uno ({n})": "Einzeln ausgeblendet ({n})"
 }

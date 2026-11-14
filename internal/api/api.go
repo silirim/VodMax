@@ -89,6 +89,7 @@ func Handler(svc *service.Service, token string, log *slog.Logger) http.Handler 
 	route("GET /api/v1/subscriptions/{id}/selection", levelAdmin, a.selectionStats)
 	route("GET /api/v1/subscriptions/{id}/categories", levelAdmin, a.selectionCategories)
 	route("PUT /api/v1/subscriptions/{id}/categories/{kind}/{category}", levelAdmin, a.putCategory)
+	route("GET /api/v1/subscriptions/{id}/hidden", levelAdmin, a.hiddenItems)
 	route("PUT /api/v1/items/{id}/hidden", levelAdmin, a.putHidden)
 	route("GET /api/v1/items/{id}/variants", levelViewer, a.variants)
 	route("GET /api/v1/items/{id}/details", levelViewer, a.details)
@@ -693,6 +694,20 @@ func (a *api) putCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *api) hiddenItems(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	list, err := a.svc.HiddenItems(r.Context(), id, r.URL.Query().Get("kind"))
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 func (a *api) putHidden(w http.ResponseWriter, r *http.Request) {

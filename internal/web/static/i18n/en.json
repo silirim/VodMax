@@ -886,5 +886,10 @@
   "Vista dei canali TV": "TV channels view",
   "Vista dei film": "Movies view",
   "Vista delle serie": "Series view",
-  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Free: one single list. Folders: the provider's categories, in its order. Can also be chosen on the page."
+  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Free: one single list. Folders: the provider's categories, in its order. Can also be chosen on the page.",
+  "Rosso nasconde": "Red hides",
+  "Nascondere «{name}»? Lo rimetti da Impostazioni › Categorie.": "Hide «{name}»? You can bring it back from Settings › Categories.",
+  "Nascosto: {name}": "Hidden: {name}",
+  "Di nuovo visibile: {name}": "Visible again: {name}",
+  "Nascosti uno per uno ({n})": "Hidden one by one ({n})"
 }
