@@ -389,7 +389,7 @@ func (s *Service) SSOFinish(ctx context.Context, state, code string) (string, er
 	}
 	name := "Accesso " + who
 	if utf8.RuneCountInString(name) > 60 {
-		name = name[:60]
+		name = string([]rune(name)[:60])
 	}
 	once := randomToken()
 	s.sso.mu.Lock()
