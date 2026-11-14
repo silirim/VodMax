@@ -18,8 +18,8 @@ android {
         applicationId "app.vodmax.client"
         minSdk 24
         targetSdk 35
-        versionCode 44
-        versionName "0.6.17"
+        versionCode 45
+        versionName "0.6.18"
     }
 
     buildFeatures { buildConfig true }
