@@ -876,5 +876,15 @@
   "Invio del file non riuscito": "No se pudo enviar el archivo",
   "Volume": "Volumen",
   "Disattiva audio": "Silenciar",
-  "Riattiva audio": "Activar sonido"
+  "Riattiva audio": "Activar sonido",
+  "Vista": "Vista",
+  "Libera": "Libre",
+  "Cartelle": "Carpetas",
+  "Tutte le cartelle": "Todas las carpetas",
+  "Cerca una cartella": "Buscar una carpeta",
+  "OK guarda · ◀ ▶ cambia cartella · Su dal primo canale: tutte le cartelle · Giallo preferito · Blu registra · Indietro chiude": "OK ver · ◀ ▶ cambiar carpeta · Arriba desde el primer canal: todas las carpetas · Amarillo favorito · Azul grabar · Atrás cerrar",
+  "Vista dei canali TV": "Vista de los canales de TV",
+  "Vista dei film": "Vista de las películas",
+  "Vista delle serie": "Vista de las series",
+  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Libre: una sola lista. Carpetas: las categorías del proveedor, en su orden. También se elige en la página."
 }

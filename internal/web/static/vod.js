@@ -145,7 +145,8 @@
     }
     if (my !== renderSeq) return;
     heroTop();
-    if (!typing || document.activeElement !== $("search")) focusFirst(main);
+    // The folders: the one just left, else the first.
+    if (!typing || document.activeElement !== $("search")) focusFirst(main.querySelector(".folders .active") || main.querySelector(".folders") || main);
   }
 
   // While a page loads: grey shapes with the radii of what is coming.
@@ -171,19 +172,97 @@
   }
   const goView = (view) => () => { state.view = view; state.query = ""; $("search").value = ""; render(); };
 
+  // ---- Libera | Cartelle, per section (the device's look, also in
+  // Aspetto). Cartelle shows the provider's categories in its order, then
+  // the open one, remembered as folder.<kind>. ----
+  const LOOK_KEY = { live: "foldersLive", movie: "foldersMovie", series: "foldersSeries" };
+  const KIND = { tv: "live", movie: "movie", series: "series" };
+  const foldersOn = (kind) => Boolean(window.VodMax.look.get()[LOOK_KEY[kind]]);
+  const openFolder = (view) => KIND[view] && foldersOn(KIND[view]) ? store.get("folder." + KIND[view], null) : null;
+  // Category ids repeat across subscriptions and may hold ':': whole keys only.
+  const folderKey = (f) => f.subscription + ":" + f.id;
+  const FAVORITES = { id: "favorites", subscription: 0, name: "★ " + t("Preferiti") };
+  // Every title or channel, also those in no category (tv.js: 0:all too).
+  const ALL = { id: "all", subscription: 0, name: t("Tutti") };
+  const isAll = (f) => folderKey(f) === folderKey(ALL);
+  const lastFolder = {}; // the folder just left: the list gives it the focus
+  function closeFolder(kind) {
+    const f = store.get("folder." + kind, null);
+    if (f) lastFolder[kind] = folderKey(f);
+    store.set("folder." + kind, null);
+    render();
+  }
+  // The switch at the end of the section's chips; the focus stays on it.
+  function viewChips(kind) {
+    const on = foldersOn(kind);
+    return [el("span", { className: "chip-label" }, t("Vista")), ...[[false, t("Libera")], [true, t("Cartelle")]].map(([v, text]) => {
+      const c = el("button", { className: "chip focusable" + (v === on ? " active" : "") }, text);
+      c.dataset.vista = "";
+      // Cartelle again from inside a folder: back to the folders.
+      c.onclick = () => {
+        if (v && on) { closeFolder(kind); return; }
+        window.VodMax.look.set({ [LOOK_KEY[kind]]: v });
+        render().then(() => { const a = $("content").querySelector("[data-vista].active"); if (a) a.focus(); });
+      };
+      return c;
+    })];
+  }
+  // Inside a folder: its name; pressed, back to the folders.
+  function folderChips(kind, open) {
+    const c = el("button", { className: "chip focusable active" });
+    // Tutti and Preferiti in today's language, not the stored one.
+    window.VodMax.label(c, "folder", isAll(open) ? ALL.name : folderKey(open) === folderKey(FAVORITES) ? FAVORITES.name : open.name);
+    c.title = t("Tutte le cartelle");
+    c.onclick = () => closeFolder(kind);
+    return [el("span", { className: "chip-label" }, t("Cartella")), c];
+  }
+  // Same-size cells in fixed columns (vod.css), like the category picker.
+  function folderGrid(kind, list) {
+    return el("div", { className: "folders" }, ...list.map((f) => {
+      const b = el("button", { className: "chip focusable" + (lastFolder[kind] === folderKey(f) ? " active" : ""), title: f.name },
+        el("span", { className: "name" }, f.name), el("small", {}, f.titles));
+      b.onclick = () => { store.set("folder." + kind, { id: f.id, subscription: f.subscription, name: f.name }); window.scrollTo(0, 0); render(); };
+      return b;
+    }));
+  }
+
   // ---- TV: the channel list, then full screen ----
   const TV_LISTS = [["", t("Tutti")], ["tv", "TV"], ["sport", t("Sport")], ["radio", t("Radio")], ["favorites", t("Preferiti")]];
-  async function renderTV(main) {
+  // free: Cartelle without any folder, the lists of Libera.
+  async function renderTV(main, free) {
     const query = state.query.toLowerCase();
     const list = store.get("tvList", "");
+    // Cartelle: the folders, then the channels of the open one (a channel
+    // is in every folder one of its versions is in).
+    const cartelle = foldersOn("live") && !free, folders = !query && cartelle;
+    const open = folders ? store.get("folder.live", null) : null;
+    const favorites = folders ? Boolean(open && folderKey(open) === folderKey(FAVORITES)) : list === "favorites";
     // A search looks in every channel, whatever the list.
-    const q = query ? "" : list === "favorites" ? "?list=favorites" : list ? "?section=" + list : "";
+    const q = query || (folders && !favorites) ? "" : favorites ? "?list=favorites" : list ? "?section=" + list : "";
     const my = renderSeq;
-    let channels = await api("GET", "/api/v1/tv/channels" + q);
+    let [channels, cats] = await Promise.all([api("GET", "/api/v1/tv/channels" + q),
+      folders && !open ? api("GET", "/api/v1/browse/live/categories?order=provider") : null]);
     if (my !== renderSeq) return;
     if (query) channels = channels.filter((c) => c.name.toLowerCase().includes(query) || String(c.number) === query);
+    if (open && !favorites && !isAll(open)) channels = channels.filter((c) => (c.folders || []).includes(folderKey(open)));
+    // Gone or emptied since (a sync, a hidden category): the folders.
+    if (open && !channels.length) { store.set("folder.live", null); return renderTV(main); }
+    const guide = el("a", { className: "chip focusable", href: "/guide.html" });
+    window.VodMax.label(guide, "calendar-days", t("Guida TV"));
+    if (folders && !open) {
+      const counts = {};
+      for (const c of channels) for (const k of c.folders || []) counts[k] = (counts[k] || 0) + 1;
+      const shown = cats.filter((c) => counts[folderKey(c)]).map((c) => ({ ...c, titles: counts[folderKey(c)] }));
+      // No folder at all (a playlist without groups): as in Libera.
+      if (!shown.length) return renderTV(main, true);
+      const fav = channels.filter((c) => c.favorite).length;
+      shown.unshift(...(fav ? [{ ...FAVORITES, titles: fav }] : []), { ...ALL, titles: channels.length });
+      main.replaceChildren(el("div", { className: "tv-tools" }, guide, ...viewChips("live")), folderGrid("live", shown));
+      return;
+    }
     const now = Date.now() / 1000;
-    const chips = TV_LISTS.map(([id, label]) => {
+    // A search in Cartelle: no lists of Libera to choose.
+    const chips = open ? folderChips("live", open) : cartelle ? [] : TV_LISTS.map(([id, label]) => {
       const b = el("button", { className: "chip focusable" + (id === list && !query ? " active" : "") }, label);
       // Focus stays on the chosen list, not back on the first one.
       b.onclick = () => { store.set("tvList", id); state.query = ""; $("search").value = ""; render().then(() => {
@@ -192,8 +271,6 @@
       }); };
       return b;
     });
-    const guide = el("a", { className: "chip focusable", href: "/guide.html" });
-    window.VodMax.label(guide, "calendar-days", t("Guida TV"));
     const item = (c) => {
       const p = c.now;
       const pct = p ? Math.min(100, Math.max(0, ((now - p.start) / (p.stop - p.start)) * 100)) : 0;
@@ -222,9 +299,9 @@
       };
     }
     const hero = el("section", { className: "hero compact" });
-    main.replaceChildren(hero, el("div", { className: "tv-tools" }, ...chips, guide),
+    main.replaceChildren(hero, el("div", { className: "tv-tools" }, ...chips, guide, ...viewChips("live")),
       query ? el("p", { className: "empty" }, t("{n} canali per “{query}” (nome o numero)", { n: channels.length, query: state.query })) : "",
-      channels.length ? ol : el("p", { className: "empty" }, list === "favorites"
+      channels.length ? ol : el("p", { className: "empty" }, favorites
         ? t("Nessun preferito: in TV premi il tasto giallo (F) su un canale.") : t("Nessun canale.")), more || "");
     if (channels.length) showHero(hero, channelHero(channels[0]));
     else hero.remove();
@@ -293,9 +370,13 @@
     if (mine.length) parts.push(section(t("La mia lista"), "mylist"), el("div", { className: "row" }, ...itemCards(mine.slice(0, 24))));
     // TMDB's week, among the titles you have (with a TMDB key).
     if (trending.length) parts.push(section(t("Di tendenza questa settimana")), el("div", { className: "row" }, ...itemCards(trending)));
-    if (favorites.length) parts.push(section(t("In onda sui tuoi canali"), "tv", () => store.set("tvList", "favorites")), el("div", { className: "row" }, ...favorites.slice(0, 20).map(channelCard)));
-    parts.push(section(t("Nuovi film"), "movie", newest("movie")), el("div", { className: "row" }, ...itemCards(films.items)));
-    parts.push(section(t("Nuove serie"), "series", newest("series")), el("div", { className: "row" }, ...itemCards(series.items)));
+    if (favorites.length) parts.push(section(t("In onda sui tuoi canali"), "tv", () => {
+      store.set("tvList", "favorites");
+      if (foldersOn("live")) store.set("folder.live", FAVORITES);
+    }), el("div", { className: "row" }, ...favorites.slice(0, 20).map(channelCard)));
+    // Cartelle opens on the folders, not on the newest: no "Vedi tutti".
+    parts.push(section(t("Nuovi film"), foldersOn("movie") ? "" : "movie", newest("movie")), el("div", { className: "row" }, ...itemCards(films.items)));
+    parts.push(section(t("Nuove serie"), foldersOn("series") ? "" : "series", newest("series")), el("div", { className: "row" }, ...itemCards(series.items)));
     const done = recordings.filter((r) => r.status === "completed").slice(0, 12);
     if (done.length) parts.push(section(t("Registrazioni recenti"), "recordings"), el("div", { className: "row" }, ...done.map(recordingCard)));
     // "Stasera" after the first two rows: what to resume and what is new
@@ -630,18 +711,30 @@
     return { sort: "recent", minRating: 0, category: "", categorySub: 0, categoryName: "", ...store.get("browse." + kind, {}) };
   }
 
-  async function renderGrid(main, kind, cursor, grid) {
-    const b = browseState(kind);
+  // free: Cartelle without any category, the grid as in Libera.
+  async function renderGrid(main, kind, cursor, grid, free) {
+    // Cartelle: the folders, or the open one through the category filter.
+    const folders = foldersOn(kind) && !free;
+    const open = folders ? store.get("folder." + kind, null) : null;
+    if (folders && !open) return renderFolders(main, kind);
+    const b = open ? { ...browseState(kind), category: open.id, categorySub: open.subscription, categoryName: open.name } : browseState(kind);
+    if (open && isAll(open)) b.category = ""; // Tutti: no category
     const q = new URLSearchParams({ limit: 60, sort: b.sort });
     if (b.minRating) q.set("min_rating", b.minRating);
     if (b.category) q.set("category", b.category);
     // Two providers (or two local collections) can use the same category id.
     if (b.category && b.categorySub) q.set("category_subscription", b.categorySub);
     if (cursor) q.set("cursor", cursor);
-    if (!grid) main.replaceChildren(el("section", { className: "hero compact" }), filterBar(kind, b), skeletonRow(false));
+    if (!grid) main.replaceChildren(el("section", { className: "hero compact" }), filterBar(kind, b, open), skeletonRow(false));
     const my = renderSeq; // "Altri titoli" too: dropped if the page changed meanwhile
     const page = await api("GET", "/api/v1/catalog/" + kind + "?" + q);
     if (my !== renderSeq) return;
+    // Nothing in the folder: the filters, or it is gone (then the folders).
+    if (open && b.category && !grid && !page.items.length) {
+      const cats = await api("GET", "/api/v1/browse/" + kind + "/categories");
+      if (my !== renderSeq) return;
+      if (!cats.some((c) => folderKey(c) === folderKey(open))) { store.set("folder." + kind, null); return renderFolders(main, kind); }
+    }
     if (!grid) {
       grid = el("div", { className: "grid" });
       main.lastElementChild.replaceWith(page.items.length ? grid : el("p", { className: "empty" }, t("Nessun titolo con questi filtri.")));
@@ -655,17 +748,18 @@
     if (oldMore) oldMore.remove();
     if (page.next) {
       const more = el("button", { className: "button more focusable" }, t("Altri titoli"));
-      more.onclick = async () => { more.remove(); const n = grid.children.length; await renderGrid(main, kind, page.next, grid); focusFirst(grid.children[n]); };
+      more.onclick = async () => { more.remove(); const n = grid.children.length; await renderGrid(main, kind, page.next, grid, free); focusFirst(grid.children[n]); };
       main.append(more);
     }
   }
 
-  function filterBar(kind, b) {
+  function filterBar(kind, b, open) {
     // After a choice the focus stays on the chip that was pressed.
     const set = (change) => {
       const pressed = document.activeElement && document.activeElement.closest(".filters .chip");
       const index = pressed ? [...pressed.parentElement.querySelectorAll(".chip")].indexOf(pressed) : -1;
-      store.set("browse." + kind, { ...b, ...change });
+      // The stored filters: b holds the open folder as its category.
+      store.set("browse." + kind, { ...browseState(kind), ...change });
       render().then(() => {
         const chips = $("content").querySelectorAll(".filters .chip");
         if (index >= 0 && chips[index]) chips[index].focus();
@@ -682,9 +776,19 @@
       ...SORTS.map(([v, text]) => chip(text, b.sort === v, () => set({ sort: v }))),
       el("span", { className: "chip-label" }, t("Voto")),
       ...RATINGS.map(([v, text]) => chip(text, b.minRating === v, () => set({ minRating: v }))),
-      el("span", { className: "chip-label" }, t("Categoria")),
-      chip(b.category ? b.categoryName : t("Tutte"), Boolean(b.category), () => pickCategory(kind, b, set), "list"),
-      b.category ? chip(t("Togli"), false, () => set({ category: "", categorySub: 0, categoryName: "" }), "x") : null);
+      ...(open ? folderChips(kind, open) : [el("span", { className: "chip-label" }, t("Categoria")),
+        chip(b.category ? b.categoryName : t("Tutte"), Boolean(b.category), () => pickCategory(kind, b, set), "list"),
+        b.category ? chip(t("Togli"), false, () => set({ category: "", categorySub: 0, categoryName: "" }), "x") : null]),
+      ...viewChips(kind));
+  }
+
+  // Cartelle: Tutti, then the provider's categories with titles, in its order.
+  async function renderFolders(main, kind) {
+    const my = renderSeq;
+    const cats = await api("GET", "/api/v1/browse/" + kind + "/categories?order=provider");
+    if (my !== renderSeq) return;
+    if (!cats.length) return renderGrid(main, kind, "", null, true);
+    main.replaceChildren(el("div", { className: "chips filters" }, ...viewChips(kind)), folderGrid(kind, [ALL, ...cats]));
   }
 
   // A panel to choose among hundreds of provider categories: type to
@@ -1624,7 +1728,7 @@
     // PIN of "Chi guarda?"); not the profile choice or pairing, where Back
     // still sends the app to the background.
     const panel = document.querySelector("#my-profile, #update-banner") || [...document.querySelectorAll(".setup-panel")].find((p) => p.back);
-    if (panel || $("picker") || !$("player").hidden || !$("detail").hidden || state.query) {
+    if (panel || $("picker") || !$("player").hidden || !$("detail").hidden || state.query || openFolder(state.view)) {
       // From the focused element, so that the panels' capture handlers on
       // document stop it before the menu's own handler sees it.
       (document.activeElement || document.body).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -2401,6 +2505,7 @@
     if (key === "Back" || (key === "Backspace" && !typing)) {
       if (!$("detail").hidden) closeDetail();
       else if (state.query) { state.query = ""; $("search").value = ""; render(); }
+      else if (openFolder(state.view)) closeFolder(KIND[state.view]); // Cartelle: back to the folders
       // As on Android: Back goes to Home, and from Home leaves the TV app
       // (webOS hands Back to the page and closes the app on window.close).
       else if (!window.VodMax.native && state.view !== "home") { state.view = "home"; render(); }

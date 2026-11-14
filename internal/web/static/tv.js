@@ -2,7 +2,8 @@
 //
 // P+/P-           change channel
 // Up/Down         browse what is on other channels without changing (OK tunes)
-// OK              channel list; Left/Right switch list
+// OK              channel list; Left/Right switch list (Cartelle: folder,
+//                 Up from the first channel then OK: all the folders)
 // Yellow / F      add or remove favourite
 // Red / P         zap through favourites only
 // digits          go to channel number
@@ -39,22 +40,99 @@
     retries: {},           // network retries per channel
     endedAt: {},           // when the server last dropped a channel's buffer
     tuneGen: 0,            // bumped by every tune: older answers are ignored
+    folders: false,        // Cartelle: LISTS are Preferiti, Tutti and the provider's folders
   };
 
-  function zapList() { return state.favoritesOnly ? LISTS[1] : LISTS[state.listIndex === 1 ? 0 : state.listIndex]; }
+  const favIndex = () => LISTS.findIndex((l) => l.favorites);
+  function zapList() {
+    const fav = favIndex();
+    // listIndex -1: Cartelle under Preferiti with no folder chosen yet.
+    return state.favoritesOnly ? LISTS[fav] : LISTS[state.listIndex === fav ? LISTS.findIndex((l) => !l.favorites) : state.listIndex] || LISTS.find((l) => !l.favorites);
+  }
+
+  // Cartelle: every folder filters one full list, so ◀ ▶ fetch nothing;
+  // fetched again after 30 s (now/next) or when a favourite changes.
+  let everyChannel = null;
+  function allChannels() {
+    if (!everyChannel || Date.now() - everyChannel.at > 30000) {
+      const list = api("GET", "/api/v1/tv/channels?");
+      everyChannel = { at: Date.now(), list };
+      list.catch(() => { if (everyChannel && everyChannel.list === list) everyChannel = null; });
+    }
+    return everyChannel.list;
+  }
 
   async function load(list) {
+    // A folder: the channels with a version in it, in number order.
+    if (list.folder) return (await allChannels()).filter((c) => list.every || (c.folders || []).includes(list.folder));
     const q = new URLSearchParams();
     if (list.section) q.set("section", list.section);
     if (list.favorites) q.set("list", "favorites");
     return api("GET", "/api/v1/tv/channels?" + q);
   }
 
+  // Cartelle: the folder to zap in for a channel, the preferred one if the
+  // channel is in it (Tutti holds them all), else the first provider's
+  // folder it is in, else Tutti.
+  function folderFor(c, prefer) {
+    const has = (l) => Boolean(l && l.folder && (l.every || (c.folders || []).includes(l.folder)));
+    if (has(LISTS[prefer])) return prefer;
+    const i = LISTS.findIndex((l) => !l.every && has(l));
+    return i >= 0 ? i : LISTS.findIndex((l) => l.every);
+  }
+
+  // Libera keeps the list's index; Cartelle the folder itself, which the
+  // Home's TV opens on too (vod.js, folder.live, Preferiti as 0:favorites).
+  function saveList() {
+    store.set("favoritesOnly", state.favoritesOnly);
+    if (!state.folders) { store.set("list", state.listIndex); return; }
+    const c = state.favoritesOnly ? { id: "favorites", subscription: 0, name: LISTS[favIndex()].label } : (LISTS[state.listIndex] || LISTS.find((l) => l.every)).category;
+    store.set("folder.live", { id: c.id, subscription: c.subscription, name: c.name });
+  }
+
+  // Cartelle (the device's look): Preferiti, Tutti, then the provider's
+  // folders that have channels, in its order. None (an older server, no
+  // categories): Libera.
+  async function folderLists() {
+    const [cats, all] = await Promise.all([api("GET", "/api/v1/browse/live/categories?order=provider"), allChannels()]);
+    const counts = {};
+    for (const c of all) for (const k of c.folders || []) counts[k] = (counts[k] || 0) + 1;
+    const folders = cats.map((c) => ({ category: c, folder: c.subscription + ":" + c.id, label: c.name, section: "", favorites: false }))
+      .filter((l) => counts[l.folder]);
+    if (!folders.length) return;
+    for (const l of folders) l.count = counts[l.folder];
+    const fav = { ...LISTS.find((l) => l.favorites), label: "★ " + t("Preferiti"), count: all.filter((c) => c.favorite).length };
+    // Tutti: every channel, also those in no folder (0:all, as in vod.js).
+    const every = { category: { id: "all", subscription: 0, name: t("Tutti") }, folder: "0:all", every: true, label: t("Tutti"), section: "", favorites: false, count: all.length };
+    LISTS.splice(0, LISTS.length, fav, every, ...folders);
+    const saved = store.get("folder.live", null);
+    const key = saved && saved.subscription + ":" + saved.id;
+    // folder.live decides, also against an older favoritesOnly: the Home
+    // writes only the folder (0:favorites for its Preferiti).
+    if (saved) state.favoritesOnly = key === "0:favorites";
+    const i = LISTS.findIndex((l) => l.folder === key);
+    // Gone or emptied: Tutti. Under Preferiti no folder was chosen (-1), so
+    // leaving them finds the channel's own folder, not Tutti.
+    state.listIndex = state.favoritesOnly ? -1 : i > 0 ? i : 1;
+    state.folders = true;
+    if (saved) saveList(); // a gone folder becomes Tutti; favoritesOnly follows
+    $("list").querySelector(".hint").textContent = t("OK guarda · ◀ ▶ cambia cartella · Su dal primo canale: tutte le cartelle · Giallo preferito · Blu registra · Indietro chiude");
+  }
+
+  // Cartelle, leaving Preferiti: a folder that holds the channel. Channels
+  // handed over by the guide have no folders: the full list's copy.
+  async function folderOfCurrent() {
+    const id = state.current && state.current.id;
+    const c = id && ((await allChannels().catch(() => [])).find((x) => x.id === id) || state.current);
+    return c ? folderFor(c, state.listIndex) : LISTS[state.listIndex] ? state.listIndex : LISTS.findIndex((l) => l.every);
+  }
+
   async function refreshChannels() {
     state.channels = await load(zapList());
     if (state.favoritesOnly && state.channels.length === 0) {
       state.favoritesOnly = false;
-      store.set("favoritesOnly", false);
+      if (state.folders) state.listIndex = await folderOfCurrent();
+      saveList();
       flash(t("Nessun preferito: elenco completo"));
       state.channels = await load(zapList());
     }
@@ -304,14 +382,16 @@
   async function openList(listIndex) {
     hideControls();
     const list = LISTS[listIndex];
-    let channels;
-    try { channels = await load(list); } catch (e) { flash(e.message); return; }
+    let channels, every = null;
+    // Cartelle: the search looks in every channel, folders are narrow.
+    try { [channels, every] = await Promise.all([load(list), state.folders ? allChannels() : null]); } catch (e) { flash(e.message); return; }
     const query = state.overlay ? state.overlay.query : "";
+    const onTab = state.folders && Boolean(state.overlay && state.overlay.selected < 0); // ◀ ▶ on the folder: it stays selected
     if (!state.overlay) $("list-search").value = "";
-    state.overlay = { listIndex, all: channels, channels, selected: 0, query };
+    state.overlay = { listIndex, all: channels, every, channels, selected: 0, query };
     filterList();
     const selected = state.overlay.channels.findIndex((c) => state.current && c.id === state.current.id);
-    state.overlay.selected = selected < 0 ? 0 : selected;
+    state.overlay.selected = onTab ? -1 : selected < 0 ? 0 : selected;
     $("list").hidden = false; // first, so renderList can measure the rows
     renderList();
     $("banner").hidden = true;
@@ -322,7 +402,7 @@
   const fold = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   function filterList() {
     const o = state.overlay, q = fold(o.query.trim());
-    o.channels = q ? o.all.filter((c) => fold(c.name).includes(q) || String(c.number).startsWith(q)) : o.all;
+    o.channels = q ? (o.every || o.all).filter((c) => fold(c.name).includes(q) || String(c.number).startsWith(q)) : o.all;
   }
   const search = $("list-search");
   search.addEventListener("input", () => {
@@ -344,10 +424,14 @@
     const o = state.overlay;
     const c = o && o.channels[o.selected];
     if (!c) return;
-    if (o.listIndex === 1) { state.favoritesOnly = true; }
-    else { state.favoritesOnly = false; state.listIndex = o.listIndex; }
-    store.set("favoritesOnly", state.favoritesOnly);
-    store.set("list", state.listIndex);
+    if (LISTS[o.listIndex].favorites && c.favorite) { state.favoritesOnly = true; }
+    else {
+      state.favoritesOnly = false;
+      // Cartelle: a channel the search found can be in another folder.
+      const i = state.folders ? folderFor(c, o.listIndex) : o.listIndex;
+      if (i >= 0) state.listIndex = i;
+    }
+    saveList();
     closeList();
     refreshChannels().then(() => tune(c));
   }
@@ -355,7 +439,21 @@
   function renderList() {
     const o = state.overlay;
     const tabs = $("list-tabs");
-    tabs.replaceChildren(...LISTS.map((l, i) => {
+    if (state.folders) {
+      // Dozens of folders: ‹ the one shown › ; on it (Up from the first
+      // channel, or a tap) the panel with all of them.
+      const tab = (cls, fn, ...content) => {
+        const s = document.createElement("span");
+        s.className = cls;
+        s.append(...content);
+        s.onclick = fn;
+        return s;
+      };
+      tabs.replaceChildren(tab("step", () => openList((o.listIndex + LISTS.length - 1) % LISTS.length), "‹"),
+        tab("active folder" + (o.selected < 0 && document.activeElement !== search ? " selected" : ""), pickFolder, window.VodMaxIcons.icon("folder"), LISTS[o.listIndex].label),
+        tab("step", () => openList((o.listIndex + 1) % LISTS.length), "›"));
+      tabs.children[1].title = t("Tutte le cartelle");
+    } else tabs.replaceChildren(...LISTS.map((l, i) => {
       const s = document.createElement("span");
       s.textContent = l.label;
       if (i === o.listIndex) s.className = "active";
@@ -375,7 +473,7 @@
       const li = document.createElement("li");
       li.className = "none";
       li.textContent = o.query.trim() ? t("Nessun canale per «{q}»", { q: o.query.trim() })
-        : o.listIndex === 1 ? t("Nessun preferito: premi Giallo su un canale per aggiungerlo.") : t("Nessun canale.");
+        : LISTS[o.listIndex].favorites ? t("Nessun preferito: premi Giallo su un canale per aggiungerlo.") : t("Nessun canale.");
       ol.replaceChildren(li);
       return;
     }
@@ -412,9 +510,37 @@
   }
 
   function closeList() {
+    if ($("picker")) $("picker").close();
     if (document.activeElement === search) search.blur();
     state.overlay = null;
     $("list").hidden = true;
+  }
+
+  // Cartelle: every list in a panel, like the films' categories (ui.css
+  // .picker): type to filter, arrows and OK to choose, Back to close.
+  function pickFolder() {
+    const o = state.overlay;
+    if (!o || $("picker")) return;
+    const make = (tag, props, ...content) => { const e = Object.assign(document.createElement(tag), props); e.append(...content); return e; };
+    const filter = make("input", { type: "search", placeholder: t("Cerca una cartella"), autocomplete: "off" });
+    const options = make("div", { className: "options" });
+    const panel = make("section", { className: "picker", id: "picker" }, make("h2", {}, t("Cartelle")), filter, options);
+    const scrim = make("div", { className: "scrim" });
+    // The list under the glass would show through it.
+    $("list").classList.add("picking");
+    panel.close = () => { panel.remove(); scrim.remove(); $("list").classList.remove("picking"); };
+    panel.filter = filter;
+    scrim.onclick = panel.close;
+    const draw = () => {
+      const f = fold(filter.value.trim());
+      options.replaceChildren(...LISTS.flatMap((l, i) => f && !fold(l.label).includes(f) ? [] : [make("button",
+        { type: "button", className: "chip" + (i === o.listIndex ? " active" : ""), title: l.label, onclick: () => { panel.close(); o.selected = 0; openList(i); } },
+        make("span", { className: "name" }, l.label), make("small", {}, l.count ? String(l.count) : ""))]));
+    };
+    filter.oninput = draw;
+    draw();
+    document.body.append(scrim, panel);
+    (options.querySelector(".active") || options.firstElementChild || filter).focus();
   }
 
   // ---- The guide over the video (decision 0053) ----
@@ -484,10 +610,13 @@
     } catch (e) { flash(e.message); return; }
     channel.favorite = !channel.favorite;
     flash(channel.favorite ? t("Aggiunto ai preferiti: {name}", { name: channel.name }) : t("Tolto dai preferiti: {name}", { name: channel.name }));
+    everyChannel = null;
+    if (state.folders) LISTS[favIndex()].count += channel.favorite ? 1 : -1;
     await refreshChannels();
     if (state.overlay) {
       const keep = state.overlay.channels[state.overlay.selected];
       state.overlay.all = await load(LISTS[state.overlay.listIndex]);
+      if (state.overlay.every) state.overlay.every = await allChannels();
       filterList();
       const i = state.overlay.channels.findIndex((c) => keep && c.id === keep.id);
       state.overlay.selected = Math.max(0, Math.min(i < 0 ? state.overlay.selected : i, state.overlay.channels.length - 1));
@@ -497,7 +626,9 @@
 
   async function toggleFavoritesOnly() {
     state.favoritesOnly = !state.favoritesOnly;
-    store.set("favoritesOnly", state.favoritesOnly);
+    // Cartelle: back to a folder that holds the channel.
+    if (state.folders && !state.favoritesOnly) state.listIndex = await folderOfCurrent();
+    saveList();
     await refreshChannels();
     flash(state.favoritesOnly ? t("P+/P− scorrono solo i preferiti") : t("P+/P− scorrono tutti i canali"));
   }
@@ -561,7 +692,7 @@
 
   const actions = {
     menu: () => { stopPlayer(); location.href = "/"; },
-    list: () => { hideControls(); openList(state.favoritesOnly ? 1 : state.listIndex); },
+    list: () => { hideControls(); openList(state.favoritesOnly ? favIndex() : state.listIndex); },
     back10: () => { state.player && state.player.seek(-10); showControls(); },
     fwd30: () => { state.player && state.player.seek(30); showControls(); },
     toggle: () => { state.player && state.player.toggle(); showControls(); },
@@ -788,12 +919,34 @@
       return;
     }
 
+    // The folders' panel: arrows by its fixed columns, Up from the first
+    // row to the field; typed text stays in the field; a digit dials.
+    const picker = $("picker");
+    if (picker) {
+      const typing = document.activeElement === picker.filter;
+      const opts = [...picker.querySelectorAll(".options button")];
+      if (key === "Back" && !(typing && e.key === "Backspace")) picker.close();
+      else if (typing && (key === "ArrowDown" || key === "OK")) { if (opts[0]) opts[0].focus(); }
+      else if (typing) return;
+      else if (key === "OK") { if (opts.includes(document.activeElement)) document.activeElement.click(); }
+      else if (key.startsWith("Arrow")) {
+        const cols = getComputedStyle(picker.querySelector(".options")).gridTemplateColumns.split(" ").length;
+        const i = opts.indexOf(document.activeElement);
+        const j = i < 0 ? 0 : i + { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols }[key];
+        if (opts[j]) { opts[j].focus(); opts[j].scrollIntoView({ block: "nearest" }); }
+        else if (key === "ArrowUp") { window.VodMax.holdKeyboard(picker.filter); picker.filter.focus(); }
+      } else if (/^[0-9]$/.test(key)) { closeList(); digit(key); }
+      e.preventDefault();
+      return;
+    }
+
     // Typing in the channel search: letters, digits and Backspace stay in
     // the field; Down or OK go to the first row (if any), Back closes the
     // list. Reached with Up the field is read-only, so the TV's keyboard
     // does not pop up: OK opens it, a typed character just goes in.
     if (document.activeElement === search) {
       if (search.readOnly && key === "OK") { search.readOnly = false; search.blur(); search.focus(); e.preventDefault(); }
+      else if (state.folders && key === "ArrowDown") { search.blur(); state.overlay.selected = -1; renderList(); e.preventDefault(); } // the folder, below
       else if (key === "ArrowDown" || key === "OK") {
         if (state.overlay.channels.length) { search.blur(); state.overlay.selected = 0; renderList(); }
         e.preventDefault();
@@ -858,13 +1011,14 @@
     const o = state.overlay;
     if (o) {
       switch (key) {
-        case "ArrowUp": if (o.selected > 0) { o.selected--; renderList(); } else { search.readOnly = true; search.focus(); } break;
+        // Cartelle: the folder sits between the search and the first channel.
+        case "ArrowUp": if (o.selected > 0 || (state.folders && o.selected === 0)) { o.selected--; renderList(); } else { search.readOnly = true; search.focus(); } break;
         case "ArrowDown": o.selected = Math.min(o.channels.length - 1, o.selected + 1); renderList(); break;
         case "ChannelUp": o.selected = Math.max(0, o.selected - 10); renderList(); break;
         case "ChannelDown": o.selected = Math.min(o.channels.length - 1, o.selected + 10); renderList(); break;
         case "ArrowLeft": openList((o.listIndex + LISTS.length - 1) % LISTS.length); break;
         case "ArrowRight": openList((o.listIndex + 1) % LISTS.length); break;
-        case "OK": pickFromList(); break;
+        case "OK": if (state.folders && o.selected < 0) pickFolder(); else pickFromList(); break;
         case "Yellow": toggleFavorite(o.channels[o.selected]); break;
         case "Blue": record(o.channels[o.selected]); break;
         case "Back": closeList(); break;
@@ -884,7 +1038,7 @@
           break;
         case "OK":
           if (state.browse !== null) { const c = state.channels[state.browse]; endBrowse(); tune(c); }
-          else openList(state.favoritesOnly ? 1 : state.listIndex);
+          else openList(state.favoritesOnly ? favIndex() : state.listIndex);
           break;
         case "Back":
           // Closes the banner first; with nothing open, back to the menu.
@@ -911,9 +1065,9 @@
 
   // ---- Start ----
   async function start() {
-    // No radio channels: no Radio list (nothing behind it).
-    const radio = await load({ section: "radio" }).catch(() => []);
-    if (!radio.length) {
+    if (window.VodMax.look.get().foldersLive) await folderLists().catch(() => {});
+    // No radio channels: no Radio list (nothing behind it; Cartelle has none).
+    if (!state.folders && !(await load({ section: "radio" }).catch(() => [])).length) {
       LISTS.splice(LISTS.findIndex((l) => l.id === "radio"), 1);
       if (state.listIndex >= LISTS.length) { state.listIndex = 0; store.set("list", 0); }
     }
@@ -927,11 +1081,13 @@
       // none left in TV): zap in the channel's own list from now on.
       const all = await load({ section: "" }).catch(() => []);
       const found = all.find((c) => c.id === last) || (state.channels.length ? null : all[0]);
-      const i = found ? LISTS.findIndex((l) => l.section === found.section) : -1;
+      // Cartelle: the remembered folder if the channel is in it, else the
+      // first one it is in, in the provider's order, else Tutti.
+      const i = !found ? -1 : state.folders ? folderFor(found, state.listIndex) : LISTS.findIndex((l) => l.section === found.section);
       if (i >= 0) {
         state.listIndex = i;
-        store.set("list", i);
-        if (state.favoritesOnly && !found.favorite) { state.favoritesOnly = false; store.set("favoritesOnly", false); }
+        if (state.favoritesOnly && !found.favorite) state.favoritesOnly = false;
+        saveList();
         await refreshChannels();
         channel = state.channels.find((c) => c.id === found.id);
       }

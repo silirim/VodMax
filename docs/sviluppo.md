@@ -68,6 +68,7 @@ anche lì il canale non è guasto.
 | `GET /api/v1/subscriptions` | Abbonamenti e raccolte con conteggi e stato della sincronizzazione: `syncing`, `sync_phase` (tradotta), `sync_count` e, quando si conosce, `sync_total` ("Salvo il catalogo (45.000 / 220.000)"), `sync_started`, `sync_seconds`; `sync_interrupted` per una lasciata a metà da un processo chiuso, anche durante la selezione che mostra i titoli nuovi (`synced_at` cambia solo dopo di essa): con la sincronizzazione automatica attiva la manutenzione la riprende dopo 30 minuti per tentativo, anche di giorno, al massimo tre volte; `last_sync`, il risultato (o `error`) dell'ultima finita da questo processo |
 | `POST /api/v1/subscriptions/{id}/sync` | Avvia la sincronizzazione in background e risponde subito (202) con l'abbonamento come in `GET`, anche se ne era già in corso una; `?wait=true` aspetta la fine e risponde con il risultato (409 se già in corso); `?allow_drop=true` accetta un calo anomalo. Mentre una gira, eliminare l'abbonamento o ripristinare un backup risponde 409 |
 | `GET /api/v1/catalog/{live\|movie\|series}` | Catalogo selezionato, una scheda per titolo: `q`, `section` (tv, sport, radio), `category` (con `category_subscription`, l'abbonamento della categoria: gli id si ripetono tra abbonamenti), `subscription`, `sort=recent`, `cursor`, `limit`, `all=true` per vedere anche l'escluso |
+| `GET /api/v1/browse/{live\|movie\|series}/categories` | Categorie con titoli visibili al profilo e quanti (`id`, `subscription`, `name`, `titles`), per nome; `order=provider`: abbonamento per abbonamento nell'ordine del provider, per le cartelle |
 | `GET` · `PUT /api/v1/subscriptions/{id}/rules` | Regole di selezione (il proprio paese `home`, altri paesi, adulti, SD, anno minimo; 0042) |
 | `POST /api/v1/subscriptions/{id}/rules/preview` | Effetto di nuove regole senza salvarle |
 | `GET /api/v1/subscriptions/{id}/selection` | Conteggi: offerti, visibili, schede, per sezione |
@@ -77,7 +78,7 @@ anche lì il canale non è guasto.
 | `GET /api/v1/items/{id}/variants` | Le versioni dello stesso titolo, migliore per prima |
 | `GET /api/v1/items/{id}/details` | Scheda di un film o una serie: trama, cast con foto (`people`), logo del titolo, sfondo, trailer, fonti |
 | `GET /api/v1/items/{id}/similar` | "Titoli simili": fino a 12 titoli dello stesso tipo del catalogo con più categorie in comune (poi voto e novità), stesse schede del catalogo; mai il titolo stesso o le sue versioni |
-| `GET /api/v1/tv/channels` | Canali in ordine da telecomando con numero, ora e a seguire: `section`, `list=favorites` |
+| `GET /api/v1/tv/channels` | Canali in ordine da telecomando con numero, ora e a seguire: `section`, `list=favorites`. `folders`: le cartelle del canale, `abbonamento:categoria` di ogni categoria in cui ha una versione visibile, come le chiavi di `browse/live/categories` (l'id della categoria può contenere `:`) |
 | `GET /api/v1/tv/channels/{id}/guide` | Guida di un canale (`hours`, massimo 72) |
 | `PUT /api/v1/tv/favorites/{id}` `{favorite}` | Aggiunge o toglie un canale dai preferiti |
 | `POST /api/v1/subscriptions/{id}/guide/sync` | Aggiorna la guida (fatto anche a ogni sincronizzazione); una guida vuota non cancella i programmi in arrivo e si riprova dopo un'ora |

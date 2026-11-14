@@ -1703,6 +1703,8 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
     for (const b of swatches.children) { b.classList.add("swatch"); b.dataset.accent = b.dataset.value; }
     // Segmented controls: ui.css chips (focus, .active, finger size) on a track.
     const size = choice("chips segmented", "fontScale", [[0.9, t("Piccolo")], [1, t("Medio")], [1.15, t("Grande")]].map(([v, text]) => [v, text, text]), "chip");
+    // Libera | Cartelle, also switched from the chips of TV, Film and Serie.
+    const view = (key) => choice("chips segmented", key, [[false, t("Libera")], [true, t("Cartelle")]].map(([v, text]) => [v, text, text]), "chip");
     // The heading stays the page title (as Abbonamenti), the rows go in one box.
     return [el("h2", {}, t("Aspetto")),
       el("p", { className: "note" }, t("Le scelte valgono per questo dispositivo, per tutti i profili.")),
@@ -1710,6 +1712,9 @@ const fromEntries = (pairs) => pairs.reduce((o, [k, v]) => { o[k] = v; return o;
       toggle("oled", t("Nero OLED"), t("Sfondo nero puro, per gli schermi OLED")),
       toggle("nofx", t("Effetti ridotti"), t("Niente sfocature né animazioni, consigliato sulle TV lente. Si attiva da solo se il sistema chiede meno movimento.")),
       row(t("Dimensione testo"), t("Per tutto VodMax su questo dispositivo"), size),
+      row(t("Vista dei canali TV"), t("Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina."), view("foldersLive")),
+      row(t("Vista dei film"), "", view("foldersMovie")),
+      row(t("Vista delle serie"), "", view("foldersSeries")),
       toggle("screensaver", t("Salvaschermo"), t("Dopo qualche minuto senza tasti, gli sfondi del catalogo con l'ora. Mai durante un video.")),
       row(t("Salvaschermo dopo"), t("Minuti senza tasti, puntatore o tocchi"),
         choice("chips segmented", "screensaverMinutes", [5, 10, 30].map((m) => [m, t("{n} minuti", { n: m }), t("{n} min", { n: m })]), "chip")))];

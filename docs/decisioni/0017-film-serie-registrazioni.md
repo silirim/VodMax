@@ -51,7 +51,9 @@ Il provider accetta le richieste a intervalli (206) e risponde in 0,5–10 s.
    Registrazioni; ricerca; scheda con Riprendi/Dall'inizio/Altre versioni;
    serie con stagioni, episodi e avanzamento; player con OK pausa, ◀ −10 s,
    ▶ +30 s, Indietro esce salvando. Navigazione con le frecce verso
-   l'elemento più vicino.
+   l'elemento più vicino. Con la vista Cartelle
+   ([0058](0058-vista-a-cartelle.md)) Film e Serie si aprono sulle
+   categorie del provider, nel suo ordine.
 
 ## Prove (29 ottobre 2026, account di prova, server di prova in rete locale)
 

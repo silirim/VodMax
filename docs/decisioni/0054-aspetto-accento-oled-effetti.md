@@ -23,6 +23,8 @@ una TV lasciata sulla Home resta ferma con le stesse immagini.
   era, senza perdere il fuoco.
 - Gli effetti "vetro" si disattivano da soli dove il motore non li regge
   (`@supports`) e quando "effetti ridotti" è attivo.
+- Nello stesso Aspetto, per dispositivo, c'è anche la vista di TV, film e
+  serie, Libera o Cartelle ([0058](0058-vista-a-cartelle.md)).
 
 ## Non ancora
 

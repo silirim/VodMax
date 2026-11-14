@@ -8,6 +8,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -672,7 +673,7 @@ func TestCategoriesOfTwoSubscriptions(t *testing.T) {
 		}
 	}
 	selectAll(st)
-	browse, err := st.BrowseCategories(ctx, "movie", false)
+	browse, err := st.BrowseCategories(ctx, "movie", false, false)
 	if err != nil || len(browse) != 2 || browse[0].Name != "Azione" || browse[0].Subscription != a || browse[1].Subscription != b {
 		t.Fatalf("browse: %+v %v", browse, err)
 	}
@@ -682,6 +683,112 @@ func TestCategoriesOfTwoSubscriptions(t *testing.T) {
 	}
 	if page, _ := st.Catalog(ctx, Query{Kind: "movie", CategoryID: "5"}); len(page.Items) != 2 {
 		t.Fatalf("without the subscription (older clients): %d", len(page.Items))
+	}
+}
+
+// Folders follow the provider's order of the categories, also after the
+// provider reorders them; without it, and for rows from before the
+// order was stored, categories go by name.
+func TestCategoriesInProviderOrder(t *testing.T) {
+	st, sub := openTest(t)
+	ctx := context.Background()
+	sync := func(names ...string) {
+		t.Helper()
+		var cats []Category
+		var items []Item
+		for _, n := range names {
+			cats = append(cats, Category{Kind: "movie", SourceID: n, Name: n})
+			items = append(items, Item{Kind: "movie", SourceID: n, Title: "Film " + n, DisplayTitle: "Film " + n, CategoryID: n, GroupKey: n})
+		}
+		// A live category first: positions count within a kind.
+		cats = append([]Category{{Kind: "live", SourceID: "9", Name: "Canali"}}, cats...)
+		if _, err := st.ReplaceCatalog(ctx, sub, []string{"live", "movie"}, cats, items, false, nil); err != nil {
+			t.Fatal(err)
+		}
+		selectAll(st)
+	}
+	order := func(provider bool) string {
+		t.Helper()
+		list, err := st.BrowseCategories(ctx, "movie", false, provider)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, c := range list {
+			out = append(out, c.Name)
+		}
+		return strings.Join(out, ",")
+	}
+	sync("Películas 2026", "Azione", "Películas HBO")
+	if got := order(true); got != "Películas 2026,Azione,Películas HBO" {
+		t.Fatalf("provider order: %s", got)
+	}
+	if got := order(false); got != "Azione,Películas 2026,Películas HBO" {
+		t.Fatalf("by name: %s", got)
+	}
+	var first int
+	st.r.QueryRowContext(ctx, `SELECT position FROM category WHERE kind = 'movie' AND source_id = 'Películas 2026'`).Scan(&first)
+	if first != 0 {
+		t.Fatalf("position within the kind: %d", first)
+	}
+	sync("Películas HBO", "Películas 2026", "Azione")
+	if got := order(true); got != "Películas HBO,Películas 2026,Azione" {
+		t.Fatalf("after the provider reordered: %s", got)
+	}
+	st.w.ExecContext(ctx, `UPDATE category SET position = 0`)
+	if got := order(true); got != "Azione,Películas 2026,Películas HBO" {
+		t.Fatalf("rows without a position: %s", got)
+	}
+}
+
+// A channel is in every folder one of its shown variants is in, and two
+// subscriptions' folders stay apart even with the same id; a channel
+// without a group key is only in its own row's folder.
+func TestChannelFolders(t *testing.T) {
+	st, a := openTest(t)
+	ctx := context.Background()
+	vpn, _ := st.AddVPN(ctx, "altra", "wireguard", func(int64) []byte { return []byte("sealed") })
+	b, err := st.AddSubscription(ctx, Subscription{Name: "C", Kind: "xtream", VPNID: vpn, Settings: json.RawMessage(`{}`)},
+		func(int64) []byte { return []byte("sealed") })
+	if err != nil {
+		t.Fatal(err)
+	}
+	live := func(sub int64, cats []Category, items []Item) {
+		t.Helper()
+		if _, err := st.ReplaceCatalog(ctx, sub, []string{"live"}, cats, items, false, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// An M3U group name is the id, ':' included.
+	live(a, []Category{{Kind: "live", SourceID: "1", Name: "Zeta"}, {Kind: "live", SourceID: "a:b", Name: "Azione"}}, []Item{
+		{Kind: "live", SourceID: "1", Title: "Rai 1 HD", DisplayTitle: "Rai 1", CategoryID: "1", GroupKey: "rai1"},
+		{Kind: "live", SourceID: "2", Title: "Senza 1", DisplayTitle: "Senza 1", CategoryID: "a:b"},
+		{Kind: "live", SourceID: "3", Title: "Senza 2", DisplayTitle: "Senza 2", CategoryID: "1"},
+	})
+	live(b, []Category{{Kind: "live", SourceID: "1", Name: "Beta"}}, []Item{
+		{Kind: "live", SourceID: "1", Title: "Rai 1 FHD", DisplayTitle: "Rai 1", CategoryID: "1", GroupKey: "rai1"},
+	})
+	selectAll(st)
+	list, err := st.TVChannels(ctx, 0, false, "", false, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AttachFolders(ctx, list, false); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, c := range list {
+		got[c.Name] = strings.Join(c.Folders, ",")
+	}
+	ka, kb := fmt.Sprint(a)+":", fmt.Sprint(b)+":"
+	want := map[string]string{"Rai 1": ka + "1," + kb + "1", "Senza 1": ka + "a:b", "Senza 2": ka + "1"}
+	if !maps.Equal(got, want) {
+		t.Fatalf("folders: %v, want %v", got, want)
+	}
+	// Subscription by subscription, each in its provider's order.
+	cats, err := st.BrowseCategories(ctx, "live", false, true)
+	if err != nil || len(cats) != 3 || cats[0].Name != "Zeta" || cats[1].Name != "Azione" || cats[2].Name != "Beta" || cats[2].Subscription != b {
+		t.Fatalf("provider order of two subscriptions: %+v %v", cats, err)
 	}
 }
 

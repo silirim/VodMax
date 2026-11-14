@@ -57,6 +57,9 @@ con l'uso di un decoder Sky:
 
    Tasti mappati per browser, LG webOS (P+ 33, P− 34, colori 403–406, Indietro
    461) e Android TV.
+
+   Con la vista Cartelle ([0058](0058-vista-a-cartelle.md)) le liste di
+   ◀ ▶ sono Preferiti, Tutti e le cartelle del provider, nel suo ordine.
 6. **Nessuna risorsa esterna nell'interfaccia** (CSP `default-src 'self'`).
    I loghi dei canali, ospitati dal provider o da terzi, sono scaricati dal
    server **tramite la VPN dell'abbonamento**:

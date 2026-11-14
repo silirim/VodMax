@@ -876,5 +876,15 @@
   "Invio del file non riuscito": "Senden der Datei fehlgeschlagen",
   "Volume": "Lautstärke",
   "Disattiva audio": "Ton aus",
-  "Riattiva audio": "Ton an"
+  "Riattiva audio": "Ton an",
+  "Vista": "Ansicht",
+  "Libera": "Frei",
+  "Cartelle": "Ordner",
+  "Tutte le cartelle": "Alle Ordner",
+  "Cerca una cartella": "Ordner suchen",
+  "OK guarda · ◀ ▶ cambia cartella · Su dal primo canale: tutte le cartelle · Giallo preferito · Blu registra · Indietro chiude": "OK ansehen · ◀ ▶ Ordner wechseln · Hoch vom ersten Sender: alle Ordner · Gelb Favorit · Blau aufnehmen · Zurück schließen",
+  "Vista dei canali TV": "Ansicht der TV-Sender",
+  "Vista dei film": "Ansicht der Filme",
+  "Vista delle serie": "Ansicht der Serien",
+  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Frei: eine einzige Liste. Ordner: die Kategorien des Anbieters, in seiner Reihenfolge. Auch auf der Seite wählbar."
 }

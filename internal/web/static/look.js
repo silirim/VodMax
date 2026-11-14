@@ -1,5 +1,7 @@
 // The device's look (decision 0054): accent colour, OLED black, reduced
-// effects, text size and the screensaver (screensaver.js reads it), kept
+// effects, text size, the screensaver (screensaver.js reads it) and the
+// view of TV, films and series (Libera, or Cartelle: the provider's
+// categories, read by vod.js and tv.js), kept
 // in localStorage as vodmax.look. Loaded
 // first in every page's <head> (the CSP allows no inline script), so the
 // classes are on <html> before ui.css paints; common.js exposes it as
@@ -16,7 +18,8 @@ window.VodMaxLook = (() => {
   // their graphics chips. A choice made in Aspetto wins.
   const ua = navigator.userAgent || "";
   const tv = /Web0S|webOS|SmartTV|SMART-TV|Tizen|NetCast/i.test(ua) || (/VodMaxAndroid/.test(ua) && !touch);
-  const DEFAULTS = { accent: "aurora", oled: false, nofx: tv, fontScale: 1, screensaver: !touch, screensaverMinutes: 5 };
+  const DEFAULTS = { accent: "aurora", oled: false, nofx: tv, fontScale: 1, screensaver: !touch, screensaverMinutes: 5,
+    foldersLive: false, foldersMovie: false, foldersSeries: false };
 
   function get() {
     try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY)) || {}); }

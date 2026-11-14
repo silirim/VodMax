@@ -555,3 +555,84 @@ func TestLiveFailover(t *testing.T) {
 		t.Fatalf("opened: %s", opened)
 	}
 }
+
+// A channel is in every folder (provider category) in which one of its
+// shown variants is: not in an excluded category, not in an adult one for
+// kids. The keys match the categories in the provider's order.
+func TestTVChannelFolders(t *testing.T) {
+	e, _ := tvSetupWith(t, newTVProvider(), `{"name":"Rai 1 FHD","stream_id":102,"category_id":"2","epg_channel_id":"Rai1.it"},
+		{"name":"Rai 1 SD","stream_id":103,"category_id":"3","epg_channel_id":"Rai1.it"}`)
+	// kid nil: the admin.
+	get := func(path string, kid *kidsLogin) (int, []byte) {
+		t.Helper()
+		if kid == nil {
+			return e.do(t, "GET", path, nil, true)
+		}
+		return e.call(t, "GET", path, nil, kid.device, kid.profile)
+	}
+	folders := func(kid *kidsLogin) map[string]string {
+		t.Helper()
+		code, body := get("/api/v1/tv/channels", kid)
+		var list []struct {
+			Name    string
+			Folders []string
+		}
+		if code != 200 || json.Unmarshal(body, &list) != nil {
+			t.Fatalf("channels: %d %s", code, body)
+		}
+		out := map[string]string{}
+		for _, c := range list {
+			out[c.Name] = strings.Join(c.Folders, ",")
+		}
+		return out
+	}
+	categories := func(query string, kid *kidsLogin) string {
+		t.Helper()
+		code, body := get("/api/v1/browse/live/categories"+query, kid)
+		var list []struct {
+			ID           string
+			Subscription int64
+			Name         string
+		}
+		if code != 200 || json.Unmarshal(body, &list) != nil {
+			t.Fatalf("categories: %d %s", code, body)
+		}
+		var out []string
+		for _, c := range list {
+			out = append(out, strconv.FormatInt(c.Subscription, 10)+":"+c.ID+" "+c.Name)
+		}
+		return strings.Join(out, ",")
+	}
+	admin := folders(nil)
+	if admin["Rai 1"] != "1:1,1:2,1:3" || admin["Cielo"] != "1:2" || admin["Canale 5"] != "1:1" {
+		t.Fatalf("folders: %v", admin)
+	}
+	if got := categories("?order=provider", nil); got != "1:1 Italia,1:2 Intrattenimento,1:3 Dazn Locale" {
+		t.Fatalf("provider order: %s", got)
+	}
+	if got := categories("", nil); got != "1:3 Dazn Locale,1:2 Intrattenimento,1:1 Italia" {
+		t.Fatalf("by name: %s", got)
+	}
+
+	// Dazn Locale for adults only: kept for the admin, not for kids.
+	e.do(t, "PUT", "/api/v1/subscriptions/1/categories/live/3", map[string]any{"adult": true}, true)
+	e.do(t, "PUT", "/api/v1/subscriptions/1/rules", map[string]any{"adult": true}, true)
+	if got := folders(nil)["Rai 1"]; got != "1:1,1:2,1:3" {
+		t.Fatalf("admin with an adult variant: %s", got)
+	}
+	kid := addKids(t, e)
+	kids := folders(&kid)
+	if kids["Rai 1"] != "1:1,1:2" || kids["DAZN Calcio 1"] != "" {
+		t.Fatalf("kids folders: %v", kids)
+	}
+	if got := categories("?order=provider", &kid); got != "1:1 Italia,1:2 Intrattenimento" {
+		t.Fatalf("kids categories: %s", got)
+	}
+
+	// An excluded category is no folder.
+	e.do(t, "PUT", "/api/v1/subscriptions/1/categories/live/2", map[string]any{"enabled": false}, true)
+	admin = folders(nil)
+	if admin["Rai 1"] != "1:1,1:3" || admin["Cielo"] != "" {
+		t.Fatalf("after excluding a category: %v", admin)
+	}
+}

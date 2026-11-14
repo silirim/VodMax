@@ -2291,7 +2291,7 @@ func (a *api) playerLog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) browseCategories(w http.ResponseWriter, r *http.Request) {
-	list, err := a.svc.BrowseCategories(r.Context(), r.PathValue("kind"))
+	list, err := a.svc.BrowseCategories(r.Context(), r.PathValue("kind"), r.URL.Query().Get("order") == "provider")
 	if err != nil {
 		a.fail(w, r, err)
 		return

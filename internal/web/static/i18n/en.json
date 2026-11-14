@@ -876,5 +876,15 @@
   "Invio del file non riuscito": "Sending the file failed",
   "Volume": "Volume",
   "Disattiva audio": "Mute",
-  "Riattiva audio": "Unmute"
+  "Riattiva audio": "Unmute",
+  "Vista": "View",
+  "Libera": "Free",
+  "Cartelle": "Folders",
+  "Tutte le cartelle": "All folders",
+  "Cerca una cartella": "Search a folder",
+  "OK guarda · ◀ ▶ cambia cartella · Su dal primo canale: tutte le cartelle · Giallo preferito · Blu registra · Indietro chiude": "OK watch · ◀ ▶ change folder · Up from the first channel: all folders · Yellow favourite · Blue record · Back close",
+  "Vista dei canali TV": "TV channels view",
+  "Vista dei film": "Movies view",
+  "Vista delle serie": "Series view",
+  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Free: one single list. Folders: the provider's categories, in its order. Can also be chosen on the page."
 }

@@ -214,6 +214,13 @@ video::cue { font-size: 1.6rem; background: rgba(0, 0, 0, 0.65); }
 .channels .what span { display: block; color: var(--soft); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .channels .what .bar { height: 4px; margin-top: 0.3rem; background: rgba(255, 255, 255, 0.14); border-radius: var(--r-pill); overflow: hidden; }
 .channels .what .bar div { height: 100%; background: var(--accent-grad); border-radius: var(--r-pill); }
+/* Cartelle: the provider's folders in fixed columns, like the category
+   picker, so the remote's arrows go straight up, down and across. */
+.folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr)); grid-auto-rows: 3.2rem; gap: 0.5rem; margin: 0.5rem 0 1rem; }
+.folders .chip { min-width: 0; height: 100%; justify-content: space-between; border-radius: var(--r-s); transform: none; }
+.folders .chip:focus { transform: none; }
+.folders .chip .name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; }
+.folders .chip small { flex: none; color: inherit; opacity: 0.7; }
 
 /* Seek bar: a taller area to click or drag, the time under the pointer. */
 .player-seek { position: relative; flex: 1; min-width: 0; padding: 0.7rem 0; cursor: pointer; touch-action: none; }

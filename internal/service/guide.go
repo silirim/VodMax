@@ -30,7 +30,7 @@ func (s *Service) Guide(ctx context.Context, from time.Time, hours int, section 
 		hours = 4
 	}
 	to := from.Add(time.Duration(hours) * time.Hour)
-	channels, err := s.TVChannels(ctx, section, favorites)
+	channels, err := s.tvChannels(ctx, section, favorites) // no folders: the guide does not use them
 	if err != nil {
 		return nil, err
 	}

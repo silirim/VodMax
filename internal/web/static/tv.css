@@ -104,6 +104,14 @@ video {
 .list .tabs { flex: none; display: flex; gap: var(--s1); padding: var(--s1); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--glass-line); border-radius: var(--r-pill); }
 .list .tabs span { flex: 1 1 0; padding: 0.4em 0.9em; color: var(--soft); font-weight: 600; text-align: center; white-space: nowrap; border-radius: var(--r-pill); }
 .list .tabs span.active { color: var(--text); background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 1px 0 var(--glass-hi); }
+/* Cartelle: ‹ the folder › ; the folder (selected with Up, or tapped)
+   opens the panel with all of them. */
+.list .tabs .step { flex: none; }
+.list .tabs .folder { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.list .tabs .folder .icon { margin-right: 0.4em; }
+.list .tabs .folder.selected { color: var(--ink); background: var(--focus); box-shadow: var(--glow); }
+/* Under the panel the list would show through the glass. */
+.list.picking { visibility: hidden; }
 
 /* Room around the rows for the focus ring of the selected one. */
 .list ol { flex: 1 1 auto; min-height: 0; margin: 0 calc(-1 * var(--s2)); padding: var(--s2); overflow: hidden; list-style: none; }
@@ -127,8 +135,8 @@ video {
 .list li.selected { color: var(--ink); background: var(--focus); box-shadow: var(--glow); }
 .list li.selected .n, .list li.selected .p, .list li.selected .star { color: var(--ink); }
 .list li.selected .p { opacity: 0.72; }
-/* One line: a second would take a row of channels. */
-.list .hint { flex: none; margin: 0 var(--s2); overflow: hidden; font-size: var(--t-xs); text-align: center; white-space: nowrap; text-overflow: ellipsis; }
+/* Two lines in the longer languages, not cut; the rows fit what is left. */
+.list .hint { flex: none; margin: 0 var(--s2); font-size: var(--t-xs); text-align: center; }
 .list li.none { display: block; padding: var(--s3); color: var(--soft); }
 
 /* The channel number being typed, top centre; under the controls bar

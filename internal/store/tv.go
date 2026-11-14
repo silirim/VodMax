@@ -118,6 +118,7 @@ type TVChannel struct {
 	CatchupDays  int        `json:"catchup_days,omitempty"`
 	Now          *Programme `json:"now,omitempty"`
 	Next         *Programme `json:"next,omitempty"`
+	Folders      []string   `json:"folders,omitempty"` // "subscription:category" of each category with a shown variant
 
 	GroupKey string `json:"-"`
 	GuideID  string `json:"-"`
@@ -188,6 +189,49 @@ func (s *Store) TVChannels(ctx context.Context, profileID int64, noAdult bool, s
 		sortByPosition(out, positions)
 	}
 	return out, s.attachNowNext(ctx, out, now)
+}
+
+// AttachFolders fills the folders of the channels: every category, in the
+// provider's order, in which a shown variant of the channel is. Keys match
+// BrowseCategories as subscription + ":" + id; ids may contain ':'.
+func (s *Store) AttachFolders(ctx context.Context, list []TVChannel, noAdult bool) error {
+	if len(list) == 0 {
+		return nil
+	}
+	rows, err := s.r.QueryContext(ctx, `SELECT v.id, v.group_key, v.subscription_id || ':' || c.source_id
+		FROM item v JOIN category c ON c.subscription_id = v.subscription_id AND c.kind = v.kind AND c.source_id = v.category_id
+		WHERE v.kind = 'live' AND v.available = 1 AND v.visible = 1 AND (? = 0 OR v.adult = 0)
+		ORDER BY v.subscription_id, c.position, c.name COLLATE NOCASE`, noAdult)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	byGroup := map[string][]string{}
+	byID := map[int64]string{} // a channel without a group key is only its own row
+	for rows.Next() {
+		var id int64
+		var group, folder string
+		if err := rows.Scan(&id, &group, &folder); err != nil {
+			return err
+		}
+		if group == "" {
+			byID[id] = folder
+		} else if !slices.Contains(byGroup[group], folder) {
+			byGroup[group] = append(byGroup[group], folder)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for i := range list {
+		c := &list[i]
+		if c.GroupKey != "" {
+			c.Folders = byGroup[c.GroupKey]
+		} else if f, ok := byID[c.ID]; ok {
+			c.Folders = []string{f}
+		}
+	}
+	return nil
 }
 
 func sortByPosition(list []TVChannel, pos map[int64]int) {

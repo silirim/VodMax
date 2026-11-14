@@ -1070,12 +1070,13 @@ func (s *Service) catalogImages(ctx context.Context, items []store.CatalogItem) 
 	}
 }
 
-// BrowseCategories lists the categories with titles the viewer can see.
-func (s *Service) BrowseCategories(ctx context.Context, kind string) ([]store.BrowseCategory, error) {
+// BrowseCategories lists the categories with titles the viewer can see,
+// by name or in the provider's order.
+func (s *Service) BrowseCategories(ctx context.Context, kind string, providerOrder bool) ([]store.BrowseCategory, error) {
 	if kind != "movie" && kind != "series" && kind != "live" {
 		return nil, invalid("tipo non valido")
 	}
-	return s.st.BrowseCategories(ctx, kind, viewerOf(ctx).Kids)
+	return s.st.BrowseCategories(ctx, kind, viewerOf(ctx).Kids, providerOrder)
 }
 
 // m3uRefused starts the error of fetch for a playlist link whose panel

@@ -256,14 +256,16 @@ func (s *Store) ReplaceCatalog(ctx context.Context, subID int64, kinds []string,
 	if err := carryGroupKeys(ctx, tx); err != nil {
 		return res, err
 	}
+	position := map[string]int{} // the sources list categories in the provider's order
 	for _, c := range categories {
 		if !covered[c.Kind] {
 			continue
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO category (subscription_id, kind, source_id, name, country, adult, low_res, section)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, subID, c.Kind, c.SourceID, c.Name, c.Country, c.Adult, c.LowRes, c.Section); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT OR REPLACE INTO category (subscription_id, kind, source_id, name, country, adult, low_res, section, position)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, subID, c.Kind, c.SourceID, c.Name, c.Country, c.Adult, c.LowRes, c.Section, position[c.Kind]); err != nil {
 			return res, err
 		}
+		position[c.Kind]++
 	}
 	if written > 0 || res.Removed > 0 {
 		if progress != nil {
@@ -698,13 +700,18 @@ type BrowseCategory struct {
 }
 
 // BrowseCategories lists the categories that have visible titles (a title
-// counts once, in every category one of its versions is in).
-func (s *Store) BrowseCategories(ctx context.Context, kind string, noAdult bool) ([]BrowseCategory, error) {
+// counts once, in every category one of its versions is in): by name, or
+// with providerOrder subscription by subscription in the provider's order.
+func (s *Store) BrowseCategories(ctx context.Context, kind string, noAdult, providerOrder bool) ([]BrowseCategory, error) {
+	order := `c.name COLLATE NOCASE, c.subscription_id`
+	if providerOrder {
+		order = `c.subscription_id, c.position, c.name COLLATE NOCASE`
+	}
 	rows, err := s.r.QueryContext(ctx, `
 		SELECT c.source_id, c.subscription_id, c.name, count(DISTINCT CASE WHEN v.group_key <> '' THEN v.group_key ELSE CAST(v.id AS TEXT) END)
 		FROM item v JOIN category c ON c.subscription_id = v.subscription_id AND c.kind = v.kind AND c.source_id = v.category_id
 		WHERE v.kind = ? AND v.available = 1 AND v.visible = 1 AND (? = 0 OR v.adult = 0)
-		GROUP BY c.subscription_id, c.source_id ORDER BY c.name COLLATE NOCASE, c.subscription_id`, kind, noAdult)
+		GROUP BY c.subscription_id, c.source_id ORDER BY `+order, kind, noAdult)
 	if err != nil {
 		return nil, err
 	}

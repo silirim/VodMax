@@ -876,5 +876,15 @@
   "Invio del file non riuscito": "Nie udało się wysłać pliku",
   "Volume": "Głośność",
   "Disattiva audio": "Wycisz",
-  "Riattiva audio": "Wyłącz wyciszenie"
+  "Riattiva audio": "Wyłącz wyciszenie",
+  "Vista": "Widok",
+  "Libera": "Swobodny",
+  "Cartelle": "Foldery",
+  "Tutte le cartelle": "Wszystkie foldery",
+  "Cerca una cartella": "Szukaj folderu",
+  "OK guarda · ◀ ▶ cambia cartella · Su dal primo canale: tutte le cartelle · Giallo preferito · Blu registra · Indietro chiude": "OK oglądaj · ◀ ▶ zmień folder · W górę od pierwszego kanału: wszystkie foldery · Żółty ulubiony · Niebieski nagraj · Wstecz zamknij",
+  "Vista dei canali TV": "Widok kanałów TV",
+  "Vista dei film": "Widok filmów",
+  "Vista delle serie": "Widok seriali",
+  "Libera: un unico elenco. Cartelle: le categorie del provider, nel suo ordine. Si sceglie anche nella pagina.": "Swobodny: jedna lista. Foldery: kategorie dostawcy, w jego kolejności. Można też wybrać na stronie."
 }

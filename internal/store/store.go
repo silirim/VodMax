@@ -411,6 +411,9 @@ var migrations = []string{
 		subscription_id INTEGER PRIMARY KEY REFERENCES subscription(id) ON DELETE CASCADE,
 		data            BLOB NOT NULL  -- sealed gzip of the file
 	)`,
+	// 22: the provider's order of the categories, for browsing by folder.
+	// Rows written before it stay at 0 (name order) until the next sync.
+	`ALTER TABLE category ADD COLUMN position INTEGER NOT NULL DEFAULT 0`,
 }
 
 // noForeignKeys lists migrations (1-based) that rebuild a parent table:

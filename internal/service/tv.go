@@ -133,7 +133,17 @@ func (s *Service) xtreamClient(ctx context.Context, subID int64, timeout time.Du
 	return xtream.New(set.Server, set.Username, sec.Password, provider.NewHTTPClient(tun, timeout))
 }
 
+// TVChannels is the channel list of the viewer, with the folders each
+// channel is in.
 func (s *Service) TVChannels(ctx context.Context, section string, favorites bool) ([]store.TVChannel, error) {
+	list, err := s.tvChannels(ctx, section, favorites)
+	if err != nil {
+		return list, err
+	}
+	return list, s.st.AttachFolders(ctx, list, viewerOf(ctx).Kids)
+}
+
+func (s *Service) tvChannels(ctx context.Context, section string, favorites bool) ([]store.TVChannel, error) {
 	switch section {
 	case "", "tv", "sport", "radio":
 	default:

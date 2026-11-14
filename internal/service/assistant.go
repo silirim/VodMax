@@ -941,7 +941,7 @@ func (s *Service) genreTitles(ctx context.Context, genres []string, wish string)
 	var out []store.CatalogItem
 	seen := map[int64]bool{}
 	for _, kind := range kinds {
-		cats, err := s.BrowseCategories(ctx, kind)
+		cats, err := s.BrowseCategories(ctx, kind, false)
 		if err != nil {
 			continue
 		}
