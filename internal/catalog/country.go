@@ -22,8 +22,11 @@ import (
 // (SD, HD, TV) are left out on purpose.
 var countryAliases = map[string]string{}
 
+// countryCodes holds every code of the table.
+var countryCodes = map[string]bool{}
+
 func init() {
-	for code, names := range map[string]string{
+	table := map[string]string{
 		"IT":      "it ita italy italia italian italiano italiani",
 		"GB":      "uk gb gbr england united kingdom british britain inghilterra regno unito",
 		"US":      "us usa united states america american stati uniti",
@@ -92,8 +95,15 @@ func init() {
 		"ASIA":    "asia asian",
 		"BENELUX": "benelux",
 		"INT":     "int international internazionale",
-	} {
+	}
+	// Codes first, spelled-out aliases after: an alias claimed on purpose
+	// ("ar" for Arabic) wins over a code that happens to read the same,
+	// whatever order the map is walked in.
+	for code := range table {
+		countryCodes[code] = true
 		countryAliases[strings.ToLower(code)] = code
+	}
+	for code, names := range table {
 		for _, n := range splitAliases(names) {
 			countryAliases[n] = code
 		}
@@ -120,7 +130,7 @@ func IsHomeCountry(code string) bool {
 	if len(code) != 2 || code == "EN" || code == "KU" {
 		return false
 	}
-	return countryAliases[strings.ToLower(code)] == code
+	return countryCodes[code]
 }
 
 // splitAliases splits an alias list on spaces, keeping the two-word names
