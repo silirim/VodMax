@@ -109,8 +109,10 @@ func (c *Config) set(section, key, value string) error {
 	switch section + "." + key {
 	case "interface.privatekey":
 		c.PrivateKey, err = ParseKey(value)
-	case "interface.address":
-		c.Addresses, err = parsePrefixes(value, true)
+	case "interface.address": // may be repeated: each line adds
+		var p []netip.Prefix
+		p, err = parsePrefixes(value, true)
+		c.Addresses = append(c.Addresses, p...)
 	case "interface.dns":
 		for _, part := range splitList(value) {
 			addr, perr := netip.ParseAddr(part)
@@ -133,7 +135,9 @@ func (c *Config) set(section, key, value string) error {
 		k, err = ParseKey(value)
 		c.PresharedKey = &k
 	case "peer.allowedips":
-		c.AllowedIPs, err = parsePrefixes(value, false)
+		var p []netip.Prefix
+		p, err = parsePrefixes(value, false)
+		c.AllowedIPs = append(c.AllowedIPs, p...)
 	case "peer.endpoint":
 		c.Endpoint = value
 	case "peer.persistentkeepalive":
