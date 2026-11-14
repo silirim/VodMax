@@ -5,7 +5,7 @@
 # repository, which gets fixes only until the next stable branch, so move
 # to each new branch (May and December) and re-test conversion with the
 # graphics card. Pinned by digest: Dependabot proposes the updates.
-FROM alpine:3.24@sha256:3f4d6b32e26703c6082839234f43769d5046b3ac7c910033911d1e71d8cd630a
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 
 # ffmpeg: pause of live TV, recordings, MKV/AVI in the browser.
 # su-exec: see packaging/docker-entrypoint.sh (PUID/PGID).
