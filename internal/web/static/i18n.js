@@ -26,6 +26,8 @@
   // Saved choice, else the device's language, else English.
   const lang = LANGS[saved] ? saved : LANGS[device] ? device : "en";
   document.documentElement.lang = lang;
+  // Right-to-left layout for Arabic (the only RTL language so far).
+  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
 
   function t(text, vars) {
     let s = (dicts[lang] && dicts[lang][text]) || text;
