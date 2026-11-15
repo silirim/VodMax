@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_title">VodMax</string>
+    <string name="setup_text">عنوان خادم VodMax المنزلي (مثال: http://192.168.1.10:8095).</string>
+    <string name="setup_hint">http://address:8095</string>
+    <string name="setup_connect">اتصال</string>
+    <string name="setup_checking">جارٍ التحقق من الخادم…</string>
+    <string name="setup_unreachable">الخادم لا يستجيب على هذا العنوان: تأكد من تشغيله وأنه على نفس الشبكة.</string>
+    <string name="error_title">الخادم غير متاح</string>
+    <string name="reconnecting">جارٍ إعادة الاتصال بالخادم…</string>
+    <string name="error_retry">إعادة المحاولة</string>
+    <string name="error_change">تغيير العنوان</string>
+    <string name="local_text">لا يوجد خادم في المنزل؟ يمكن لـ VodMax العمل على هذا الجهاز وحده: أضف اشتراكًا وVPN من الإعدادات. بدون تسجيل أو إيقاف البث المباشر.</string>
+    <string name="local_button">استخدام هذا الجهاز وحده</string>
+    <string name="local_starting">جارٍ تشغيل VodMax…</string>
+    <string name="local_failed">تعذّر تشغيل VodMax على هذا الجهاز</string>
+    <string name="local_exited">توقف الخادم المدمج (الرمز %1$d)</string>
+    <string name="local_no_answer">الخادم المدمج لا يستجيب</string>
+    <string name="update_no_permission_screen">هذا الجهاز ليس فيه شاشة للسماح بتثبيت التطبيقات: ثبّت ملف APK يدويًا</string>
+    <string name="update_allow_installs">اسمح لـ VodMax بتثبيت التطبيقات ثم عُد: سيتواصل التحديث</string>
+    <string name="update_no_installer">هذا الجهاز ليس فيه مثبّت تطبيقات: ثبّت ملف APK يدويًا</string>
+    <string name="local_port_busy">المنفذ 8095 مشغول بتطبيق آخر: أغلقه أو أعد تشغيل الجهاز</string>
+    <string name="save_unavailable">هذا الجهاز لا يسمح باختيار مكان حفظ الملف</string>
+    <string name="save_cancelled">تم إلغاء الحفظ</string>
+    <string name="save_failed">لم يُحفظ الملف</string>
+    <string name="update_refused">رُفض التحديث: ليس من إصدارات VodMax</string>
+    <string name="update_not_vodmax">رُفض التحديث: الملف ليس تطبيق VodMax</string>
+    <string name="update_bad_checksum">الملف المنزّل لا يطابق الإصدار (مجموع تحقق مختلف)</string>
+    <string name="pip_play">تشغيل</string>
+    <string name="pip_pause">إيقاف مؤقت</string>
+    <string name="skip_intro">تخطي المقدمة</string>
+    <string name="next_episode">الحلقة التالية</string>
+    <string name="next_in">بعد %1$d ث</string>
+    <string name="watch_now">شاهد الآن</string>
+    <string name="cancel">إلغاء</string>
+    <string name="copy_channel">نسخ على هذا الجهاز</string>
+    <string name="copy_wifi">في انتظار Wi-Fi</string>
+    <string name="copy_network">في انتظار الشبكة</string>
+    <string name="copy_folder">المجلد غير متاح: أعد توصيل مفتاح USB أو اختر المجلد مجددًا</string>
+    <string name="copy_app_folder">على هذا الجهاز، تُحذف الملفات المنسوخة إذا ألغيت تثبيت VodMax</string>
+</resources>
